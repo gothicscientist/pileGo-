@@ -101,6 +101,25 @@ do $$ begin
   assert (select status from public.listings where marketplace = 'depop') = 'needs_action', 'double sale flagged';
 end $$;
 
+-- Ana sells a second item in person; its live Vinted listing gets a delist job.
+insert into public.items (id, sku, title, price, currency, condition)
+values ('33333333-3333-3333-3333-333333333333', 'TOP-CCCCC', 'Striped tee', 25, 'USD', 'good');
+select * from public.queue_publish('33333333-3333-3333-3333-333333333333', array['vinted', 'etsy']);
+update public.listings set status = 'listed', external_id = 'v3'
+  where item_id = '33333333-3333-3333-3333-333333333333' and marketplace = 'vinted';
+update public.listings set status = 'listed'
+  where item_id = '33333333-3333-3333-3333-333333333333' and marketplace = 'etsy';
+select public.record_offline_sale('33333333-3333-3333-3333-333333333333', 20);
+do $$ begin
+  assert (select status from public.items where id = '33333333-3333-3333-3333-333333333333') = 'sold', 'offline sale marks sold';
+  assert (select sold_price from public.items where id = '33333333-3333-3333-3333-333333333333') = 20, 'offline sale price';
+  assert (select status from public.listings where external_id = 'v3') = 'delisting', 'vinted listing is taken down';
+  assert (select count(*) from public.jobs j join public.listings l on l.id = j.listing_id
+          where l.external_id = 'v3' and j.kind = 'delist') = 1, 'delist job queued';
+  assert (select status from public.listings where item_id = '33333333-3333-3333-3333-333333333333' and marketplace = 'etsy')
+         = 'needs_action', 'manual listing flagged';
+end $$;
+
 -- Selling again is refused.
 do $$ begin
   begin

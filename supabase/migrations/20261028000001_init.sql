@@ -472,6 +472,36 @@ begin
   return v_job;
 end $$;
 
+-- After a sale, stop everything else: queued listings go back to draft,
+-- listings pileGo can end get a delist job, the rest are flagged for the seller.
+create or replace function public.take_down_others(v_item public.items, p_except uuid, p_sold_on text)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_other public.listings;
+begin
+  update public.jobs set status = 'cancelled', error = 'Item sold'
+    where item_id = v_item.id and kind in ('publish', 'relist', 'update_price') and status in ('pending', 'needs_user');
+
+  for v_other in
+    select * from public.listings
+    where item_id = v_item.id and id is distinct from p_except
+      and status in ('listed', 'publishing', 'needs_action', 'queued')
+  loop
+    if v_other.status = 'queued' then
+      update public.listings set status = 'draft' where id = v_other.id;
+    elsif public.is_manual_marketplace(v_other.marketplace) or v_other.marketplace = 'facebook' then
+      update public.listings set status = 'needs_action', error = 'Sold elsewhere. Remove this listing by hand.'
+        where id = v_other.id;
+    else
+      update public.listings set status = 'delisting' where id = v_other.id;
+      insert into public.jobs (user_id, kind, runner, marketplace, item_id, listing_id, payload)
+      values (v_item.user_id, 'delist', public.runner_for(v_other.marketplace), v_other.marketplace,
+              v_item.id, v_other.id, jsonb_build_object('reason', 'sold_elsewhere', 'sold_on', coalesce(p_sold_on, 'elsewhere')));
+    end if;
+  end loop;
+end $$;
+
 -- ---------------------------------------------------------------------------
 -- RPC: record a sale. Marks the item and listing sold and queues delists on
 -- every other marketplace the item is live on. Called by the extension (as the
@@ -488,7 +518,6 @@ language plpgsql security definer set search_path = public as $$
 declare
   v_listing public.listings;
   v_item public.items;
-  v_other public.listings;
 begin
   select * into v_listing from public.listings where id = p_listing_id for update;
   if v_listing.id is null then
@@ -521,28 +550,35 @@ begin
   values (v_item.user_id, v_item.id, v_listing.id, v_listing.marketplace, 'sold',
           jsonb_build_object('price', v_item.sold_price) || coalesce(p_data, '{}'::jsonb));
 
-  -- Stop anything still trying to publish this item.
-  update public.jobs set status = 'cancelled', error = 'Item sold'
-    where item_id = v_item.id and kind in ('publish', 'relist', 'update_price') and status in ('pending', 'needs_user');
+  perform public.take_down_others(v_item, v_listing.id, v_listing.marketplace);
 
-  for v_other in
-    select * from public.listings
-    where item_id = v_item.id and id <> v_listing.id
-      and status in ('listed', 'publishing', 'needs_action', 'queued')
-  loop
-    if v_other.status = 'queued' then
-      update public.listings set status = 'draft' where id = v_other.id;
-    elsif public.is_manual_marketplace(v_other.marketplace) or v_other.marketplace = 'facebook' then
-      update public.listings set status = 'needs_action', error = 'Sold elsewhere. Remove this listing by hand.'
-        where id = v_other.id;
-    else
-      update public.listings set status = 'delisting' where id = v_other.id;
-      insert into public.jobs (user_id, kind, runner, marketplace, item_id, listing_id, payload)
-      values (v_item.user_id, 'delist', public.runner_for(v_other.marketplace), v_other.marketplace,
-              v_item.id, v_other.id, jsonb_build_object('reason', 'sold_elsewhere', 'sold_on', v_listing.marketplace));
-    end if;
-  end loop;
+  return v_item;
+end $$;
 
+-- ---------------------------------------------------------------------------
+-- RPC: the item sold somewhere pileGo does not list (in person, a fair, a DM).
+-- ---------------------------------------------------------------------------
+
+create or replace function public.record_offline_sale(p_item_id uuid, p_price numeric default null, p_sold_at timestamptz default now())
+returns public.items
+language plpgsql security definer set search_path = public as $$
+declare
+  v_item public.items;
+begin
+  select * into v_item from public.items where id = p_item_id for update;
+  if v_item.id is null or v_item.user_id is distinct from auth.uid() then
+    raise exception 'Item not found' using errcode = 'P0002';
+  end if;
+  if v_item.status in ('sold', 'shipped') then
+    return v_item;
+  end if;
+  update public.items set status = 'sold', sold_at = p_sold_at, sold_price = coalesce(p_price, v_item.price),
+    sold_marketplace = null
+    where id = p_item_id
+    returning * into v_item;
+  insert into public.events (user_id, item_id, type, data)
+  values (v_item.user_id, v_item.id, 'sold', jsonb_build_object('price', v_item.sold_price, 'offline', true));
+  perform public.take_down_others(v_item, null, null);
   return v_item;
 end $$;
 
@@ -607,11 +643,14 @@ begin
 end $$;
 
 revoke all on function public.record_sale(uuid, numeric, timestamptz, jsonb) from public, anon;
+revoke all on function public.record_offline_sale(uuid, numeric, timestamptz) from public, anon;
+revoke all on function public.take_down_others(public.items, uuid, text) from public, anon, authenticated;
 revoke all on function public.queue_publish(uuid, text[], jsonb) from public, anon;
 revoke all on function public.queue_listing_job(uuid, text, jsonb) from public, anon;
 revoke all on function public.claim_jobs(text, text[], int) from public, anon;
 revoke all on function public.finish_job(uuid, text, jsonb, text, int) from public, anon;
 grant execute on function public.record_sale(uuid, numeric, timestamptz, jsonb) to authenticated, service_role;
+grant execute on function public.record_offline_sale(uuid, numeric, timestamptz) to authenticated;
 grant execute on function public.queue_publish(uuid, text[], jsonb) to authenticated, service_role;
 grant execute on function public.queue_listing_job(uuid, text, jsonb) to authenticated, service_role;
 grant execute on function public.claim_jobs(text, text[], int) to authenticated, service_role;

@@ -282,7 +282,7 @@ export interface PublishInput {
   site: EbaySite;
   setup: EbaySetup;
   profile: Pick<Profile, 'voice' | 'region' | 'fee_overrides'> & { price_strategy?: 'same' | 'match_take_home' };
-  overrides: { title?: string; price?: number; aspects?: Record<string, string[]>; category_id?: string };
+  overrides: { title?: string; price?: number; description?: string; aspects?: Record<string, string[]>; category_id?: string };
   offerId?: string | null;
 }
 
@@ -309,6 +309,7 @@ export async function publishToEbay(token: string, input: PublishInput): Promise
   });
   const title = (input.overrides.title ?? generated.title).slice(0, 80);
   const price = input.overrides.price ?? generated.price ?? item.price!;
+  const description = (input.overrides.description?.trim() || generated.description).slice(0, 4000);
 
   const category = input.overrides.category_id
     ? { id: input.overrides.category_id, name: '', tree: await categoryTreeId(site) }
@@ -331,7 +332,7 @@ export async function publishToEbay(token: string, input: PublishInput): Promise
       conditionDescription: item.condition && item.condition !== 'new_with_tags' ? (item.flaws ?? undefined)?.slice(0, 1000) : undefined,
       product: {
         title,
-        description: generated.description.slice(0, 4000),
+        description,
         aspects: values,
         imageUrls: input.imageUrls.slice(0, 24),
       },
@@ -344,7 +345,7 @@ export async function publishToEbay(token: string, input: PublishInput): Promise
     format: 'FIXED_PRICE',
     availableQuantity: 1,
     categoryId: category.id,
-    listingDescription: descriptionHtml(generated.description),
+    listingDescription: descriptionHtml(description),
     listingPolicies: {
       fulfillmentPolicyId: setup.fulfillment_policy_id,
       paymentPolicyId: setup.payment_policy_id,

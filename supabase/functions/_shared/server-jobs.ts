@@ -93,6 +93,7 @@ export async function runServerJob(admin: SupabaseClient, job: Job): Promise<Job
           overrides: {
             title: listing.title ?? (payload.title as string | undefined),
             price: listing.price ?? undefined,
+            description: payload.description as string | undefined,
             aspects: payload.aspects as Record<string, string[]> | undefined,
             category_id: payload.category_id as string | undefined,
           },
