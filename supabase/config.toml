@@ -1,0 +1,45 @@
+# Supabase CLI settings for local development (`supabase start`).
+project_id = "pilego"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+
+[db]
+port = 54322
+major_version = 15
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173/**"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[storage]
+enabled = true
+file_size_limit = "15MiB"
+
+# Every function checks the caller itself: eBay's OAuth redirect and the cron
+# jobs do not carry a user JWT.
+[functions.scan-item]
+verify_jwt = false
+
+[functions.jobs]
+verify_jwt = false
+
+[functions.ebay-connect]
+verify_jwt = false
+
+[functions.ebay-sync]
+verify_jwt = false
+
+[functions.price-comps]
+verify_jwt = false
