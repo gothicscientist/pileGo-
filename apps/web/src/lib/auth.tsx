@@ -1,6 +1,6 @@
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { shareSessionWithExtension } from './extension';
+import { setExtensionUser } from './extension';
 import { supabase } from './supabase';
 
 interface AuthState {
@@ -17,11 +17,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let alive = true;
     supabase.auth.getSession().then(({ data }) => {
       if (alive) setState({ session: data.session, loading: false });
-      shareSessionWithExtension(data.session);
+      setExtensionUser(data.session?.user.id ?? null);
     });
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       setState({ session, loading: false });
-      shareSessionWithExtension(session);
+      setExtensionUser(session?.user.id ?? null);
     });
     return () => {
       alive = false;

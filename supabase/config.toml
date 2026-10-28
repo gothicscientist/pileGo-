@@ -43,3 +43,6 @@ verify_jwt = false
 
 [functions.price-comps]
 verify_jwt = false
+
+[functions.extension-link]
+verify_jwt = false
