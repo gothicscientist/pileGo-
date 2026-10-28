@@ -1,0 +1,68 @@
+:root {
+  --floor: #2b3fe8;
+  --paper: #f6f6f1;
+  --ink: #16172b;
+  --muted: #5b5c70;
+  --tag: #ff4f9a;
+  --sticker: #ffe14d;
+  --line: #d6d6cc;
+  --danger: #c81e4a;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  width: 320px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--floor);
+  color: var(--paper);
+}
+.tag {
+  display: inline-block;
+  padding: 3px 10px 3px 16px;
+  background: var(--tag);
+  color: var(--ink);
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  clip-path: polygon(10px 0, 100% 0, 100% 100%, 10px 100%, 0 50%);
+  border-radius: 0 6px 6px 0;
+  transform: rotate(-5deg);
+}
+.hand { font-style: italic; opacity: 0.85; }
+main { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+h1 { margin: 0; font-size: 18px; line-height: 1.2; }
+p { margin: 0; }
+.muted { color: var(--muted); }
+.err { color: var(--danger); font-weight: 600; }
+.note { background: var(--sticker); padding: 8px 10px; border-radius: 8px; font-weight: 600; transform: rotate(-0.6deg); }
+ul.tabs { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+ul.tabs li { padding: 2px 8px; border-radius: 999px; background: #fff; border: 1.5px solid var(--line); font-size: 12px; }
+ul.tabs li.on { border-color: var(--ink); font-weight: 600; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+button, a.btn {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+button.go { background: var(--tag); }
+button.quiet { border-color: transparent; background: transparent; text-decoration: underline; font-weight: 600; }
+button:disabled { opacity: 0.55; cursor: progress; }
+button:focus-visible, a.btn:focus-visible { outline: 3px solid var(--sticker); outline-offset: 2px; }
+code { font-size: 12px; word-break: break-all; }

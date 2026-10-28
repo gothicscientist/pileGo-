@@ -3,7 +3,7 @@
   "compilerOptions": {
     "noEmit": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["chrome"]
+    "types": ["chrome", "node"]
   },
-  "include": ["src", "build.mjs"]
+  "include": ["src", "test", "e2e", "build.mjs", "playwright.config.ts", "vitest.config.ts"]
 }

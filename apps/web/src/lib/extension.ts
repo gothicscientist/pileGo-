@@ -26,6 +26,8 @@ export interface ExtensionStatus {
   /** The extension is waiting for the seller to approve this app in its popup. */
   needs_approval?: boolean;
   last_error?: string | null;
+  /** The outcome of the last thing it was asked to do, such as an import. */
+  last_message?: string | null;
 }
 
 const EMPTY: ExtensionStatus = { installed: false, version: null, tabs: {}, running: 0, linked: false, user_id: null };

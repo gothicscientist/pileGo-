@@ -368,14 +368,20 @@ function Extension() {
       title="Browser extension"
       intro="Vinted, Depop, Poshmark, Mercari, Grailed and Facebook have no public API for sellers. The pileGo extension works in your own logged-in tabs: one click on Vinted, a filled-in form on the others."
     >
-      {ext.installed ? (
+      {ext.installed && ext.needs_approval ? (
+        <p className="flex items-start gap-2 rounded-lg bg-sticker p-3 text-sm font-semibold text-ink">
+          <PlugZap className="mt-0.5 size-5 shrink-0" aria-hidden />
+          The extension wants your OK before it links to this copy of pileGo. Click the pileGo icon in your browser’s toolbar and choose Allow.
+        </p>
+      ) : ext.installed ? (
         <div className="flex flex-col gap-4">
           <p className="flex items-center gap-2 text-sm font-semibold">
-            <span className="size-2.5 rounded-full bg-[#1fa36b]" aria-hidden />
-            Connected{ext.version ? `, version ${ext.version}` : ''}
+            <span className={cx('size-2.5 rounded-full', ext.linked ? 'bg-[#1fa36b]' : 'bg-sticker')} aria-hidden />
+            {ext.linked ? 'Connected' : 'Installed, linking…'}
+            {ext.version ? `, version ${ext.version}` : ''}
             {ext.running ? `, running ${ext.running} ${ext.running === 1 ? 'job' : 'jobs'}` : ''}
           </p>
-          <ul className="flex flex-wrap gap-2">
+          <ul className="flex flex-wrap gap-2" aria-label="Marketplace tabs open in this browser">
             {EXTENSION_MARKETS.map(m => (
               <li key={m} className="flex items-center gap-1.5 rounded-lg bg-paper-2 px-2 py-1 text-xs">
                 <Sticker id={m} size="sm" tilt={false} muted={!ext.tabs[m]} />
@@ -383,10 +389,16 @@ function Extension() {
               </li>
             ))}
           </ul>
+          {ext.last_message && <p className="text-sm text-ink-2">{ext.last_message}</p>}
+          <ErrorNote error={ext.last_error} />
+          <p className="text-sm text-muted">
+            Vinted jobs run by themselves while a Vinted tab is open. For the other marketplaces the extension opens the sell form, fills it, and you press post.
+          </p>
           <div className="flex flex-wrap gap-2">
             <Button
               variant="line"
               icon={<Download className="size-4" aria-hidden />}
+              disabled={!ext.linked}
               onClick={() => {
                 askExtensionToImport('vinted');
                 toast('Importing your Vinted wardrobe in the extension');
@@ -397,6 +409,7 @@ function Extension() {
             <Button
               variant="line"
               icon={<RefreshCw className="size-4" aria-hidden />}
+              disabled={!ext.linked}
               onClick={() => {
                 askExtensionToSync();
                 toast('Checking your marketplaces for sales');
@@ -414,12 +427,13 @@ function Extension() {
           </p>
           <ol className="list-decimal space-y-1 pl-5 text-ink-2">
             <li>
-              Download the latest <strong>pilego-extension-chrome.zip</strong> (or the Firefox one) from the project’s releases page and unzip it.
+              Download <strong>pilego-extension-chrome.zip</strong> (or the Firefox one) from the project’s releases page and unzip it.
             </li>
             <li>
-              Open <code>chrome://extensions</code>, turn on Developer mode, and choose <em>Load unpacked</em> with the unzipped folder.
+              In Chrome, Edge or Brave open <code>chrome://extensions</code>, turn on Developer mode and choose <em>Load unpacked</em>. In
+              Firefox open <code>about:debugging</code> and load the zip as a temporary add-on.
             </li>
-            <li>Come back to this page. It connects by itself and stays signed in with your pileGo account.</li>
+            <li>Come back to this page. The extension links to your account by itself and stays signed in.</li>
           </ol>
           <a className="btn btn-ink self-start" href="https://github.com/gothicscientist/pileGo-/releases" target="_blank" rel="noreferrer">
             Releases page
