@@ -1,0 +1,76 @@
+name: Deploy
+
+# Deploys main to production: the web app to Cloudflare Pages and the backend
+# (migrations and edge functions) to Supabase. Each job runs only when its
+# token is set under Settings > Secrets and variables > Actions:
+#   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID   the web app
+#   SUPABASE_ACCESS_TOKEN                         the backend
+# Variables (optional) override the defaults below for a self-hosted copy.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  # Public values: the anon key is meant for browsers and ships in the app.
+  VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://jobkhbfymwgyfadpmeqk.supabase.co' }}
+  VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpvYmtoYmZ5bXdneWZhZHBtZXFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMTU4MzUsImV4cCI6MjEwODc5MTgzNX0.C9BVN8QijdvatvLLIoIcCmBzblfBw2_79ZN66dTbeAY' }}
+  SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF || 'jobkhbfymwgyfadpmeqk' }}
+  PAGES_PROJECT: ${{ vars.PAGES_PROJECT || 'pilego-web' }}
+  PILEGO_APP_ORIGINS: ${{ vars.PILEGO_APP_ORIGINS || 'https://pilego.app' }}
+
+jobs:
+  backend:
+    name: Supabase migrations and functions
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        if: env.SUPABASE_ACCESS_TOKEN != ''
+      - uses: actions/setup-node@v4
+        if: env.SUPABASE_ACCESS_TOKEN != ''
+        with:
+          node-version: 22
+      - name: Deploy
+        if: env.SUPABASE_ACCESS_TOKEN != ''
+        run: node scripts/deploy.mjs --only=migrations,functions
+      - name: Skipped
+        if: env.SUPABASE_ACCESS_TOKEN == ''
+        run: echo "SUPABASE_ACCESS_TOKEN is not set; the backend was not deployed."
+
+  web:
+    name: Web app to Cloudflare Pages
+    runs-on: ubuntu-latest
+    needs: backend
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        if: env.CLOUDFLARE_API_TOKEN != ''
+      - uses: pnpm/action-setup@v4
+        if: env.CLOUDFLARE_API_TOKEN != ''
+      - uses: actions/setup-node@v4
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        if: env.CLOUDFLARE_API_TOKEN != ''
+      - run: pnpm --filter @pilego/web build
+        if: env.CLOUDFLARE_API_TOKEN != ''
+      - name: Upload to Pages
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: npx --yes wrangler@4 pages deploy apps/web/dist --project-name "$PAGES_PROJECT" --branch main --commit-dirty=true
+      - name: Skipped
+        if: env.CLOUDFLARE_API_TOKEN == ''
+        run: echo "CLOUDFLARE_API_TOKEN is not set; the web app was not deployed."
