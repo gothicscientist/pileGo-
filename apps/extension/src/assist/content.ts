@@ -1,7 +1,6 @@
-// Runs on the sell pages of Depop, Poshmark, Mercari and Grailed.
-// On Depop and Poshmark it fills every field and presses the site's own post
-// button, with a few seconds to press Stop first. Elsewhere it fills what it
-// can find and shows a panel with the rest to copy; the seller posts.
+// Runs on the sell pages of Depop, Poshmark, Mercari and Grailed. It fills
+// every field and presses the site's own post button, with a few seconds to
+// press Stop first.
 
 import { MARKETPLACES, type MarketplaceId } from '@pilego/core';
 import { ext, fromBase64, send, sleep } from '../shared/browser.ts';
@@ -11,6 +10,8 @@ import { watchSellerAddress } from './seller-address.ts';
 import { fillDepop } from './depop.ts';
 import { norm, pageError, text, waitFor } from './dom.ts';
 import { Stopped, type Driver, type DriverContext } from './driver.ts';
+import { fillGrailed } from './grailed.ts';
+import { fillMercari } from './mercari.ts';
 import { fillPoshmark } from './poshmark.ts';
 import { addPhotos, findField, findPhotoInput, postedListing, setValue, siteFor, SITES, type FieldKey } from './sites.ts';
 
@@ -171,10 +172,10 @@ function report(msg: AssistReport | AssistProgress) {
 }
 
 // ---------------------------------------------------------------------------
-// Depop and Poshmark: fill everything and post, with a Stop button.
+// Depop, Poshmark, Mercari and Grailed: fill everything and post, with a Stop button.
 // ---------------------------------------------------------------------------
 
-const DRIVERS: Partial<Record<MarketplaceId, Driver>> = { depop: fillDepop, poshmark: fillPoshmark };
+const DRIVERS: Partial<Record<MarketplaceId, Driver>> = { depop: fillDepop, poshmark: fillPoshmark, mercari: fillMercari, grailed: fillGrailed };
 
 /** Seconds the seller has to press Stop before pileGo presses the site's post button. */
 const GRACE_SECONDS = 3;

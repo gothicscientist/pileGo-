@@ -1,5 +1,5 @@
 import { expect, tabId, test, work } from './fixtures.ts';
-import { DEPOP_FORM, POSHMARK_FORM } from './mocks.ts';
+import { DEPOP_FORM, GRAILED_FORM, MERCARI_FORM, POSHMARK_FORM } from './mocks.ts';
 
 const VINTED = 'https://www.vinted.co.uk';
 
@@ -307,6 +307,81 @@ test('fills every field on Poshmark, through the photo and price pop-ups, and li
     brand: 'GAP',
   });
   expect(page.url()).toBe('https://poshmark.com/listing/GAP-Jacket-65a1b2c3');
+});
+
+const SELLER_ADDRESS = { full_name: 'Sam Lee', line1: '1 Main St', line2: '', city: 'Austin', state: 'TX', postal_code: '78701', country: 'US', phone: '' };
+
+test('fills every field on Mercari, adds the missing ship-from address, and lists', async ({ context, worker }) => {
+  await context.route('https://www.mercari.com/**', route => route.fulfill({ contentType: 'text/html', body: MERCARI_FORM }));
+  const page = await context.newPage();
+  await page.goto('https://www.mercari.com/sell/');
+  const id = await tabId(worker, 'https://www.mercari.com/*');
+  const base = work();
+  const item = { ...base.item, brand: 'Carhartt', department: 'men', category: 'tops', subcategory: 't-shirts', size: 'M', condition: 'good' };
+  const out = await worker.evaluate(({ id, work }) => chrome.tabs.sendMessage(id, { type: 'assist:fill', work }), {
+    id,
+    work: work({ marketplace: 'mercari', item, seller_address: SELLER_ADDRESS, photos: [base.photos[0], base.photos[0]], listing: { ...base.listing, marketplace: 'mercari', title: 'Carhartt pocket tee', description: 'Heavyweight pocket tee, light wear, no holes.' } }),
+  });
+  expect(out).toMatchObject({ ok: true, posted: true, photos: 2, missing: [] });
+  const listed = await page.evaluate(() => (window as unknown as { listed: Record<string, unknown> }).listed);
+  expect(listed).toMatchObject({
+    photos: 2,
+    category: 'Men > Tops > T-shirts',
+    brand: 'Carhartt',
+    condition: 'Good',
+    size: 'M (38-40)',
+    address: 'Sam|Lee|1 Main St|Austin|Texas|78701',
+    shipping: 'USPS Ground Advantage',
+    payer: 'No',
+    smart: 'OFF',
+    title: 'Carhartt pocket tee',
+    price: '32',
+  });
+  expect(page.url()).toBe('https://www.mercari.com/sell/confirmation/m81234567890/');
+});
+
+test('stops on Mercari and says why when it wants a payment card first', async ({ context, worker }) => {
+  await context.route('https://www.mercari.com/**', route => route.fulfill({ contentType: 'text/html', body: MERCARI_FORM.replace('window.state = {};', 'window.state = {}; window.needsCard = true;') }));
+  const page = await context.newPage();
+  await page.goto('https://www.mercari.com/sell/');
+  const id = await tabId(worker, 'https://www.mercari.com/*');
+  const base = work();
+  const out = await worker.evaluate(({ id, work }) => chrome.tabs.sendMessage(id, { type: 'assist:fill', work }), {
+    id,
+    work: work({ marketplace: 'mercari', item: { ...base.item, department: 'men', category: 'tops', subcategory: 't-shirts' }, seller_address: SELLER_ADDRESS, listing: { ...base.listing, marketplace: 'mercari', title: 'Carhartt pocket tee', description: 'Heavyweight pocket tee, light wear, no holes.' } }),
+  });
+  expect(out).toMatchObject({ posted: false });
+  expect(out.error).toContain('payment card');
+});
+
+test('fills every field on Grailed, adds the missing return address, and publishes', async ({ context, worker }) => {
+  await context.route('https://www.grailed.com/**', route => route.fulfill({ contentType: 'text/html', body: GRAILED_FORM }));
+  const page = await context.newPage();
+  await page.goto('https://www.grailed.com/sell/new');
+  const id = await tabId(worker, 'https://www.grailed.com/*');
+  const base = work();
+  const item = { ...base.item, brand: 'Carhartt', department: 'men', category: 'tops', subcategory: 't-shirts', size: 'M', colors: ['black'], condition: 'good', style_tags: ['workwear'] };
+  const out = await worker.evaluate(({ id, work }) => chrome.tabs.sendMessage(id, { type: 'assist:fill', work }), {
+    id,
+    work: work({ marketplace: 'grailed', item, seller_address: SELLER_ADDRESS, photos: [base.photos[0], base.photos[0]], listing: { ...base.listing, marketplace: 'grailed', title: 'Carhartt pocket tee', description: 'Heavyweight pocket tee, light wear.' } }),
+  });
+  expect(out).toMatchObject({ ok: true, posted: true, photos: 2, missing: [] });
+  const listed = await page.evaluate(() => (window as unknown as { listed: Record<string, unknown> }).listed);
+  expect(listed).toMatchObject({
+    category: 'Menswear / Tops',
+    subcategory: 'Short Sleeve T-Shirts',
+    designer: 'Carhartt',
+    size: 'US M / EU 48-50 / 2',
+    colour: 'Black',
+    condition: 'Used',
+    style: 'Workwear',
+    address: 'Sam Lee|1 Main St|Austin|TX|US|78701|true',
+    title: 'Pocket tee',
+    price: '32',
+    smart: false,
+    photos: 2,
+  });
+  expect(page.url()).toBe('https://www.grailed.com/listings/71234567-carhartt-pocket-tee');
 });
 
 test.describe('after pressing post', () => {

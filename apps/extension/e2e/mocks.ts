@@ -208,3 +208,183 @@ export const POSHMARK_FORM = `<!doctype html><html><body>
     history.pushState({}, '', '/listing/GAP-Jacket-65a1b2c3');
   });
 </script></body></html>`;
+
+/**
+ * Mercari's sell form as of October 2026, with the hooks the driver uses. The
+ * seller has no saved address yet, so Ships from is empty until one is added.
+ */
+export const MERCARI_FORM = `<!doctype html><html><body>
+<div role="dialog" data-testid="DialogWrapper" id="welcome"><p>Why not earn some extra $$$?</p><button data-testid="NewListerDialogCreateOwn" type="submit">Create a listing</button></div>
+<main>
+  <input data-testid="SellPhotoInput" type="file" multiple accept="image/*" /><div id="thumbs"></div>
+  <input data-testid="Title" id="sellName" name="sellName" />
+  <textarea data-testid="Description" name="sellDescription"></textarea>
+  <button data-testid="SellCategoryFieldButton" type="button">Select category</button>
+  <div><input data-testid="Brand" id="sellBrandId" aria-haspopup="listbox" /><ul id="sellBrandOptions" role="listbox"></ul></div>
+  <div id="sellCondition"><div role="radiogroup" aria-label="Condition"></div></div>
+  <div id="sizebox"></div>
+  <div data-testid="ShipsFrom">Ships from: <span id="zip"></span></div><button data-testid="ShipsFromEditButton" type="submit">Edit</button>
+  <input data-testid="SelectShipping" readonly value="" />
+  <div aria-haspopup="listbox" id="ShippingPayerOption" data-testid="ShippingPayerOption" tabindex="0">Yes (Recommended)</div>
+  <input data-testid="Price" name="sellPrice" />
+  <button data-testid="SmartPricingButton" role="button" aria-pressed="true" type="submit">ON</button>
+  <button data-testid="ListButton" type="submit">List</button>
+</main>
+<script>
+  window.state = {};
+  const $ = s => document.querySelector(s);
+  const el = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstChild; };
+  $('[data-testid=NewListerDialogCreateOwn]').addEventListener('click', () => $('#welcome').remove());
+  $('[data-testid=SellPhotoInput]').addEventListener('change', e => {
+    for (const f of e.target.files) { const img = document.createElement('img'); img.alt = 'thumbnail'; img.style.cssText = 'display:block;width:20px;height:20px'; $('#thumbs').append(img); }
+  });
+  const TREE = { Women: { 'Tops & blouses': ['T-shirts', 'Other'] }, Men: { Tops: ['Button-front', 'T-shirts', 'Other'], Jeans: ['Other'] }, Kids: {} };
+  let path = [];
+  function dialog() {
+    let d = $('#catdialog');
+    if (!d) { d = el('<div role="dialog" data-testid="DialogWrapper" id="catdialog"><button aria-label="Close">x</button><div data-testid="CategoryDialogBody"><button aria-label="Back">&lt;</button><div id="rows"></div></div></div>'); document.body.append(d);
+      d.querySelector('[aria-label=Close]').addEventListener('click', () => d.remove());
+      d.querySelector('[aria-label=Back]').addEventListener('click', () => { path.pop(); draw(); }); }
+    draw();
+  }
+  function draw() {
+    const rows = $('#rows'); rows.innerHTML = '';
+    let node = TREE; for (const p of path) node = node[p];
+    const names = Array.isArray(node) ? [...node, 'All ' + path[1]] : Object.keys(node);
+    for (const n of names) { const b = el('<button data-testid="CategoryRow"></button>'); b.textContent = n; rows.append(b);
+      b.addEventListener('click', () => {
+        if (Array.isArray(node)) { const chosen = n.startsWith('All ') ? path.join(' > ') : [...path, n].join(' > '); window.state.category = chosen; $('[data-testid=SellCategoryFieldButton]').textContent = chosen; $('#catdialog').remove(); sizes(); quote(); }
+        else { path.push(n); draw(); }
+      }); }
+  }
+  $('[data-testid=SellCategoryFieldButton]').addEventListener('click', dialog);
+  const BRANDS = ['Carhartt', 'Carhartt WIP', 'Carrhart', '3M', 'Adidas'];
+  const brand = $('[data-testid=Brand]');
+  const brandList = (q) => { const ul = $('#sellBrandOptions'); ul.innerHTML = ''; BRANDS.filter(b => !q || b.toLowerCase().includes(q.toLowerCase())).forEach((b, i) => {
+    const li = el('<li role="option"></li>'); li.id = 'sellBrandOptions-' + i; li.textContent = b; li.addEventListener('click', () => { brand.value = b; window.state.brand = b; ul.innerHTML = ''; }); ul.append(li); }); };
+  brand.addEventListener('focus', () => brandList(''));
+  brand.addEventListener('input', () => setTimeout(() => brandList(brand.value), 300));
+  ['New', 'Like new', 'Good', 'Fair', 'Poor'].forEach((c, i) => { const l = el('<label><input type="radio" name="_r_0_" value="' + (i + 1) + '"><b>' + c + '</b><br><span>details</span></label>'); l.querySelector('input').addEventListener('change', () => (window.state.condition = c)); $('[aria-label=Condition]').append(l); });
+  function sizes() {
+    $('#sizebox').innerHTML = '<input data-testid="Size" id="itemSizeId" aria-haspopup="listbox"><ul id="itemSizeId" role="listbox"></ul>';
+    const s = $('#sizebox input');
+    s.addEventListener('focus', () => { const ul = $('#sizebox ul'); ul.innerHTML = '<li role="presentation">REGULAR</li>';
+      for (const z of ['XS (30-32)', 'S (34-36)', 'M (38-40)', 'L (42-44)', '__TALL', 'M', 'L']) { if (z === '__TALL') { ul.append(el('<li role="presentation">TALL</li>')); continue; } const li = el('<li role="option"></li>'); li.textContent = z; li.addEventListener('click', () => { s.value = z; window.state.size = z; ul.innerHTML = ''; }); ul.append(li); } });
+  }
+  function quote() { setTimeout(() => { if ($('[data-testid=Title]').value && window.state.category) $('[data-testid=SelectShipping]').value = 'USPS Ground Advantage'; }, 400); }
+  $('[data-testid=Title]').addEventListener('input', quote);
+  $('[data-testid=ShipsFromEditButton]').addEventListener('click', () => {
+    const d = el('<div role="dialog" data-testid="DialogWrapper" id="addr"><button data-testid="MyAddressesDialog-Close">x</button><button data-testid="AddAddressButton">Add address</button></div>'); document.body.append(d);
+    d.querySelector('[data-testid=MyAddressesDialog-Close]').addEventListener('click', () => d.remove());
+    d.querySelector('[data-testid=AddAddressButton]').addEventListener('click', () => {
+      const f = el('<div role="dialog" data-testid="DialogWrapper" id="addform"><input data-testid="AddressFirstName" autocomplete="given-name"><input data-testid="AddressLastName" autocomplete="family-name"><input data-testid="AddressLine1" autocomplete="address-line1"><input data-testid="AddressLine2"><input data-testid="AddressZipCode" autocomplete="postal-code"><input data-testid="AddressCity" autocomplete="address-level2"><div data-testid="AddressState" aria-haspopup="listbox">Select a state</div><ul id="states"></ul><button data-testid="SaveButton">Save Address</button></div>');
+      document.body.append(f);
+      f.querySelector('[data-testid=AddressState]').addEventListener('click', () => { for (const st of ['Alabama', 'California', 'Texas']) { const li = el('<li role="option" data-testid="AddressState-option"></li>'); li.textContent = st; li.addEventListener('click', () => { f.querySelector('[data-testid=AddressState]').textContent = st; $('#states').innerHTML = ''; }); $('#states').append(li); } });
+      f.querySelector('[data-testid=SaveButton]').addEventListener('click', () => {
+        const v = t => f.querySelector('[data-testid=' + t + ']').value;
+        window.state.address = [v('AddressFirstName'), v('AddressLastName'), v('AddressLine1'), v('AddressCity'), f.querySelector('[data-testid=AddressState]').textContent, v('AddressZipCode')].join('|');
+        $('#zip').textContent = v('AddressZipCode'); f.remove();
+        d.append(el('<button data-testid="EditAddress">Edit</button>'));
+      });
+    });
+  });
+  $('#ShippingPayerOption').addEventListener('click', () => {
+    const ul = el('<ul id="ShippingPayerOption" role="listbox"><li data-testid="FreeShippingYesButton">Yes (Recommended)</li><li data-testid="FreeShippingNoButton">No</li></ul>'); document.body.append(ul);
+    ul.querySelector('[data-testid=FreeShippingNoButton]').addEventListener('click', () => { $('div#ShippingPayerOption').textContent = 'No'; ul.remove(); });
+  });
+  // A new price resets the shipping payer to Mercari's default a moment later.
+  $('[data-testid=Price]').addEventListener('change', () => setTimeout(() => ($('div#ShippingPayerOption').textContent = 'Yes (Recommended)'), 600));
+  $('[data-testid=SmartPricingButton]').addEventListener('click', () => {
+    const m = el('<div role="dialog" data-testid="DialogWrapper" id="smart"><button data-testid="SmartPricingTurnOffButton">Turn off</button></div>'); document.body.append(m);
+    m.querySelector('button').addEventListener('click', () => { const b = $('[data-testid=SmartPricingButton]'); b.setAttribute('aria-pressed', 'false'); b.textContent = 'OFF'; m.remove(); });
+  });
+  $('[data-testid=ListButton]').addEventListener('click', () => {
+    if (window.needsCard) { document.body.append(el('<div role="dialog" data-testid="DialogWrapper"><div data-testid="PaymentWarningModal">You are almost done<button data-testid="AddCardButton">Add credit / debit card</button></div></div>')); return; }
+    Object.assign(window.state, { title: $('[data-testid=Title]').value, price: $('[data-testid=Price]').value, payer: $('div#ShippingPayerOption').textContent, smart: $('[data-testid=SmartPricingButton]').textContent, photos: document.querySelectorAll('img[alt=thumbnail]').length, shipping: $('[data-testid=SelectShipping]').value });
+    window.listed = window.state;
+    history.pushState({}, '', '/sell/confirmation/m81234567890/');
+  });
+</script></body></html>`;
+
+/**
+ * Grailed's sell form as of October 2026: Radix menus that open on
+ * pointerdown, a designer search that picks on mousedown, and a seller with
+ * no saved return address yet.
+ */
+export const GRAILED_FORM = `<!doctype html><html><body><form id="f">
+  <button type="button" aria-haspopup="menu" data-state="closed" id="m0">Department / Category</button>
+  <button type="button" aria-haspopup="menu" data-state="closed" id="m1" disabled>Sub-category (Select category first)</button>
+  <div><div><div><input id="designer-autocomplete" disabled placeholder="Designer (Select category first)"></div><ul role="menu" id="dlist"></ul></div></div>
+  <button type="button" aria-haspopup="menu" data-state="closed" id="m2" disabled>Select Size (Select category first)</button>
+  <input name="title" placeholder="Item name">
+  <button type="button" aria-haspopup="menu" data-state="closed" id="m3">Select a Color</button>
+  <button type="button" aria-haspopup="menu" data-state="closed" id="m4">Item Condition</button>
+  <textarea name="description"></textarea>
+  <button type="button" aria-haspopup="menu" data-state="closed" id="m5">Select a Style</button>
+  <input name="price" type="tel">
+  <input name="makeOffer" type="checkbox" checked>
+  <input name="smartPricing.enabled" type="checkbox" checked>
+  <div id="shipfrom"><button type="button" id="selectaddr">Select address</button></div>
+  <div id="photos"></div>
+  <button type="submit">SAVE AS DRAFT</button>
+  <button type="submit" id="publish">PUBLISH</button>
+</form>
+<script>
+  window.state = {};
+  const $ = s => document.querySelector(s);
+  const el = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstChild; };
+  $('#f').addEventListener('submit', e => e.preventDefault());
+  const slots = () => { const p = $('#photos'); const have = p.querySelectorAll('img').length; p.querySelectorAll('input').forEach(i => i.remove()); for (let i = have; i < 9; i++) { const inp = el('<input type="file" multiple accept="image/*">'); inp.id = 'photo_input_' + i; inp.addEventListener('change', () => { for (const f of inp.files) { if (p.querySelectorAll('img').length >= 9) break; p.append(el('<img alt="Listing" style="display:block;width:20px;height:20px">')); } slots(); }); p.append(inp); } };
+  slots();
+  let open = null;
+  function menu(button, items, onPick, header) {
+    closeMenu();
+    const m = el('<div role="menu" data-state="open"></div>'); if (header) m.append(header);
+    for (const it of items) { const d = el('<div role="menuitem"></div>'); d.textContent = it; d.addEventListener('click', () => onPick(it, m)); m.append(d); }
+    m.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+    document.body.append(m); button.setAttribute('data-state', 'open'); open = { m, button };
+    return m;
+  }
+  function closeMenu() { if (open) { open.m.remove(); open.button.setAttribute('data-state', 'closed'); open = null; } }
+  const CATS = { Menswear: { Tops: ['Polos', 'Short Sleeve T-Shirts', 'Sweatshirts & Hoodies'], Bottoms: ['Denim', 'Shorts'] }, Womenswear: { Tops: ['Blouses', 'Hoodies'] } };
+  let dept = null;
+  function departments(button) {
+    menu(button, Object.keys(CATS), d => { dept = d; categories(button); });
+  }
+  function categories(button) {
+    const back = el('<div><button type="button" data-testid="back-button" aria-label="Back to departments"></button></div>');
+    back.querySelector('button').addEventListener('click', () => departments(button));
+    menu(button, Object.keys(CATS[dept]), c => { window.state.category = dept + ' / ' + c; button.textContent = window.state.category; closeMenu(); $('#m1').disabled = false; $('#m2').disabled = false; $('#designer-autocomplete').disabled = false; }, back);
+  }
+  const on = (id, fn) => $(id).addEventListener('pointerdown', e => { if (e.button === 0) fn($(id)); });
+  on('#m0', b => (dept ? categories(b) : departments(b)));
+  on('#m1', b => menu(b, CATS[dept][window.state.category.split(' / ')[1]], s => { window.state.subcategory = s; b.textContent = s; closeMenu(); }));
+  on('#m2', b => menu(b, ['US XS / EU 42 / 0', 'US S / EU 44-46 / 1', 'US M / EU 48-50 / 2', 'US L / EU 52-54 / 3'], s => { window.state.size = s; b.textContent = s; closeMenu(); }));
+  on('#m3', b => menu(b, ['Black', 'White', 'Brown', 'Blue', 'Multi'], s => { window.state.colour = s; b.textContent = s; closeMenu(); }));
+  on('#m4', b => menu(b, ['New/Never Worn', 'Gently Used', 'Used', 'Very Worn'], s => { window.state.condition = s; b.textContent = s; closeMenu(); }));
+  on('#m5', b => menu(b, ['None', 'Luxury', 'Vintage', 'Streetwear', 'Workwear'], s => { window.state.style = s; b.textContent = s; closeMenu(); }));
+  const d = $('#designer-autocomplete'); let query = '';
+  d.addEventListener('input', () => { query = d.value; setTimeout(() => { const ul = $('#dlist'); ul.innerHTML = '';
+    for (const n of ['Carhartt', 'Carhartt Wip'].filter(n => query && n.toLowerCase().startsWith(query.toLowerCase()))) { const li = el('<li role="menuitem"></li>'); li.textContent = n; li.addEventListener('mousedown', () => { window.state.designer = n; query = ''; ul.innerHTML = ''; }); ul.append(li); }
+    const un = el('<li role="menuitem"><span>Designer not listed / Not sure</span></li>'); un.addEventListener('mousedown', () => { window.state.designer = 'unbranded'; ul.innerHTML = ''; }); ul.append(un); }, 300); });
+  d.addEventListener('blur', () => { $('#dlist').innerHTML = ''; d.value = window.state.designer === 'unbranded' ? 'Designer not listed' : (window.state.designer || ''); if (window.state.designer && !$('[aria-label="Clear selected designer"]')) d.after(el('<button type="button" aria-label="Clear selected designer">x</button>')); });
+  $('#selectaddr').addEventListener('click', () => {
+    const dlg = el('<div role="dialog"><p>My Addresses</p><button type="button" data-testid="modal-close" aria-label="Close">x</button><div id="list"><p>You have no saved addresses</p><button type="button" id="add"><p>Add new address</p></button></div><button type="submit" id="done" disabled>Done</button></div>');
+    document.body.append(dlg);
+    dlg.querySelector('[data-testid=modal-close]').addEventListener('click', () => dlg.remove());
+    dlg.querySelector('#add').addEventListener('click', () => {
+      const form = el('<form><input id="recipientName" name="recipientName"><input id="line1" name="line1"><input id="line2" name="line2"><input id="city" name="city"><input id="state" name="state" placeholder="AL"><select id="countryCode" name="countryCode"><option value=""></option><option value="CA">Canada</option><option value="US">United States</option></select><input id="postalCode" name="postalCode"><input type="checkbox" name="defaultReturn"><button type="submit">SAVE ADDRESS</button></form>');
+      dlg.querySelector('#list').replaceWith(form);
+      form.addEventListener('submit', e => { e.preventDefault(); const v = n => form.querySelector('[name=' + n + ']').value;
+        window.state.address = [v('recipientName'), v('line1'), v('city'), v('state'), v('countryCode'), v('postalCode'), form.querySelector('[name=defaultReturn]').checked].join('|');
+        const list = el('<div id="list"><label><input type="radio" name="addr"> ' + v('line1') + '</label></div>'); form.replaceWith(list);
+        list.querySelector('input').addEventListener('change', () => (dlg.querySelector('#done').disabled = false)); });
+    });
+    dlg.querySelector('#done').addEventListener('click', () => { $('#shipfrom').innerHTML = '<p>Ship from saved</p>'; dlg.remove(); });
+  });
+  $('#publish').addEventListener('click', () => {
+    Object.assign(window.state, { title: $('[name=title]').value, price: $('[name=price]').value, smart: $('[name="smartPricing.enabled"]').checked, photos: document.querySelectorAll('#photos img').length, description: $('[name=description]').value.slice(0, 20) });
+    window.listed = window.state;
+    history.pushState({}, '', '/listings/71234567-carhartt-pocket-tee');
+  });
+</script></body></html>`;

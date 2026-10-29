@@ -91,6 +91,18 @@ describe('after pressing post', () => {
     expect(leftForm('depop', 'https://www.depop.com/products/create/')).toBe(false);
     expect(leftForm('depop', 'https://www.depop.com/products/create/success/?productId=976402921')).toBe(true);
     expect(leftForm('mercari', 'https://www.mercari.com/mypage/')).toBe(false);
+    expect(leftForm('mercari', 'https://www.mercari.com/sell/')).toBe(false);
+    expect(leftForm('mercari', 'https://www.mercari.com/sell/confirmation/m81234567890/')).toBe(true);
+    expect(leftForm('grailed', 'https://www.grailed.com/sell/new')).toBe(false);
+    expect(leftForm('grailed', 'https://www.grailed.com/listings/71234567-carhartt-pocket-tee')).toBe(true);
+  });
+
+  it('stores Mercari’s item page, not its confirmation page', () => {
+    expect(postedListing('mercari', 'https://www.mercari.com/sell/confirmation/m81234567890/')).toEqual({ id: 'm81234567890', url: 'https://www.mercari.com/us/item/m81234567890/' });
+    expect(postedListing('mercari', 'https://www.mercari.com/us/item/m81234567890/?ref=x')).toEqual({ id: 'm81234567890', url: 'https://www.mercari.com/us/item/m81234567890/' });
+    expect(postedListing('grailed', 'https://www.grailed.com/sell/onboarding?listing_id=110511471&return_to=listing_page')).toEqual({ id: '110511471', url: 'https://www.grailed.com/listings/110511471' });
+    expect(leftForm('grailed', 'https://www.grailed.com/sell/onboarding?listing_id=110511471&return_to=listing_page')).toBe(true);
+    expect(postedListing('grailed', 'https://www.grailed.com/listings/71234567-carhartt-pocket-tee')).toEqual({ id: '71234567', url: 'https://www.grailed.com/listings/71234567-carhartt-pocket-tee' });
   });
 });
 

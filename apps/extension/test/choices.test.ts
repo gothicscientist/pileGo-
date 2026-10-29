@@ -10,8 +10,15 @@ import {
   poshmarkCategory,
   poshmarkColours,
   poshmarkTags,
+  grailedCategory,
+  grailedColour,
+  grailedStyle,
+  mercariCategory,
+  pickSize,
+  sizeLabels,
   sizeWants,
 } from '../src/assist/choices.ts';
+import { addressParts } from '../src/assist/address.ts';
 import { pickOption } from '../src/assist/dom.ts';
 
 const item = (over: Record<string, unknown> = {}) => ({
@@ -89,5 +96,60 @@ describe('matching', () => {
     expect(decade('90s')).toBe(1990);
     expect(decade('1970s')).toBe(1970);
     expect(decade('modern')).toBeNull();
+  });
+});
+
+describe('Mercari choices', () => {
+  it('walks department, category and subcategory', () => {
+    expect(mercariCategory(item({ department: 'men', category: 'tops', subcategory: 't-shirts' }))).toEqual({ department: 'Men', category: ['Tops'], subcategory: ['T-shirts'] });
+    expect(mercariCategory(item({ department: 'women', category: 'dresses', subcategory: 'mini-dresses' })).subcategory).toEqual(['Above knee, mini']);
+    expect(mercariCategory(item({ department: 'unisex', category: 'knitwear', subcategory: 'hoodies' }))).toMatchObject({ department: 'Men', category: ['Sweats & hoodies'] });
+    expect(mercariCategory(item({ department: 'kids', category: 'dresses', subcategory: 'midi-dresses' }))).toEqual({ department: 'Kids', category: ['Girls dresses'], subcategory: ['Girls (4+)'] });
+  });
+});
+
+describe('Grailed choices', () => {
+  it('picks Grailed’s department, category and subcategory', () => {
+    expect(grailedCategory(item({ department: 'men', category: 'bottoms', subcategory: 'jeans' }))).toEqual({ department: 'Menswear', category: ['Bottoms'], subcategory: ['Denim'] });
+    expect(grailedCategory(item({ department: 'women', category: 'outerwear', subcategory: 'puffers' }))).toEqual({ department: 'Womenswear', category: ['Outerwear'], subcategory: ['Down Jackets'] });
+  });
+  it('takes one colour, Multi for many', () => {
+    expect(grailedColour(item({ colors: ['navy'] }))).toBe('Blue');
+    expect(grailedColour(item({ colors: ['red', 'blue', 'green'] }))).toBe('Multi');
+    expect(grailedColour(item({ colors: [] }))).toBeNull();
+  });
+  it('maps the style, or leaves it unset', () => {
+    expect(grailedStyle(item({ style_tags: ['utility'] }))).toBe('Workwear');
+    expect(grailedStyle(item({ era: '90s' }))).toBe('Vintage');
+    expect(grailedStyle(item())).toBeNull();
+  });
+});
+
+describe('size lists', () => {
+  it('reads sizes the ways sites label them', () => {
+    expect(sizeLabels('M (38-40)')).toContain('M');
+    expect(sizeLabels('US M / EU 48-50 / 2')).toContain('M');
+    expect(sizeLabels('32 in.')).toContain('32');
+  });
+  it('picks the first matching size, not a lookalike', () => {
+    const mercari = ['XS (30-32)', 'S (34-36)', 'M (38-40)', 'L (42-44)', 'M', 'L'];
+    expect(pickSize(mercari, s => s, 'M')).toBe('M (38-40)');
+    const grailed = ['US XS / EU 42 / 0', 'US S / EU 44-46 / 1', 'US M / EU 48-50 / 2'];
+    expect(pickSize(grailed, s => s, 'S')).toBe('US S / EU 44-46 / 1');
+    expect(pickSize(['US 30 / EU 46', 'US 31', 'US 32 / EU 48'], s => s, 'W32')).toBe('US 32 / EU 48');
+    expect(pickSize(['23 in.', '32 in.'], s => s, '32x30')).toBe('32 in.');
+    expect(pickSize(['XS', 'S'], s => s, 'XL')).toBeNull();
+  });
+});
+
+describe('the setup address', () => {
+  const address = { full_name: 'Sam Lee Park', line1: '1 Main St', line2: '', city: 'Austin', state: 'texas', postal_code: '78701', country: 'US', phone: '' };
+  it('splits the name and gives the state both ways', () => {
+    expect(addressParts(address)).toMatchObject({ first_name: 'Sam Lee', last_name: 'Park', state_code: 'TX', state_name: 'Texas' });
+    expect(addressParts({ ...address, state: 'CA' })).toMatchObject({ state_code: 'CA', state_name: 'California' });
+  });
+  it('is null when there is none, or it is incomplete', () => {
+    expect(addressParts(null)).toBeNull();
+    expect(addressParts({ ...address, line1: '' })).toBeNull();
   });
 });

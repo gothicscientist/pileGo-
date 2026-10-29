@@ -12,7 +12,7 @@ import { activate, createTab, navigate, openTabs, readyTab, removeTab, sendToTab
 export const ASSIST_MARKETS: MarketplaceId[] = ['depop', 'poshmark', 'mercari', 'grailed'];
 
 /** Marketplaces where pileGo fills every field and presses the site's own post button. */
-export const AUTO_POST: MarketplaceId[] = ['depop', 'poshmark'];
+export const AUTO_POST: MarketplaceId[] = ['depop', 'poshmark', 'mercari', 'grailed'];
 
 type FullProfile = Profile & { price_strategy?: 'same' | 'match_take_home' };
 
@@ -98,7 +98,7 @@ async function photoBytes(sb: SupabaseClient, item: Item, max: number): Promise<
     if (!r.ok) continue;
     let type = r.headers.get('content-type') || 'image/jpeg';
     let bytes = await r.arrayBuffer();
-    // Depop and Poshmark take JPEG and PNG only.
+    // The sell forms take JPEG and PNG only.
     if (!/jpe?g|png/.test(type)) {
       const jpeg = await toJpeg(new Blob([bytes], { type })).catch(() => null);
       if (jpeg) {

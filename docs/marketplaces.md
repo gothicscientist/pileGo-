@@ -52,7 +52,7 @@ real Vinted accounts.
     The pause doubles with each refusal in a day and honours Vinted's
     Retry-After.
 
-## Depop and Poshmark: Auto-post
+## Depop, Poshmark, Mercari and Grailed: Auto-post
 
 These sites' APIs are closed to individual sellers, so the extension works
 their sell forms the way a person would, in the seller's logged-in tab. The
@@ -74,10 +74,34 @@ tab opens in front, because browsers throttle pages in background tabs.
   subcategory, size (a custom size when it is not on the list), condition,
   brand, up to two colours, up to three style tags, and price through the price
   pop-up. Then Next and List This Item.
+- **Mercari** (`apps/extension/src/assist/mercari.ts`): closes the first-time
+  seller dialog, then photos (up to 12), title, description, category
+  (department, category and subcategory from Mercari's picker, or its "All"
+  row), brand, condition, size, price and the suggested prepaid label. Smart
+  pricing goes off, since it lowers the price by itself, and buyers pay
+  shipping, as on the other sites, so pileGo's price is what you get before
+  fees. Then List. Mercari's `/sell/confirmation/<id>` page is stored as the
+  item's own `/us/item/<id>/` link.
+- **Grailed** (`apps/extension/src/assist/grailed.ts`): department and
+  category, subcategory, designer ("Designer not listed" when the brand is not
+  on Grailed), size, title, one colour, condition, description, style, price
+  and photos (up to 20). Smart pricing goes off for the same reason. Grailed's
+  own shipping regions and costs stay as Grailed sets them. Then Publish. The
+  dropdowns are Radix menus that open on pointerdown, and designer rows pick on
+  mousedown.
+
+If Mercari or Grailed has no saved ship-from or return address, the driver adds
+the seller address from pileGo's setup (Settings) to the seller's
+account first. Mercari asks for a payment card before a seller's first listing,
+and Grailed for a phone check; both are one-time steps only the seller can do,
+so pileGo stops and says which one is needed. The app lists these steps
+(`first_listing` in `packages/core/src/marketplaces.ts`) wherever it reminds
+sellers to log in: in setup, in Settings and in the cross-list sheet.
 
 What to pick for each item is in `apps/extension/src/assist/choices.ts`:
 source and age come from the item's era, styles and tags from its style tags,
-era and materials, and package size from its category. A panel shows each step
+era and materials, and package size from its category. Mercari's and Grailed's
+category trees were read off their live pickers (October 2026). A panel shows each step
 and counts down for three seconds before posting, with a Stop button. If a
 required field cannot be filled, or the site refuses the form, nothing is
 posted: the listing is marked as needing you, the tab stays open with the
@@ -106,35 +130,22 @@ to you. When Depop answers Post with a 500 (a "status code 500" toast),
 pileGo presses it once more. If that fails too, the form goes to you: the
 same form would get the same answer, and a Post that fails with a 500 can
 still have gone through, so check your Depop listings before posting again.
-Poshmark still presses List again up to three times, then fills fresh forms
-as above; check for a double after a run like that.
+Mercari and Grailed do the same as Depop. Poshmark still presses List again
+up to three times, then fills fresh forms as above; check for a double after a
+run like that.
 
 No tab holds up the queue. A sell form gets 10 minutes to answer and a Vinted
 request gets 5. Vinted jobs run before the sell forms. Each run of the queue
 also settles listings whose tab was closed, or that nothing has heard from
 since the fill should have ended, so nothing sits on "Listing…" for good.
 
-## Mercari, Grailed: Assisted
+## After listing on the extension sites
 
-The extension:
-
-1. Opens the sell form in a new tab.
-2. Adds your photos, up to each site's limit.
-3. Fills in the title, description, price, brand and size where the form has
-   them. The description includes hashtags on Depop. The original price is
-   filled on Poshmark.
-4. Shows a pileGo panel with every field and a copy button. Category,
-   condition and other pickers stay with you, since each site builds them
-   differently.
-
-You press the site's own post button. When the tab lands on the new listing,
-pileGo records it as live with its link. You can also press "I've posted it".
+These apply to Depop, Poshmark, Mercari and Grailed:
 
 - **Sales:** pileGo checks each live listing's public page about every 30
   minutes while your browser is open. It reads schema.org availability first,
   then each site's own markers.
-These also apply to Depop and Poshmark:
-
 - **Taking down after a sale elsewhere:** pileGo opens the listing with a panel
   that asks you to delete it or mark it sold. Then you press Done.
 - **Relisting and import:** not supported on these sites yet.

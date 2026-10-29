@@ -57,25 +57,28 @@ export const SITES: Partial<Record<MarketplaceId, SiteAdapter>> = {
   },
   mercari: {
     id: 'mercari',
-    sellPage: /mercari\.com\/sell\/?/,
-    posted: /mercari\.com\/(?:us\/)?item\/(m\d+)/,
+    sellPage: /mercari\.com\/sell\/?(?:[?#]|$)/,
+    // After List, Mercari shows /sell/confirmation/<item id>.
+    posted: /mercari\.com\/(?:(?:us\/)?item\/(m\d+)|sell\/confirmation\/(m?\d+))/,
+    afterPost: /mercari\.com\/(?:mypage\/listings|sell\/confirmation)/,
     selectors: {
-      title: ['input[data-testid="Title"]', 'input[name="name"]', 'input[name="title"]'],
-      description: ['textarea[data-testid="Description"]', 'textarea[name="description"]'],
-      price: ['input[data-testid="Price"]', 'input[name="price"]'],
+      title: ['input[data-testid="Title"]', 'input[name="sellName"]'],
+      description: ['textarea[data-testid="Description"]', 'textarea[name="sellDescription"]'],
+      price: ['input[data-testid="Price"]', 'input[name="sellPrice"]'],
       brand: ['input[data-testid="Brand"]'],
     },
     skip: ['original_price'],
   },
   grailed: {
     id: 'grailed',
-    sellPage: /grailed\.com\/sell(\/new)?/,
-    posted: /grailed\.com\/listings\/(\d+)/,
+    sellPage: /grailed\.com\/sell(?:\/new)?\/?(?:[?#]|$)/,
+    // A first listing goes to /sell/onboarding?listing_id=<id> to set up payouts.
+    posted: /grailed\.com\/(?:listings\/(\d+)|sell\/onboarding\?(?:[^#]*&)?listing_id=(\d+))/,
     selectors: {
       title: ['input[name="title"]'],
       description: ['textarea[name="description"]'],
       price: ['input[name="price"]'],
-      brand: ['input[name="designer"]', 'input[placeholder*="designer" i]'],
+      brand: ['input#designer-autocomplete'],
     },
     skip: ['original_price'],
   },
@@ -90,6 +93,14 @@ export function postedListing(market: MarketplaceId, url: string): { id: string 
   // The seller's "View listing" link on Depop's success screen ends in
   // /manage/. Store the public listing URL, not that management page.
   if (market === 'depop') url = url.replace(/\/manage\/?(?=[?#]|$)/, '/');
+  // Mercari's confirmation page names the new item; store the item's own page.
+  const confirmed = market === 'mercari' ? url.match(/mercari\.com\/sell\/confirmation\/(m?\d+)/) : null;
+  if (confirmed) {
+    const id = confirmed[1]!.startsWith('m') ? confirmed[1]! : `m${confirmed[1]}`;
+    return { id, url: `https://www.mercari.com/us/item/${id}/` };
+  }
+  const onboarding = market === 'grailed' ? url.match(/grailed\.com\/sell\/onboarding\?(?:[^#]*&)?listing_id=(\d+)/) : null;
+  if (onboarding) return { id: onboarding[1]!, url: `https://www.grailed.com/listings/${onboarding[1]}` };
   const site = SITES[market];
   if (!site || site.sellPage.test(url)) return null;
   const hit = url.match(site.posted);

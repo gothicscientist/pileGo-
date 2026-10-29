@@ -45,6 +45,30 @@ export function press(el: Element): void {
   (el as HTMLElement).click();
 }
 
+/**
+ * Press as a mouse would: hover, pointer down with focus, up, click. Some
+ * widgets only take a choice as the seller's own after the full sequence;
+ * Mercari's free-shipping menu puts its suggestion back otherwise.
+ */
+export function pressLikeMouse(el: Element): void {
+  const win = el.ownerDocument.defaultView ?? window;
+  const pointer = (type: string) =>
+    el.dispatchEvent(new win.PointerEvent(type, { bubbles: !/enter/.test(type), cancelable: true, button: 0, pointerType: 'mouse', isPrimary: true }));
+  const mouse = (type: string) => el.dispatchEvent(new win.MouseEvent(type, { bubbles: !/enter/.test(type), cancelable: true, button: 0 }));
+  (el as HTMLElement).scrollIntoView?.({ block: 'center' });
+  pointer('pointerover');
+  pointer('pointerenter');
+  mouse('mouseover');
+  mouse('mouseenter');
+  mouse('mousemove');
+  pointer('pointerdown');
+  mouse('mousedown');
+  (el as HTMLElement).focus?.();
+  pointer('pointerup');
+  mouse('mouseup');
+  (el as HTMLElement).click();
+}
+
 /** Type into an input the way a person would, so search-as-you-type lists open. */
 export function typeText(el: HTMLInputElement | HTMLTextAreaElement, value: string): void {
   const win = el.ownerDocument.defaultView ?? window;
