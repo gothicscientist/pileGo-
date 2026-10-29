@@ -99,6 +99,12 @@ the background and open sell-form tabs for the assisted marketplaces.
   lists the remaining fields with copy buttons. The listing counts as posted
   when the tab reaches the site's listing URL, or when the seller presses "I've
   posted it".
+- **Sold prices** (`src/bg/comps.ts`). When the app asks, the worker reads
+  eBay's public sold-listings search for the seller's region from the
+  seller's own browser, since eBay's sold-price API is closed and its pages
+  refuse servers. It reads titles, sold prices and links from both of eBay's
+  result layouts, skips ranges and accepted offers, waits ten seconds between
+  searches and keeps each for six hours.
 - **Sales.** For Vinted, the worker reads the seller's wardrobe and treats
   closed items as sold. For Depop, Poshmark, Mercari and Grailed, it reads each
   live listing's public page. It looks for schema.org availability first, then
