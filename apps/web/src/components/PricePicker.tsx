@@ -48,7 +48,9 @@ function currencySign(currency: string): string {
 }
 
 function parsePrice(text: string): number | null {
-  const n = Number(text.replace(/[^\d.,]/g, '').replace(',', '.'));
+  const digits = text.replace(/[^\d.,]/g, '');
+  // "12,50" is a decimal comma; "1,200" and "1,200.50" are thousands.
+  const n = Number(/^\d+,\d{2}$/.test(digits) ? digits.replace(',', '.') : digits.replace(/,/g, ''));
   return text.trim() && Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
 }
 
