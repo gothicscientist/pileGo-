@@ -84,29 +84,41 @@ PILEGO_APP_URL=https://your-app.pages.dev node scripts/deploy.mjs --only=secrets
 This allows sign-in links to land on your app. It also limits the server
 functions to requests from your app.
 
-## 5. Build the browser extension
+## 5. The browser extension
 
 Vinted, Depop, Poshmark, Mercari, Grailed and Facebook have no public API for
-sellers, so the extension does that work from your own logged-in tabs.
+sellers, so the extension does that work from your own logged-in tabs. It also
+reads eBay's public sold listings in your browser, for price suggestions.
+
+You do not need to build it separately: the web app's build also builds the
+extension and serves both zips from the app, at
+`/downloads/pilego-extension-chrome.zip` and
+`/downloads/pilego-extension-firefox.zip`. The app's `/extension` page has
+download buttons, step-by-step instructions and a live check that the
+extension is installed and linked. Settings links to it.
+
+The extension trusts `https://pilego.app` and localhost out of the box. Set
+`PILEGO_APP_ORIGINS` in your host's build environment (comma separated, for
+example `https://your-app.pages.dev`) so it trusts your copy too. An app at any
+other `*.pages.dev` address can only link after the seller approves it in the
+extension's popup.
+
+To build the zips on their own:
 
 ```sh
 PILEGO_APP_ORIGINS=https://your-app.pages.dev pnpm --filter @pilego/extension build:zip
 ```
 
 This writes `apps/extension/dist/pilego-extension-chrome.zip` and
-`pilego-extension-firefox.zip`. `PILEGO_APP_ORIGINS` tells the extension which
-app to trust. An app at any other `*.pages.dev` address can only link after you
-approve it in the extension's popup.
+`pilego-extension-firefox.zip`. Pushing a tag like `v0.2.0` also attaches both
+zips to a GitHub release; set the repository variable `PILEGO_APP_ORIGINS`
+under Settings > Secrets and variables > Actions > Variables for your origin.
 
-To publish zips with every release instead, set a repository variable
-`PILEGO_APP_ORIGINS` under Settings > Secrets and variables > Actions >
-Variables. Then push a tag like `v0.1.0`. The release workflow attaches both
-zips to a GitHub release.
-
-To install the extension:
+To install it:
 
 - **Chrome, Edge, Brave:** unzip it, open `chrome://extensions`, turn on
-  Developer mode, choose Load unpacked, and pick the unzipped folder.
+  Developer mode, choose Load unpacked, and pick the unzipped folder. Keep the
+  folder: the browser loads the extension from it.
 - **Firefox:** open `about:debugging#/runtime/this-firefox` and choose Load
   Temporary Add-on. Firefox removes temporary add-ons when it restarts. To keep
   it, sign the zip at addons.mozilla.org as an unlisted add-on.

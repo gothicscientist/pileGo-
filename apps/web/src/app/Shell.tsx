@@ -38,14 +38,23 @@ function useAttentionCount(): number {
 
 function ExtensionDot() {
   const ext = useExtension();
+  const label = !ext.installed
+    ? 'Get the extension'
+    : ext.needs_approval
+      ? 'Extension needs your OK'
+      : !ext.linked
+        ? 'Extension linking…'
+        : ext.running
+          ? `Extension running ${ext.running}`
+          : 'Extension linked';
   return (
     <NavLink
-      to="/settings#extension"
+      to={ext.installed ? '/settings#extension' : '/extension'}
       className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-ink-2 hover:bg-paper-2"
-      title={ext.installed ? 'The pileGo extension is connected' : 'The pileGo extension is not installed in this browser'}
+      title={ext.installed ? 'The pileGo browser extension in this browser' : 'Install the pileGo browser extension for Vinted, Depop and the rest'}
     >
-      <span className={cx('size-2 rounded-full', ext.installed ? 'bg-[#1fa36b]' : 'bg-line')} aria-hidden />
-      {ext.installed ? (ext.running ? `Extension running ${ext.running}` : 'Extension connected') : 'No extension'}
+      <span className={cx('size-2 rounded-full', ext.linked ? 'bg-[#1fa36b]' : ext.installed ? 'bg-sticker' : 'bg-line')} aria-hidden />
+      {label}
     </NavLink>
   );
 }

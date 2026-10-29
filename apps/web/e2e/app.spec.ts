@@ -122,3 +122,31 @@ test('scan page offers camera and file pickers', async ({ page }, info) => {
   await expect(page.getByRole('button', { name: 'Scan with AI' })).toBeDisabled();
   await snap(page, 'scan', info.project.name);
 });
+
+test('the extension page offers both downloads and says when it is missing', async ({ page }, info) => {
+  await mockSupabase(page, { signedIn: false });
+  await page.goto('/extension');
+  await expect(page.getByRole('heading', { name: 'Get the browser extension' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Download for Chrome, Edge or Brave' })).toHaveAttribute('href', '/downloads/pilego-extension-chrome.zip');
+  await expect(page.getByRole('link', { name: 'Download for Firefox' })).toHaveAttribute('href', '/downloads/pilego-extension-firefox.zip');
+  await expect(page.getByTestId('extension-status')).toContainText('Not detected in this browser');
+  await snap(page, 'extension', info.project.name);
+});
+
+test('an installed extension shows up on the extension page', async ({ page }) => {
+  await mockSupabase(page, { signedIn: false });
+  // Stands in for the extension's content script.
+  await page.addInitScript(() => {
+    window.addEventListener('message', e => {
+      if (e.data?.source !== 'pilego-app') return;
+      window.postMessage(
+        { source: 'pilego-ext', type: 'status', status: { installed: true, version: '0.1.0', tabs: {}, running: 0, linked: false, user_id: null } },
+        location.origin,
+      );
+    });
+  });
+  await page.goto('/extension');
+  const status = page.getByTestId('extension-status');
+  await expect(status).toContainText('Installed. Sign in to link it');
+  await expect(status).toContainText(/Version 0\.1\.0\. Version \d+\.\d+\.\d+ is out/);
+});

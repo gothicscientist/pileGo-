@@ -163,6 +163,58 @@ test.describe('linking', () => {
     expect(status).toHaveProperty('tabs');
   });
 
+  test('the production app at pilego.app is trusted out of the box', async ({ context }) => {
+    const page = await appPage(context, 'https://pilego.app');
+    const status = await page.evaluate(ask, 'hello');
+    expect(status).toMatchObject({ installed: true, linked: false, needs_approval: false });
+    expect(status).toHaveProperty('tabs');
+  });
+
+  test('reads sold prices from eBay for the app', async ({ context }) => {
+    const searches: string[] = [];
+    await context.route('https://www.ebay.com/**', route => {
+      searches.push(route.request().url());
+      return route.fulfill({
+        contentType: 'text/html',
+        body: `<ul class="srp-results">
+          <li class="s-card s-card--horizontal"><a class="su-link" href="https://www.ebay.com/itm/396112233445?x=1">
+            <div class="s-card__title"><span>GAP Arch Logo Hoodie Brown M</span></div></a>
+            <div class="s-card__attribute-row"><span class="su-styled-text positive bold large-1 s-card__price">$21.50</span></div></li>
+        </ul>`,
+      });
+    });
+    const page = await appPage(context, 'https://pilego.app');
+    const reply = await page.evaluate(
+      () =>
+        new Promise(resolve => {
+          window.addEventListener('message', e => {
+            if (e.data?.source === 'pilego-ext' && e.data.type === 'sold-comps' && e.data.request_id === 'r1') resolve(e.data);
+          });
+          window.postMessage({ source: 'pilego-app', type: 'sold-comps', request_id: 'r1', query: 'gap arch hoodie', region: 'US' }, location.origin);
+        }),
+    );
+    expect(reply).toMatchObject({
+      request_id: 'r1',
+      comps: [{ source: 'ebay', title: 'GAP Arch Logo Hoodie Brown M', price: 21.5, currency: 'USD', url: 'https://www.ebay.com/itm/396112233445', sold: true }],
+    });
+    expect(searches).toHaveLength(1);
+    expect(new URL(searches[0]!).searchParams.get('LH_Sold')).toBe('1');
+  });
+
+  test('an unknown app cannot use the browser to read eBay', async ({ context }) => {
+    const page = await appPage(context, 'https://someone-else.pages.dev');
+    const reply = await page.evaluate(
+      () =>
+        new Promise(resolve => {
+          window.addEventListener('message', e => {
+            if (e.data?.source === 'pilego-ext' && e.data.type === 'sold-comps') resolve(e.data);
+          });
+          window.postMessage({ source: 'pilego-app', type: 'sold-comps', request_id: 'r2', query: 'gap arch hoodie', region: 'US' }, location.origin);
+        }),
+    );
+    expect(reply).toMatchObject({ request_id: 'r2', comps: null });
+  });
+
   test('an unknown pages.dev app has to be approved in the popup', async ({ context, worker }) => {
     const page = await appPage(context, 'https://someone-else.pages.dev');
     const link = {

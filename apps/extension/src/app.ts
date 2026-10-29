@@ -15,6 +15,17 @@ window.addEventListener('message', event => {
   const data = event.data as { source?: string; type?: string } | null;
   if (!data || data.source !== APP || typeof data.type !== 'string') return;
   const { source: _source, type, ...payload } = data;
+  if (type === 'sold-comps') {
+    // Answered by request id, since several can be in flight at once.
+    const requestId = (payload as { request_id?: unknown }).request_id;
+    ext.runtime
+      .sendMessage({ type: 'app:sold-comps', payload })
+      .then((r: { comps?: unknown; error?: string; url?: string } | undefined) =>
+        post('sold-comps', { request_id: requestId, comps: r?.comps ?? null, error: r?.error, url: r?.url }),
+      )
+      .catch(() => post('sold-comps', { request_id: requestId, comps: null, error: 'The extension was restarting. Try again.' }));
+    return;
+  }
   ext.runtime
     .sendMessage({ type: `app:${type}`, payload })
     .then(status => status && post('status', { status }))

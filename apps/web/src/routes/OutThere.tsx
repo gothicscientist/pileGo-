@@ -134,7 +134,7 @@ export function OutThere() {
               {moving.some(j => j.runner === 'extension') && !ext.installed && (
                 <p className="mt-3 text-sm text-muted">
                   Some of these run in the browser extension. Open pileGo in a browser that has it, or{' '}
-                  <Link to="/settings#extension" className="underline">
+                  <Link to="/extension" className="underline">
                     install it
                   </Link>
                   .
