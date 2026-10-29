@@ -128,7 +128,7 @@ const work: ListingWork = {
     fields: [],
     warnings: [],
   },
-  item: { sku: 'OUT-1', brand: 'Levi’s', department: 'women', category: 'outerwear', subcategory: 'denim-jackets', size: 'M', colors: ['blue'], condition: 'good', original_price: null },
+  item: { sku: 'OUT-1', brand: 'Levi’s', department: 'women', category: 'outerwear', subcategory: 'denim-jackets', size: 'M', colors: ['blue'], condition: 'good', original_price: null, materials: [], style_tags: [], era: null },
   photos: [],
   learned: {},
   external_id: null,

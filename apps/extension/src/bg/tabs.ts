@@ -85,3 +85,20 @@ export async function readyTab(tab: chrome.tabs.Tab, ping: unknown): Promise<boo
     }
   }
 }
+
+/**
+ * Bring a tab to the front. Chrome refuses tab edits while the seller drags a
+ * tab ("Tabs cannot be edited right now"), so this tries again for a moment.
+ */
+export async function activate(tabId: number): Promise<void> {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    try {
+      const tab = await ext.tabs.update(tabId, { active: true });
+      if (tab?.windowId != null) await ext.windows.update(tab.windowId, { focused: true }).catch(() => {});
+      return;
+    } catch (err) {
+      if (!/cannot be edited|dragging/i.test(String((err as Error)?.message ?? err))) throw err;
+      await sleep(600);
+    }
+  }
+}

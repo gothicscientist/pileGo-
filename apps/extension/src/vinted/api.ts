@@ -182,11 +182,28 @@ async function anonId(): Promise<string | null> {
   return readCookie('anon_id') ?? (await workerTokens()).anon ?? null;
 }
 
-export function memberId(): string | null {
-  const fromPath = location.pathname.match(/\/member\/(\d+)/);
-  if (fromPath) return fromPath[1]!;
+let currentUser: string | null | undefined;
+
+/**
+ * The logged-in member's id. The v_uid cookie used to say, but Vinted now
+ * marks it HttpOnly on some domains (vinted.com), so the page cannot read it;
+ * the current-user endpoint answers for any logged-in tab.
+ */
+export async function memberId(): Promise<string | null> {
   const fromCookie = readCookie('v_uid');
-  return fromCookie && /^\d+$/.test(fromCookie) ? fromCookie : null;
+  if (fromCookie && /^\d+$/.test(fromCookie)) return fromCookie;
+  if (currentUser !== undefined) return currentUser;
+  try {
+    const reply = await request(`${SITE}/api/v2/users/current`, { headers: { accept: 'application/json, text/plain, */*' } });
+    const id = reply.ok ? (JSON.parse(reply.text || '{}') as { user?: { id?: number } }).user?.id : null;
+    currentUser = id ? String(id) : null;
+  } catch {
+    return null;
+  }
+  // A logged-out answer is not cached: the seller may log in in this tab.
+  const found = currentUser;
+  if (!found) currentUser = undefined;
+  return found ?? null;
 }
 
 async function writeHeaders(): Promise<Record<string, string>> {
@@ -295,8 +312,13 @@ export function catalogs(): Promise<CatalogNode[] | null> {
 }
 
 export async function sizeGroups(catalogId: number): Promise<SizeGroup[]> {
-  const body = await get<{ size_groups?: SizeGroup[] }>(`/api/v2/item_upload/size_groups?catalog_ids[]=${catalogId}`);
-  return body.size_groups ?? [];
+  // vinted.com answers the first path only; the older one is kept for other domains.
+  return (
+    (await getFirst(
+      [`/api/v2/size_groups?catalog_ids=${catalogId}`, `/api/v2/item_upload/size_groups?catalog_ids[]=${catalogId}`],
+      b => (Array.isArray(b.size_groups) ? (b.size_groups as SizeGroup[]) : null),
+    )) ?? []
+  );
 }
 
 export function colours(): Promise<Array<{ id: number; title: string }> | null> {
@@ -414,7 +436,7 @@ export async function wardrobePage(member: string, page: number): Promise<{ item
   return { items: body.items ?? [], total_pages: body.pagination?.total_pages ?? null };
 }
 
-/** Whether this tab is logged in, cheaply: the member cookie is set on login. */
-export function loggedIn(): boolean {
-  return memberId() != null;
+/** Whether this tab is logged in to Vinted. */
+export async function loggedIn(): Promise<boolean> {
+  return (await memberId()) != null;
 }

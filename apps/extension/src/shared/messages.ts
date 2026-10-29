@@ -25,6 +25,9 @@ export interface ListingWork {
     colors: string[];
     condition: string | null;
     original_price: number | null;
+    materials: string[];
+    style_tags: string[];
+    era: string | null;
   };
   photos: PhotoBytes[];
   /** Ids learned earlier for this marketplace (catalog, brand). */
@@ -70,4 +73,24 @@ export type AssistRequest =
 export type AssistReport =
   | { type: 'assist:posted'; job_id: string; url: string | null }
   | { type: 'assist:removed'; job_id: string }
-  | { type: 'assist:gave-up'; job_id: string; message: string };
+  | { type: 'assist:gave-up'; job_id: string; message: string }
+  /** The form would not post on its own; the tab stays open for the seller. */
+  | { type: 'assist:stuck'; job_id: string; message: string };
+
+/** What a sell-form tab answers to assist:fill, once it has done all it can. */
+export interface FillResult {
+  ok: boolean;
+  filled: string[];
+  missing: string[];
+  photos: number;
+  /** pileGo pressed the site's own post button. */
+  posted: boolean;
+  error?: string;
+}
+
+/** Keeps the background worker awake and the seller informed while a form fills. */
+export interface AssistProgress {
+  type: 'assist:progress';
+  job_id: string;
+  step: string;
+}

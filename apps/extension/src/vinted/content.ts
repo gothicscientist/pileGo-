@@ -88,7 +88,7 @@ function needsUser(message: string, draftId: number, learned: Record<string, unk
 
 /** Publish a new listing, or with `replace`, publish it and remove the old one first. */
 async function publish(work: ListingWork, replace: string | null): Promise<VintedOutcome> {
-  if (!api.loggedIn()) return { status: 'failed', message: 'Log in to Vinted in this browser first.' };
+  if (!(await api.loggedIn())) return { status: 'failed', message: 'Log in to Vinted in this browser first.' };
   const sessionId = uuid();
   const { ids, learned, missing } = await resolveIds(work);
   await step();
@@ -144,7 +144,7 @@ async function changePrice(externalId: string, price: number): Promise<VintedOut
 }
 
 async function wardrobe(maxPages = 25): Promise<VintedOutcome> {
-  const member = api.memberId();
+  const member = await api.memberId();
   if (!member) return { status: 'failed', message: 'Log in to Vinted in this browser first.' };
   const items: WardrobeItem[] = [];
   let complete = false;
@@ -164,7 +164,7 @@ async function handle(msg: VintedRequest): Promise<VintedOutcome> {
   try {
     switch (msg.type) {
       case 'vinted:ping':
-        return { status: 'done', data: { site: api.SITE, logged_in: api.loggedIn() } };
+        return { status: 'done', data: { site: api.SITE, logged_in: await api.loggedIn() } };
       case 'vinted:publish':
         return await publish(msg.work, null);
       case 'vinted:relist':
@@ -196,4 +196,4 @@ ext.runtime.onMessage.addListener((msg: VintedRequest, _sender, reply) => {
   return true;
 });
 
-void ext.runtime.sendMessage({ type: 'vinted:hello', site: api.SITE, logged_in: api.loggedIn() }).catch(() => {});
+void api.loggedIn().then(logged_in => ext.runtime.sendMessage({ type: 'vinted:hello', site: api.SITE, logged_in })).catch(() => {});

@@ -173,9 +173,17 @@ export function setValue(el: Fillable, value: string): void {
   el.blur();
 }
 
+/**
+ * The listing's photo input. Search-by-photo inputs in the site header take
+ * images too, and photos handed to one of those never reach the listing.
+ */
 export function findPhotoInput(doc: Document): HTMLInputElement | null {
-  const inputs = [...doc.querySelectorAll<HTMLInputElement>('input[type="file"]')];
-  return inputs.find(i => /image/.test(i.accept) || i.multiple) ?? inputs[0] ?? null;
+  const inputs = [...doc.querySelectorAll<HTMLInputElement>('input[type="file"]')].filter(
+    i => !i.closest('header, nav, [role="search"]') && !/search/i.test(`${i.id} ${i.name} ${i.getAttribute('data-testid') ?? ''} ${i.getAttribute('aria-label') ?? ''}`),
+  );
+  const inForm = inputs.filter(i => i.closest('form, main'));
+  const pool = inForm.length ? inForm : inputs;
+  return pool.find(i => /image|jpe?g|png/.test(i.accept) || i.multiple) ?? pool[0] ?? null;
 }
 
 /** Hand files to the site's own upload input, as if the seller had picked them. */
