@@ -16,7 +16,15 @@ import { Button, ChipInput, ChoiceChips, ErrorNote, Field, Paper, Select, Spinne
 import { useAuth } from '~/lib/auth';
 import { askExtensionToImport, askExtensionToSync, useExtension } from '~/lib/extension';
 import { ago, cx } from '~/lib/format';
-import { useEbayActions, useEbayPolicies, useEbayStatus, useProfile, useUpdateProfile, type FullProfile } from '~/lib/queries';
+import {
+  useEbayActions,
+  useEbayPolicies,
+  useEbayStatus,
+  useProfile,
+  useUpdateProfile,
+  type EbayStatus,
+  type FullProfile,
+} from '~/lib/queries';
 import { errorMessage, supabase } from '~/lib/supabase';
 import { applyTheme, savedTheme, type Theme } from '~/lib/theme';
 
@@ -196,7 +204,7 @@ function Ebay() {
     const result = params.get('ebay');
     if (!result) return;
     if (result === 'connected') toast('eBay connected');
-    else toast('eBay was not connected', { tone: 'error' });
+    else toast(EBAY_RETURN_MESSAGE[result] ?? 'eBay was not connected', { tone: 'error' });
     void status.refetch();
     setParams(
       p => {
@@ -223,11 +231,7 @@ function Ebay() {
       ) : status.isError ? (
         <ErrorNote error={status.error} />
       ) : !status.data?.configured ? (
-        <p className="text-sm text-ink-2">
-          This copy of pileGo has no eBay developer keys yet. Whoever runs it adds <code>EBAY_CLIENT_ID</code>,{' '}
-          <code>EBAY_CLIENT_SECRET</code> and <code>EBAY_RUNAME</code> to the server functions’ secrets; the self-hosting guide shows how.
-          Until then, eBay works with the listing kit.
-        </p>
+        <EbaySetupNeeded setup={status.data?.setup} />
       ) : !connected ? (
         <div className="flex flex-col items-start gap-3">
           {status.data.account?.status === 'expired' && (
@@ -288,7 +292,11 @@ function Ebay() {
             />
           </div>
           {policies.isError && <ErrorNote error={policies.error} />}
-          <p className="-mt-2 text-xs text-muted">Leave a policy on “First one” and pileGo uses your first eBay policy, or creates a simple one.</p>
+          <p className="-mt-2 text-xs text-muted">
+            Leave a policy on “First one” and pileGo uses your first eBay policy. Without payment or returns policies, pileGo makes
+            simple ones (30-day returns, buyer pays return postage). The shipping policy sets postage, so create that one in eBay
+            Seller Hub.
+          </p>
 
           <div id="import" className="flex scroll-mt-24 flex-wrap gap-2">
             <Button
@@ -321,6 +329,53 @@ function Ebay() {
         </div>
       )}
     </Section>
+  );
+}
+
+const EBAY_RETURN_MESSAGE: Record<string, string> = {
+  declined: 'eBay was not connected: the sign-in was cancelled on eBay.',
+  expired: 'The eBay sign-in took too long. Press Connect eBay to try again.',
+  error: 'eBay signed you in but pileGo could not finish connecting. Try again in a minute.',
+};
+
+/** Shown while the server has no eBay keys: what the seller can do now, and what whoever runs pileGo still has to add. */
+function EbaySetupNeeded({ setup }: { setup?: EbayStatus['setup'] }) {
+  const steps: Array<[string, boolean | undefined]> = [
+    ['App ID (Client ID): EBAY_CLIENT_ID', setup?.client_id],
+    ['Cert ID (Client Secret): EBAY_CLIENT_SECRET', setup?.client_secret],
+    ['RuName (eBay redirect URL name): EBAY_RU_NAME', setup?.ru_name],
+    ['Account deletion verification token: EBAY_VERIFICATION_TOKEN', setup?.verification_token],
+  ];
+  return (
+    <div className="flex flex-col gap-3 text-sm text-ink-2">
+      <p>
+        eBay isn’t switched on for this copy of pileGo yet, so the Connect button is hidden. Until it is, use the listing kit on an
+        item’s eBay listing: it copies the title, description and photos for eBay’s own sell form.
+      </p>
+      <details className="rounded-lg bg-paper-2 px-3 py-2">
+        <summary className="cursor-pointer font-semibold text-ink">For whoever runs pileGo</summary>
+        <p className="mt-2">
+          Add these eBay developer keys to the Supabase function secrets ({setup?.environment ?? 'production'} keys). The steps are in{' '}
+          <a className="underline" href="https://github.com/gothicscientist/pileGo-/blob/main/docs/ebay-setup.md" target="_blank" rel="noreferrer">
+            docs/ebay-setup.md
+          </a>
+          .
+        </p>
+        <ul className="mt-2 flex flex-col gap-1">
+          {steps.map(([label, done]) => (
+            <li key={label} className="flex items-start gap-2">
+              <span aria-hidden className={cx('font-bold', done ? 'text-tag' : 'text-muted')}>
+                {done ? '✓' : '○'}
+              </span>
+              <span>
+                {label}
+                <span className="sr-only">{done ? ' (set)' : ' (missing)'}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </details>
+    </div>
   );
 }
 

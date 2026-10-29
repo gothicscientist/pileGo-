@@ -7,7 +7,7 @@ import { EBAY_CONDITIONS, EBAY_CONDITION_ENUM_ID } from './core/conditions.ts';
 import { generateListing } from './core/listing.ts';
 import { findSubcategory } from './core/taxonomy.ts';
 import type { Item, Profile } from './core/types.ts';
-import { ebay, EbayError, getAppToken, type EbaySite } from './ebay.ts';
+import { ebay, EbayError, getAppToken, mediaBase, type EbaySite } from './ebay.ts';
 
 export interface EbaySetup {
   fulfillment_policy_id: string;
@@ -17,7 +17,12 @@ export interface EbaySetup {
 }
 
 export class NeedsSeller extends Error {
-  constructor(message: string, public missing: string[] = []) {
+  constructor(
+    message: string,
+    public missing: string[] = [],
+    /** Allowed values for each missing eBay aspect; empty when any text works. */
+    public choices: Record<string, string[]> = {},
+  ) {
     super(message);
   }
 }
@@ -33,7 +38,68 @@ interface AccountMeta {
   [key: string]: unknown;
 }
 
-/** Find (or create) the business policies and ship-from location eBay requires. */
+const CATEGORY_TYPES = [{ name: 'ALL_EXCLUDING_MOTORS_VEHICLES' }];
+
+/** eBay error 20403: the seller is not opted in to business policies. */
+async function optInToPolicies(token: string): Promise<never> {
+  try {
+    await ebay({
+      method: 'POST',
+      path: '/sell/account/v1/program/opt_in',
+      token,
+      body: { programType: 'SELLING_POLICY_MANAGEMENT' },
+    });
+  } catch (err) {
+    console.warn('business policy opt-in failed', err);
+    throw new NeedsSeller('Turn on business policies in eBay Seller Hub (Account › Business policies), then try again.');
+  }
+  throw new NeedsSeller(
+    'pileGo just turned on business policies for your eBay account. eBay can take up to an hour to finish; then create a shipping policy in Seller Hub (Account › Business policies) and press List again.',
+  );
+}
+
+/** A payment policy is a formality with eBay managed payments, so pileGo makes one when there is none. */
+async function createPaymentPolicy(token: string, site: EbaySite): Promise<string> {
+  const r = await ebay<{ paymentPolicyId: string }>({
+    method: 'POST',
+    path: '/sell/account/v1/payment_policy',
+    token,
+    site,
+    body: {
+      name: 'pileGo payment',
+      marketplaceId: site.marketplace_id,
+      categoryTypes: CATEGORY_TYPES,
+      immediatePay: true,
+    },
+  });
+  return r.paymentPolicyId;
+}
+
+/** 30-day returns, buyer pays return postage: the common default for secondhand clothes. */
+async function createReturnPolicy(token: string, site: EbaySite): Promise<string> {
+  const r = await ebay<{ returnPolicyId: string }>({
+    method: 'POST',
+    path: '/sell/account/v1/return_policy',
+    token,
+    site,
+    body: {
+      name: 'pileGo returns',
+      marketplaceId: site.marketplace_id,
+      categoryTypes: CATEGORY_TYPES,
+      returnsAccepted: true,
+      returnPeriod: { value: 30, unit: 'DAY' },
+      returnShippingCostPayer: 'BUYER',
+      refundMethod: 'MONEY_BACK',
+    },
+  });
+  return r.returnPolicyId;
+}
+
+/**
+ * Find the business policies and ship-from location eBay requires. Payment
+ * and return policies are created when the seller has none; a shipping
+ * policy sets postage costs, so that one is the seller's to make.
+ */
 export async function ensureSetup(
   admin: SupabaseClient,
   userId: string,
@@ -42,7 +108,7 @@ export async function ensureSetup(
   meta: AccountMeta,
 ): Promise<EbaySetup> {
   const q = { marketplace_id: site.marketplace_id };
-  const [fulfillment, payment, returns] = await Promise.all([
+  let [fulfillment, payment, returns] = await Promise.all([
     meta.fulfillment_policy_id
       ? Promise.resolve(meta.fulfillment_policy_id)
       : ebay<{ fulfillmentPolicies?: Array<{ fulfillmentPolicyId: string }> }>({
@@ -59,20 +125,16 @@ export async function ensureSetup(
           path: '/sell/account/v1/return_policy', token, query: q,
         }).then(r => r.returnPolicies?.[0]?.returnPolicyId),
   ]).catch(err => {
-    if (err instanceof EbayError && err.has(20403)) {
-      throw new NeedsSeller('Turn on business policies in eBay Seller Hub (Account › Business policies), then try again.');
-    }
+    if (err instanceof EbayError && err.has(20403)) return optInToPolicies(token);
     throw err;
   });
 
-  const missing: string[] = [];
-  if (!fulfillment) missing.push('a shipping policy');
-  if (!payment) missing.push('a payment policy');
-  if (!returns) missing.push('a return policy');
-  if (missing.length) {
+  if (!payment) payment = await createPaymentPolicy(token, site);
+  if (!returns) returns = await createReturnPolicy(token, site);
+  if (!fulfillment) {
     throw new NeedsSeller(
-      `Create ${missing.join(', ')} in eBay Seller Hub (Account › Business policies), then try again.`,
-      missing,
+      'Create a shipping policy in eBay Seller Hub (Account › Business policies) so eBay knows what postage to charge, then press List again.',
+      ['shipping policy'],
     );
   }
 
@@ -131,6 +193,15 @@ async function categoryTreeId(site: EbaySite): Promise<string> {
   });
   treeIds.set(site.marketplace_id, r.categoryTreeId);
   return r.categoryTreeId;
+}
+
+/** What to ask the category suggester: the department matters (men's vs women's jeans). */
+export function categoryQuery(item: Pick<Item, 'department'>, title: string): string {
+  const dept: Record<string, string> = { women: "Women's", men: "Men's", kids: 'Kids' };
+  const prefix = item.department ? dept[item.department] : undefined;
+  if (!prefix) return title;
+  const word = prefix.toLowerCase().replace("'s", '');
+  return new RegExp(`\\b${word}`, 'i').test(title) ? title : `${prefix} ${title}`;
 }
 
 export async function suggestCategory(site: EbaySite, query: string): Promise<{ id: string; name: string; tree: string }> {
@@ -201,30 +272,49 @@ export function candidateAspects(item: Item): Record<string, string[]> {
     kids: ['Unisex Kids', 'Girls', 'Boys'],
   };
   const material = item.materials.map(m => m.replace(/^\d+%\s*/, '').split(/[,/]/)[0]!.trim()).filter(Boolean);
+  const type = sub ? [sub.label.replace(/s$/, ''), sub.label, ...sub.search] : [];
   return {
     Brand: [item.brand?.trim() || 'Unbranded'],
-    Size: item.size ? [item.size] : [],
+    Size: sizeCandidates(item.size),
     'Size Type': ['Regular'],
     Department: item.department ? dept[item.department] ?? [] : [],
-    Type: sub ? [sub.label.replace(/s$/, ''), sub.label, ...sub.search] : [],
+    Type: type,
     Color: item.colors.map(c => c[0]!.toUpperCase() + c.slice(1)),
     Material: material.map(m => m[0]!.toUpperCase() + m.slice(1)),
     'Outer Shell Material': material,
-    Style: item.style_tags,
+    // Many clothing categories require Style; the garment type is a fair answer when there are no tags.
+    Style: [...item.style_tags, ...type],
     Theme: item.era ? [item.era] : [],
     Vintage: item.era && /\d0s|vintage|y2k/i.test(item.era) ? ['Yes'] : [],
     Pattern: [],
   };
 }
 
+const LETTER_SIZES: Record<string, string> = {
+  'extra small': 'XS', 'x small': 'XS', small: 'S', medium: 'M', large: 'L', 'extra large': 'XL', 'x large': 'XL',
+};
+
+/** The size as printed, then without its system ("UK 10" → "10") and as a letter ("Medium" → "M"). */
+export function sizeCandidates(size: string | null): string[] {
+  if (!size?.trim()) return [];
+  const raw = size.trim();
+  const out = [raw];
+  const bare = raw.replace(/^(uk|us|eu|it|fr|jp|au|size)\s*/i, '').trim();
+  if (bare && bare !== raw) out.push(bare);
+  const letter = LETTER_SIZES[raw.toLowerCase().replace(/[-.]/g, ' ').replace(/\s+/g, ' ')];
+  if (letter) out.push(letter);
+  return out;
+}
+
 export function buildAspects(
   item: Item,
   aspects: Aspect[],
   overrides: Record<string, string[]> = {},
-): { values: Record<string, string[]>; missing: string[] } {
+): { values: Record<string, string[]>; missing: string[]; choices: Record<string, string[]> } {
   const known = candidateAspects(item);
   const values: Record<string, string[]> = {};
   const missing: string[] = [];
+  const choices: Record<string, string[]> = {};
   for (const aspect of aspects) {
     const wanted = overrides[aspect.name] ?? known[aspect.name] ?? [];
     let picked: string[] = [];
@@ -235,11 +325,14 @@ export function buildAspects(
     }
     picked = picked.map(v => v.slice(0, 65));
     if (picked.length) values[aspect.name] = picked;
-    else if (aspect.required) missing.push(aspect.name);
+    else if (aspect.required) {
+      missing.push(aspect.name);
+      choices[aspect.name] = aspect.mode === 'SELECTION_ONLY' ? aspect.values.slice(0, 200) : [];
+    }
   }
   // Brand is always worth sending, even if the category does not list it.
   if (!values.Brand) values.Brand = known.Brand!;
-  return { values, missing };
+  return { values, missing, choices };
 }
 
 async function conditionFor(token: string, site: EbaySite, categoryId: string, item: Item): Promise<string> {
@@ -266,6 +359,31 @@ async function conditionFor(token: string, site: EbaySite, categoryId: string, i
     console.warn('condition policy lookup failed', err);
   }
   return wanted[0]!;
+}
+
+/**
+ * Copy the photos to eBay Picture Services. pileGo's own photo links are
+ * signed and expire, so eBay gets copies of its own. If the Media API
+ * refuses one, the signed link is sent instead.
+ */
+export async function hostImages(token: string, urls: string[]): Promise<string[]> {
+  return Promise.all(
+    urls.map(async url => {
+      try {
+        const r = await ebay<{ imageUrl?: string }>({
+          method: 'POST',
+          base: mediaBase(),
+          path: '/commerce/media/v1_beta/image/create_image_from_url',
+          token,
+          body: { imageUrl: url },
+        });
+        return r?.imageUrl || url;
+      } catch (err) {
+        console.warn('eBay image upload failed, sending the direct link', err instanceof Error ? err.message : err);
+        return url;
+      }
+    }),
+  );
 }
 
 function descriptionHtml(text: string): string {
@@ -313,12 +431,17 @@ export async function publishToEbay(token: string, input: PublishInput): Promise
 
   const category = input.overrides.category_id
     ? { id: input.overrides.category_id, name: '', tree: await categoryTreeId(site) }
-    : await suggestCategory(site, title);
+    : await suggestCategory(site, categoryQuery(item, title));
   const aspectList = await aspectsFor(category.tree, category.id);
-  const { values, missing } = buildAspects(item, aspectList, input.overrides.aspects);
+  const { values, missing, choices } = buildAspects(item, aspectList, input.overrides.aspects);
   if (missing.length) {
-    throw new NeedsSeller(`eBay needs ${missing.join(', ')} for “${category.name || 'this category'}”. Fill them in on the item’s eBay tab.`, missing);
+    throw new NeedsSeller(
+      `eBay needs ${missing.join(', ')} for “${category.name || 'this category'}”. Fill them in on the eBay listing and press List again.`,
+      missing,
+      choices,
+    );
   }
+  const imageUrls = await hostImages(token, input.imageUrls.slice(0, 24));
   const condition = await conditionFor(token, site, category.id, item);
 
   await ebay({
@@ -334,7 +457,7 @@ export async function publishToEbay(token: string, input: PublishInput): Promise
         title,
         description,
         aspects: values,
-        imageUrls: input.imageUrls.slice(0, 24),
+        imageUrls,
       },
     },
   });
@@ -395,13 +518,16 @@ export async function withdrawFromEbay(token: string, offerId: string): Promise<
     await ebay({ method: 'POST', path: `/sell/inventory/v1/offer/${offerId}/withdraw`, token });
   } catch (err) {
     // Already ended (sold or withdrawn) counts as done.
-    if (err instanceof EbayError && (err.status === 404 || /not.*(published|active)|already/i.test(err.message))) return;
+    if (err instanceof EbayError && (err.status === 404 || err.has(25713) || /not.*(published|active)|already|ended/i.test(err.message))) return;
     throw err;
   }
 }
 
 export async function updateEbayPrice(token: string, site: EbaySite, sku: string, offerId: string, price: number): Promise<void> {
-  await ebay({
+  // The call answers 200 even when an offer fails; each response has its own status.
+  const r = await ebay<{
+    responses?: Array<{ statusCode?: number; errors?: Array<{ errorId?: number; message?: string; longMessage?: string }> }>;
+  }>({
     method: 'POST',
     path: '/sell/inventory/v1/bulk_update_price_quantity',
     token,
@@ -415,4 +541,6 @@ export async function updateEbayPrice(token: string, site: EbaySite, sku: string
       ],
     },
   });
+  const failed = (r?.responses ?? []).find(x => (x.statusCode ?? 200) >= 400);
+  if (failed) throw new EbayError(failed.statusCode!, { errors: failed.errors ?? [] }, 'eBay did not take the new price.');
 }

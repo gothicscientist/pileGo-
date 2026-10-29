@@ -45,8 +45,33 @@ function authBase(): string {
   return sandbox() ? 'https://auth.sandbox.ebay.com' : 'https://auth.ebay.com';
 }
 
+/** Media API (image uploads to eBay Picture Services) lives on its own host. */
+export function mediaBase(): string {
+  return sandbox() ? 'https://apim.sandbox.ebay.com' : 'https://apim.ebay.com';
+}
+
 export function ebayConfigured(): boolean {
   return Boolean(Deno.env.get('EBAY_CLIENT_ID') && Deno.env.get('EBAY_CLIENT_SECRET') && Deno.env.get('EBAY_RU_NAME'));
+}
+
+/** Which eBay settings this server has, without their values. */
+export function ebaySetup(): {
+  environment: 'production' | 'sandbox';
+  client_id: boolean;
+  client_secret: boolean;
+  ru_name: boolean;
+  verification_token: boolean;
+  app_url: boolean;
+} {
+  const has = (name: string) => Boolean(Deno.env.get(name)?.trim());
+  return {
+    environment: sandbox() ? 'sandbox' : 'production',
+    client_id: has('EBAY_CLIENT_ID'),
+    client_secret: has('EBAY_CLIENT_SECRET'),
+    ru_name: has('EBAY_RU_NAME'),
+    verification_token: has('EBAY_VERIFICATION_TOKEN'),
+    app_url: has('PILEGO_APP_URL'),
+  };
 }
 
 function basicAuth(): string {
@@ -115,6 +140,16 @@ async function tokenRequest(body: URLSearchParams): Promise<TokenResponse> {
     throw new EbayError(res.status, data, 'eBay refused the sign-in. Connect eBay again from Settings.');
   }
   return data as TokenResponse;
+}
+
+/** The public key eBay signs notifications with (Notification API getPublicKey). */
+export function notificationPublicKey(kid: string): Promise<{ key: string; algorithm?: string; digest?: string }> {
+  return getAppToken().then(token =>
+    ebay<{ key: string; algorithm?: string; digest?: string }>({
+      path: `/commerce/notification/v1/public_key/${encodeURIComponent(kid)}`,
+      token,
+    }),
+  );
 }
 
 export function exchangeCode(code: string): Promise<TokenResponse> {
@@ -223,10 +258,12 @@ export interface EbayRequest {
   site?: EbaySite;
   query?: Record<string, string | number | undefined>;
   headers?: Record<string, string>;
+  /** Another eBay host, such as mediaBase(). */
+  base?: string;
 }
 
 export async function ebay<T = unknown>(req: EbayRequest): Promise<T> {
-  const url = new URL(apiBase() + req.path);
+  const url = new URL((req.base ?? apiBase()) + req.path);
   for (const [k, v] of Object.entries(req.query ?? {})) if (v !== undefined) url.searchParams.set(k, String(v));
   const headers: Record<string, string> = {
     Authorization: `Bearer ${req.token}`,

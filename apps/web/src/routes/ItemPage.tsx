@@ -27,6 +27,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { JobRow } from '~/components/JobRow';
 import { ItemStatusTag, ListingStatusText, PhotoImg, Sticker, TierLabel } from '~/components/bits';
 import { CrossListSheet } from '~/components/CrossListSheet';
+import { EbayAspects, missingEbayAspects } from '~/components/EbayAspects';
 import { diffForm, formFromItem, ItemForm, type FormValue } from '~/components/ItemForm';
 import { ListingKit } from '~/components/ListingKit';
 import { Sheet, useToast } from '~/components/overlay';
@@ -544,6 +545,7 @@ function ListingRow({
         <TierLabel tier={info.capabilities.create} />
       </div>
       {listing.error && <ErrorNote error={listing.error} className="mt-3" />}
+      <EbayAspects listing={listing} />
       <div className="mt-3 flex flex-wrap gap-2">
         {listing.status === 'listed' && canRelist && (
           <Button size="sm" variant="line" icon={<RefreshCw className="size-4" aria-hidden />} busy={job.isPending} onClick={() => run('relist')}>
@@ -560,7 +562,12 @@ function ListingRow({
             List again
           </Button>
         )}
-        {listing.status === 'needs_action' && (
+        {listing.status === 'needs_action' && info.capabilities.create === 'api' && item.status !== 'sold' && !missingEbayAspects(listing).length && (
+          <Button size="sm" variant="line" icon={<RotateCcw className="size-4" aria-hidden />} onClick={() => run('relist')}>
+            Try again
+          </Button>
+        )}
+        {listing.status === 'needs_action' && info.capabilities.create !== 'api' && (
           <Button
             size="sm"
             variant="line"

@@ -4,10 +4,17 @@
 // GET  ?challenge_code=…  → { challengeResponse } proving this endpoint is ours
 // POST { notification: { data: { username, userId } } } → forget that eBay account
 //
+// A POST only counts when its X-EBAY-SIGNATURE checks out against eBay's
+// public key; anything else gets 412, as eBay's SDKs answer. Without the
+// eBay keys there is no way to check, but then no eBay account can be
+// connected either, so the notice is acknowledged and nothing is done.
+//
 // pileGo keeps an eBay account's tokens, username and id. When eBay says the
 // account was deleted, the tokens and the connection go; the seller's own
 // items and listings stay, since they belong to the pileGo account.
 
+import { ebayConfigured, notificationPublicKey } from '../_shared/ebay.ts';
+import { parseSignatureHeader, publicKeyFor, verifySignature } from '../_shared/ebay-notify.ts';
 import { HttpError, env, serve } from '../_shared/http.ts';
 import { adminClient } from '../_shared/supabase.ts';
 
@@ -30,18 +37,41 @@ serve(async req => {
   }
   if (req.method !== 'POST') throw new HttpError(405, 'Use GET or POST.');
 
-  const body = (await req.json().catch(() => null)) as { notification?: { data?: { username?: string; userId?: string } } } | null;
+  const raw = await req.text();
+  if (!ebayConfigured()) return new Response(null, { status: 204 });
+
+  const header = parseSignatureHeader(req.headers.get('x-ebay-signature'));
+  if (!header) return new Response(null, { status: 412 });
+  let verified = false;
+  try {
+    verified = await verifySignature(raw, header, await publicKeyFor(header.kid, notificationPublicKey));
+  } catch (err) {
+    // eBay retries notifications it does not see acknowledged, so a failed
+    // key lookup is a server error rather than a rejection.
+    console.error('eBay notification key lookup failed', err);
+    return new Response(null, { status: 500 });
+  }
+  if (!verified) return new Response(null, { status: 412 });
+
+  let body: { notification?: { data?: { username?: string; userId?: string } } } | null = null;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return new Response(null, { status: 204 });
+  }
   const data = body?.notification?.data;
   if (!data?.username && !data?.userId) return new Response(null, { status: 204 });
 
   const admin = adminClient();
-  let query = admin.from('marketplace_accounts').select('user_id').eq('marketplace', 'ebay');
   const filters = [
     data.username ? `username.eq.${JSON.stringify(data.username)}` : null,
     data.userId ? `meta->>ebay_user_id.eq.${JSON.stringify(data.userId)}` : null,
   ].filter(Boolean);
-  query = query.or(filters.join(','));
-  const { data: rows, error } = await query;
+  const { data: rows, error } = await admin
+    .from('marketplace_accounts')
+    .select('user_id')
+    .eq('marketplace', 'ebay')
+    .or(filters.join(','));
   if (error) throw new HttpError(500, error.message);
 
   for (const { user_id } of rows ?? []) {
