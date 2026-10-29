@@ -81,7 +81,7 @@ pnpm install
 SUPABASE_ACCESS_TOKEN=… SUPABASE_PROJECT_REF=… GEMINI_API_KEY=… \
 PILEGO_APP_URL=https://your-app.pages.dev node scripts/deploy.mjs
 pnpm --filter @pilego/web build          # deploy apps/web/dist
-PILEGO_APP_ORIGINS=https://your-app.pages.dev pnpm --filter @pilego/extension build:zip
+# The web build also builds the extension and serves it at /downloads; see /extension in the app.
 ```
 
 ## Develop

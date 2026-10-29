@@ -109,7 +109,8 @@ export function SignIn() {
                   Email me a sign-in link
                 </Button>
                 <p className="text-xs text-muted">
-                  Free and open source. Read the <a className="underline" href="/privacy">privacy notes</a>.
+                  Free and open source. Read the <a className="underline" href="/privacy">privacy notes</a>, or{' '}
+                  <a className="underline" href="/extension">get the browser extension</a>.
                 </p>
               </form>
             )}

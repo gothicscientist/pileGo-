@@ -21,8 +21,9 @@ jobs:
       - name: Build Chrome and Firefox zips
         run: pnpm --filter @pilego/extension build:zip
         env:
-          # The deployed web app, set under Settings > Secrets and variables > Actions > Variables.
-          PILEGO_APP_ORIGINS: ${{ vars.PILEGO_APP_ORIGINS }}
+          # https://pilego.app is trusted by default. A self-hosted copy adds its own
+          # origins under Settings > Secrets and variables > Actions > Variables.
+          PILEGO_APP_ORIGINS: ${{ vars.PILEGO_APP_ORIGINS || 'https://pilego.app' }}
       - uses: softprops/action-gh-release@v2
         with:
           files: apps/extension/dist/*.zip

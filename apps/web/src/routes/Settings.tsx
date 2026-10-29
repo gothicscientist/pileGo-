@@ -9,7 +9,7 @@ import {
 } from '@pilego/core';
 import { Download, LogOut, PlugZap, RefreshCw } from 'lucide-react';
 import { useEffect, useId, useState, type ReactNode } from 'react';
-import { useLocation, useSearchParams } from 'react-router';
+import { Link, useLocation, useSearchParams } from 'react-router';
 import { Sticker, TierLabel } from '~/components/bits';
 import { useToast } from '~/components/overlay';
 import { Button, ChipInput, ChoiceChips, ErrorNote, Field, Paper, Select, Spinner, TextField } from '~/components/ui';
@@ -19,6 +19,7 @@ import { ago, cx } from '~/lib/format';
 import { useEbayActions, useEbayPolicies, useEbayStatus, useProfile, useUpdateProfile, type FullProfile } from '~/lib/queries';
 import { errorMessage, supabase } from '~/lib/supabase';
 import { applyTheme, savedTheme, type Theme } from '~/lib/theme';
+import { EXTENSION_VERSION, older } from '~/routes/ExtensionPage';
 
 const CURRENCIES = ['USD', 'GBP', 'EUR', 'CAD', 'AUD'];
 const REGIONS: Array<{ id: Profile['region']; label: string }> = [
@@ -381,6 +382,15 @@ function Extension() {
             {ext.version ? `, version ${ext.version}` : ''}
             {ext.running ? `, running ${ext.running} ${ext.running === 1 ? 'job' : 'jobs'}` : ''}
           </p>
+          {older(ext.version, EXTENSION_VERSION) && (
+            <p className="rounded-lg bg-sticker/60 px-3 py-2 text-sm text-[#16172b]">
+              Version {EXTENSION_VERSION} is out.{' '}
+              <Link to="/extension" className="font-semibold underline">
+                Download it
+              </Link>{' '}
+              and press reload on the pileGo card in your browser’s extensions page.
+            </p>
+          )}
           <ul className="flex flex-wrap gap-2" aria-label="Marketplace tabs open in this browser">
             {EXTENSION_MARKETS.map(m => (
               <li key={m} className="flex items-center gap-1.5 rounded-lg bg-paper-2 px-2 py-1 text-xs">
@@ -425,19 +435,14 @@ function Extension() {
             <PlugZap className="size-5" aria-hidden />
             Not installed in this browser
           </p>
-          <ol className="list-decimal space-y-1 pl-5 text-ink-2">
-            <li>
-              Download <strong>pilego-extension-chrome.zip</strong> (or the Firefox one) from the project’s releases page and unzip it.
-            </li>
-            <li>
-              In Chrome, Edge or Brave open <code>chrome://extensions</code>, turn on Developer mode and choose <em>Load unpacked</em>. In
-              Firefox open <code>about:debugging</code> and load the zip as a temporary add-on.
-            </li>
-            <li>Come back to this page. The extension links to your account by itself and stays signed in.</li>
-          </ol>
-          <a className="btn btn-ink self-start" href="https://github.com/gothicscientist/pileGo-/releases" target="_blank" rel="noreferrer">
-            Releases page
-          </a>
+          <p className="text-ink-2">
+            Download it from pileGo, unzip it and load it in Chrome, Edge, Brave or Firefox. It takes about two minutes, and it links
+            to your account by itself.
+          </p>
+          <Link className="btn btn-tag self-start" to="/extension">
+            <Download className="size-4" aria-hidden />
+            Get the extension
+          </Link>
         </div>
       )}
     </Section>
