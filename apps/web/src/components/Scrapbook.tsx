@@ -2,7 +2,7 @@
 // photos with tape, and the kraft tag. Each one can be picked up and dropped,
 // and settles back with a little spring.
 
-import { motion, useReducedMotion, type MotionStyle } from 'motion/react';
+import { motion, useReducedMotion, type MotionStyle, type PanInfo } from 'motion/react';
 import type { CSSProperties, ReactNode, RefObject } from 'react';
 import { CUTOUTS, type CutoutId } from '~/lib/art';
 import { cx } from '~/lib/format';
@@ -75,6 +75,9 @@ export function Polaroid({
   index = 0,
   className,
   style,
+  onDragStart,
+  onDrag,
+  onDragEnd,
 }: {
   src: string;
   caption?: ReactNode;
@@ -83,6 +86,9 @@ export function Polaroid({
   index?: number;
   className?: string;
   style?: CSSProperties;
+  onDragStart?: () => void;
+  onDrag?: (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => void;
+  onDragEnd?: (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => void;
 }) {
   const reduce = useReducedMotion();
   const r = at?.r ?? 0;
@@ -91,6 +97,9 @@ export function Polaroid({
       drag={Boolean(board)}
       dragConstraints={board}
       dragElastic={0.18}
+      onDragStart={onDragStart}
+      onDrag={onDrag}
+      onDragEnd={onDragEnd}
       initial={reduce ? false : { opacity: 0, y: 24, rotate: r - 10 }}
       animate={{ opacity: 1, y: 0, rotate: r }}
       whileHover={reduce ? undefined : { rotate: r * 0.5, y: -5, scale: 1.02 }}
@@ -118,9 +127,10 @@ export function Polaroid({
 
 /** A loose kraft tag: "$18, your find". Swings on hover. */
 export function LooseTag({ price, note, className, style }: { price: ReactNode; note?: ReactNode; className?: string; style?: CSSProperties }) {
+  const reduce = useReducedMotion();
   return (
     <motion.div
-      initial={{ opacity: 0, rotate: 18, y: -20 }}
+      initial={reduce ? false : { opacity: 0, rotate: 18, y: -20 }}
       animate={{ opacity: 1, rotate: 8, y: 0 }}
       transition={{ type: 'spring', stiffness: 140, damping: 10, delay: 0.6 }}
       className={cx('swing-on-hover absolute origin-top', className)}
