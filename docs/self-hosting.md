@@ -118,7 +118,9 @@ you built it for, the toolbar icon shows **!**. Click it and choose Allow.
 ## 6. Connect eBay (optional)
 
 eBay is the one marketplace with a public seller API, so it works without the
-extension, even with your browser closed.
+extension, even with your browser closed. [ebay-setup.md](ebay-setup.md) walks
+through eBay's developer portal screen by screen, written for pilego.app;
+swap in your own project ref and app address.
 
 1. Join the [eBay developer program](https://developer.ebay.com) and create a
    **production** keyset.

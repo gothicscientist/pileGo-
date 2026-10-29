@@ -4,12 +4,15 @@
 // GET  ?code=…&state=…                       ← eBay's redirect after consent
 // POST { action: 'settings', postal_code, country?, region? }
 // POST { action: 'disconnect' }
-// POST { action: 'status' }                  → { configured, connected, username, meta }
+// POST { action: 'status' }                  → { configured, setup, connected, account }
+// GET  ?setup=1                              → which eBay settings the server has (no values)
 
+import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.118.0';
 import {
   consentUrl,
   ebay,
   ebayConfigured,
+  ebaySetup,
   exchangeCode,
   saveTokens,
   signState,
@@ -41,57 +44,77 @@ function safeReturn(url: string | undefined): string {
   return `${fallback}/settings`;
 }
 
+/** Record who connected: their eBay username and id (account-deletion notices name the id). */
+async function finishConnect(admin: SupabaseClient, uid: string, accessToken: string): Promise<void> {
+  let username: string | null = null;
+  let ebayUserId: string | null = null;
+  try {
+    const me = await fetch(
+      (Deno.env.get('EBAY_ENV') === 'sandbox' ? 'https://apiz.sandbox.ebay.com' : 'https://apiz.ebay.com') +
+        '/commerce/identity/v1/user/',
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    if (me.ok) {
+      const who = (await me.json()) as { username?: string; userId?: string };
+      username = who.username ?? null;
+      ebayUserId = who.userId ?? null;
+    }
+  } catch {
+    // The username is a nicety.
+  }
+
+  const { data: existing } = await admin
+    .from('marketplace_accounts')
+    .select('meta')
+    .eq('user_id', uid)
+    .eq('marketplace', 'ebay')
+    .maybeSingle();
+  await admin.from('marketplace_accounts').upsert(
+    {
+      user_id: uid,
+      marketplace: 'ebay',
+      status: 'connected',
+      username,
+      // eBay's account-deletion notices name the user by id, so keep it.
+      meta: { ...(existing?.meta ?? {}), ...(ebayUserId ? { ebay_user_id: ebayUserId } : {}) },
+      last_error: null,
+      connected_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,marketplace' },
+  );
+}
+
 serve(async req => {
   const url = new URL(req.url);
 
-  // eBay sends the seller back here after the consent screen.
+  if (req.method === 'GET' && url.searchParams.has('setup')) {
+    return json(req, { configured: ebayConfigured(), setup: ebaySetup() });
+  }
+
+  // eBay sends the seller back here after the consent screen, with a code,
+  // or without one when they declined. Either way they land back in the app.
   if (req.method === 'GET') {
     const state = url.searchParams.get('state');
-    if (!state) throw new HttpError(400, 'Missing state.');
-    const { uid, return_to } = await verifyState(state);
+    if (!state) return redirect(withParam(safeReturn(undefined), 'ebay', 'declined'));
+    let target: { uid: string; return_to: string };
+    try {
+      target = await verifyState(state);
+    } catch {
+      return redirect(withParam(safeReturn(undefined), 'ebay', 'expired'));
+    }
+    const { uid, return_to } = target;
     const code = url.searchParams.get('code');
     if (!code) return redirect(withParam(return_to, 'ebay', 'declined'));
 
     const admin = adminClient();
-    const tokens = await exchangeCode(code);
-    await saveTokens(admin, uid, tokens);
-
-    let username: string | null = null;
-    let ebayUserId: string | null = null;
     try {
-      const me = await fetch(
-        (Deno.env.get('EBAY_ENV') === 'sandbox' ? 'https://apiz.sandbox.ebay.com' : 'https://apiz.ebay.com') +
-          '/commerce/identity/v1/user/',
-        { headers: { Authorization: `Bearer ${tokens.access_token}` } },
-      );
-      if (me.ok) {
-        const who = (await me.json()) as { username?: string; userId?: string };
-        username = who.username ?? null;
-        ebayUserId = who.userId ?? null;
-      }
-    } catch {
-      // The username is a nicety.
+      const tokens = await exchangeCode(code);
+      await saveTokens(admin, uid, tokens);
+      await finishConnect(admin, uid, tokens.access_token);
+    } catch (err) {
+      console.error('eBay connect failed', err);
+      return redirect(withParam(return_to, 'ebay', 'error'));
     }
-
-    const { data: existing } = await admin
-      .from('marketplace_accounts')
-      .select('meta')
-      .eq('user_id', uid)
-      .eq('marketplace', 'ebay')
-      .maybeSingle();
-    await admin.from('marketplace_accounts').upsert(
-      {
-        user_id: uid,
-        marketplace: 'ebay',
-        status: 'connected',
-        username,
-        // eBay's account-deletion notices name the user by id, so keep it.
-        meta: { ...(existing?.meta ?? {}), ...(ebayUserId ? { ebay_user_id: ebayUserId } : {}) },
-        last_error: null,
-        connected_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id,marketplace' },
-    );
     return redirect(withParam(return_to, 'ebay', 'connected'));
   }
 
@@ -117,11 +140,16 @@ serve(async req => {
         .eq('user_id', user.id)
         .eq('marketplace', 'ebay')
         .maybeSingle();
-      return json(req, { configured: ebayConfigured(), connected: data?.status === 'connected', account: data ?? null });
+      return json(req, {
+        configured: ebayConfigured(),
+        setup: ebaySetup(),
+        connected: data?.status === 'connected',
+        account: data ?? null,
+      });
     }
     case 'start': {
       if (!ebayConfigured()) {
-        throw new HttpError(503, 'eBay is not set up on this server yet. Add EBAY_CLIENT_ID, EBAY_CLIENT_SECRET and EBAY_RU_NAME.');
+        throw new HttpError(503, 'eBay is not set up on this server yet. Add EBAY_CLIENT_ID, EBAY_CLIENT_SECRET and EBAY_RU_NAME to the function secrets.');
       }
       const state = await signState({ uid: user.id, return_to: safeReturn(body.return_to) });
       return json(req, { url: consentUrl(state) });

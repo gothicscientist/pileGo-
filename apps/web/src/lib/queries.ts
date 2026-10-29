@@ -162,6 +162,15 @@ export function useAccounts() {
 
 export interface EbayStatus {
   configured: boolean;
+  /** Which eBay settings the server has, without their values. */
+  setup?: {
+    environment: 'production' | 'sandbox';
+    client_id: boolean;
+    client_secret: boolean;
+    ru_name: boolean;
+    verification_token: boolean;
+    app_url: boolean;
+  };
   connected: boolean;
   account: MarketplaceAccount | null;
 }

@@ -56,6 +56,11 @@ async function finish(
   return { id: job.id, kind: job.kind, status, message: error ?? undefined };
 }
 
+function withoutAspectQuestions(payload: Record<string, unknown>): Record<string, unknown> {
+  const { missing_aspects: _missing, aspect_choices: _choices, ...rest } = payload;
+  return rest;
+}
+
 async function setListing(admin: SupabaseClient, id: string, patch: Partial<Listing>): Promise<void> {
   const { error } = await admin.from('listings').update(patch).eq('id', id);
   if (error) throw error;
@@ -107,8 +112,14 @@ export async function runServerJob(admin: SupabaseClient, job: Job): Promise<Job
           title: result.title,
           price: result.price,
           listed_at: new Date().toISOString(),
-          relist_count: job.kind === 'relist' ? listing.relist_count + 1 : listing.relist_count,
-          payload: { ...payload, offer_id: offerId, sku: ctx.item.sku, category_id: result.category_id, category_name: result.category_name },
+          relist_count: job.kind === 'relist' && listing.external_id ? listing.relist_count + 1 : listing.relist_count,
+          payload: {
+            ...withoutAspectQuestions(payload),
+            offer_id: offerId,
+            sku: ctx.item.sku,
+            category_id: result.category_id,
+            category_name: result.category_name,
+          },
           error: null,
         });
         return finish(admin, job, 'done', result as unknown as Record<string, unknown>, null);
@@ -149,7 +160,14 @@ export async function runServerJob(admin: SupabaseClient, job: Job): Promise<Job
     const message = err instanceof Error ? err.message : String(err);
     const needsUser = err instanceof NeedsSeller || err instanceof EbayNotConnected;
     if (job.listing_id) {
-      await setListing(admin, job.listing_id, { status: needsUser ? 'needs_action' : 'failed', error: message }).catch(() => {});
+      const patch: Partial<Listing> = { status: needsUser ? 'needs_action' : 'failed', error: message };
+      // Remember which item specifics eBay wants, so the app can ask for them.
+      if (ctx.listing && (job.kind === 'publish' || job.kind === 'relist')) {
+        const rest = withoutAspectQuestions((ctx.listing.payload ?? {}) as Record<string, unknown>);
+        const asks = err instanceof NeedsSeller && Object.keys(err.choices).length ? err : null;
+        patch.payload = asks ? { ...rest, missing_aspects: asks.missing, aspect_choices: asks.choices } : rest;
+      }
+      await setListing(admin, job.listing_id, patch).catch(() => {});
     }
     if (needsUser) return finish(admin, job, 'needs_user', null, message);
     const transient = err instanceof EbayError && (err.status === 429 || err.status >= 500);
