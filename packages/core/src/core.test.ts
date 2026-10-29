@@ -4,7 +4,16 @@ import {
   buildTitle,
   clampParagraphs,
   clampWords,
+  cleanComps,
+  compQuery,
   computeAnalytics,
+  looksLikeLot,
+  positionForPrice,
+  priceAtPosition,
+  priceLadder,
+  sanitizeSoldComps,
+  sizesInTitle,
+  trimOutliers,
   feeFor,
   feeRule,
   generateListing,
@@ -115,7 +124,107 @@ describe('suggestPrice', () => {
     expect(s.low).toBeLessThanOrEqual(s.suggested);
     expect(s.high).toBeGreaterThanOrEqual(s.suggested);
     expect(s.comps_used).toBe(3);
-    expect(s.reasons.length).toBe(3);
+    // Sold, asking, AI, and the euro comparable that was left out.
+    expect(s.reasons.length).toBe(4);
+    expect(s.sources).toEqual({ sold: 2, asking: 1, own: 0, ai: true, dropped: 1 });
+  });
+  it('discounts an AI-only estimate', () => {
+    const s = suggestPrice({ currency: 'USD', condition: 'good', ai: { low: 40, high: 60, suggested: 50 } })!;
+    expect(s.suggested).toBe(40);
+    expect(s.low).toBe(32);
+    expect(s.high).toBe(48);
+    expect(s.confidence).toBe('low');
+    expect(s.quick!).toBeLessThan(s.low);
+  });
+  it('lets sold prices outweigh a high AI guess', () => {
+    const sold = [22, 24, 25, 26, 28, 30].map((price, i) => ({ source: 'ebay' as const, title: `hoodie ${i}`, price, currency: 'USD', sold: true }));
+    const s = suggestPrice({ currency: 'USD', condition: 'good', ai: { low: 40, high: 70, suggested: 55 }, comps: sold })!;
+    expect(s.suggested).toBeGreaterThan(24);
+    expect(s.suggested).toBeLessThan(31);
+    expect(s.confidence).toBe('high');
+    expect(s.sold_prices).toEqual([22, 24, 25, 26, 28, 30]);
+  });
+});
+
+describe('comparables', () => {
+  it('builds a search without the size and with the distinctive words', () => {
+    const q = compQuery(baseItem({ title: "Levi's faded denim trucker jacket size M", size: 'M', subcategory: 'denim-jackets', category: 'outerwear' }));
+    expect(q).toContain("Levi's");
+    expect(q).toContain('trucker');
+    expect(q).not.toMatch(/\bM\b/);
+    expect(q).not.toMatch(/size/i);
+    expect(compQuery(baseItem({ category: 'outerwear', subcategory: 'denim-jackets' }), { broad: true })).toBe("Levi's Denim jackets");
+  });
+  it('trims outliers', () => {
+    expect(trimOutliers([20, 22, 24, 25, 26, 28, 300])).toEqual([20, 22, 24, 25, 26, 28]);
+    expect(trimOutliers([2, 40, 42, 44, 45])).toEqual([40, 42, 44, 45]);
+    expect(trimOutliers([10, 500])).toEqual([10, 500]);
+  });
+  it('spots bundles and sizes in titles', () => {
+    expect(looksLikeLot('Lot of 5 vintage tees')).toBe(true);
+    expect(looksLikeLot('Bundle 3 hoodies')).toBe(true);
+    expect(looksLikeLot('Patagonia Better Sweater fleece')).toBe(false);
+    expect(sizesInTitle('Patagonia Better Sweater Mens Size L')).toEqual(['l']);
+    expect(sizesInTitle('Nike tee XL black')).toEqual(['xl']);
+    expect(sizesInTitle('Small batch denim from Japan')).toEqual([]);
+  });
+  it('checks sold prices sent from the browser', () => {
+    const out = sanitizeSoldComps([
+      { title: 'Fleece', price: 40, currency: 'usd', url: 'https://www.ebay.com/itm/1', sold: false },
+      { title: 'Fleece', price: '41.5', currency: 'USD', url: 'https://evil.example/itm/1' },
+      { title: '', price: 40, currency: 'USD' },
+      { title: 'Fleece', price: -1, currency: 'USD' },
+      { title: 'Fleece', price: 20000, currency: 'USD' },
+      { title: 'Fleece', price: 40, currency: 'DOLLARS' },
+      null,
+    ]);
+    expect(out).toEqual([
+      { source: 'ebay', title: 'Fleece', price: 40, currency: 'USD', url: 'https://www.ebay.com/itm/1', sold: true },
+      { source: 'ebay', title: 'Fleece', price: 41.5, currency: 'USD', url: null, sold: true },
+    ]);
+    expect(sanitizeSoldComps('nope')).toEqual([]);
+    expect(sanitizeSoldComps(Array.from({ length: 100 }, () => ({ title: 'x', price: 1, currency: 'USD' }))).length).toBe(60);
+  });
+  it('keeps comparables in the same size, currency and one piece', () => {
+    const c = (title: string, price: number, currency = 'USD') => ({ source: 'ebay' as const, title, price, currency, sold: true });
+    const out = cleanComps(
+      [c('Fleece Size M', 40), c('Fleece M navy', 42), c('Fleece size L', 60), c('Fleece', 44), c('Lot of 3 fleeces', 90), c('Fleece M', 41, 'GBP')],
+      { currency: 'USD', size: 'Medium' },
+    );
+    expect(out.sold).toEqual([40, 42, 44]);
+    expect(out.dropped).toBe(3);
+  });
+});
+
+describe('pricing slider', () => {
+  const sold = [18, 20, 22, 24, 25, 26, 28, 30, 34, 38].map((price, i) => ({ source: 'ebay' as const, title: `t${i}`, price, currency: 'USD', sold: true }));
+  const s = suggestPrice({ currency: 'USD', condition: 'good', comps: sold })!;
+  const rule = feeRule('depop', 'US');
+
+  it('runs from sell fast to maximize profit', () => {
+    const ladder = priceLadder(s, 7, [{ id: 'depop', rule }]);
+    expect(ladder[0]!.price).toBe(s.quick);
+    expect(ladder[3]!.price).toBe(s.suggested);
+    expect(ladder[6]!.price).toBe(s.max);
+    for (let i = 1; i < ladder.length; i++) {
+      expect(ladder[i]!.price).toBeGreaterThanOrEqual(ladder[i - 1]!.price);
+      expect(ladder[i]!.percentile).toBeGreaterThanOrEqual(ladder[i - 1]!.percentile);
+      expect(ladder[i]!.take_home[0]!.keep).toBeGreaterThanOrEqual(ladder[i - 1]!.take_home[0]!.keep);
+    }
+    expect(ladder[0]!.speed).toBe('fast');
+    expect(['slow', 'stretch']).toContain(ladder[6]!.speed);
+    expect(ladder[0]!.rough).toBe(false);
+  });
+  it('round-trips a price to a position', () => {
+    expect(priceAtPosition(s, positionForPrice(s, s.suggested))).toBe(s.suggested);
+    expect(positionForPrice(s, 0)).toBe(0);
+    expect(positionForPrice(s, 10_000)).toBe(1);
+  });
+  it('calls time estimates rough without sold prices, and handles old suggestions', () => {
+    const old = { suggested: 48, low: 38, high: 60, currency: 'USD', confidence: 'medium' as const, reasons: [], comps_used: 11, computed_at: '' };
+    const ladder = priceLadder(old, 3);
+    expect(ladder.map(p => p.price)).toEqual([38, 48, 60]);
+    expect(ladder.every(p => p.rough)).toBe(true);
   });
   it('drops the price for stale listings', () => {
     const fresh = suggestPrice({ currency: 'USD', condition: 'good', ai: { low: 80, high: 120, suggested: 100 } })!;
