@@ -4,7 +4,7 @@
 // can find and shows a panel with the rest to copy; the seller posts.
 
 import { MARKETPLACES, type MarketplaceId } from '@pilego/core';
-import { ext, fromBase64, sleep } from '../shared/browser.ts';
+import { ext, fromBase64, send, sleep } from '../shared/browser.ts';
 import type { AssistProgress, AssistReport, AssistRequest, FillResult, ListingWork } from '../shared/messages.ts';
 import { fillDepop } from './depop.ts';
 import { waitFor } from './dom.ts';
@@ -165,7 +165,7 @@ function panel(opts: {
 }
 
 function report(msg: AssistReport | AssistProgress) {
-  void ext.runtime.sendMessage(msg).catch(() => {});
+  void send(msg);
 }
 
 // ---------------------------------------------------------------------------
