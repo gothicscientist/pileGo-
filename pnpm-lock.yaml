@@ -44,7 +44,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@fontsource-variable/dm-sans':
+      '@fontsource-variable/libre-franklin':
         specifier: ^5.3.0
         version: 5.3.0
       '@imgly/background-removal':
@@ -1020,8 +1020,8 @@ packages:
       '@noble/hashes':
         optional: true
 
-  '@fontsource-variable/dm-sans@5.3.0':
-    resolution: {integrity: sha512-BpUG5bqePiDFMBM4ZtLSlPdAIOM990uB1dlXzIf4aw21yQR7BmykedLXXXMqGWsR18aMLOsbWccwJNh3ztTQaA==}
+  '@fontsource-variable/libre-franklin@5.3.0':
+    resolution: {integrity: sha512-PEQemCKVRtkLZJNpfvR4wG7x87c8iG05XJuEaX59ogMcAQpdtCZz/NXZUrXLJyvyx3/HD70W4LUppWLBdEdU2g==}
 
   '@imgly/background-removal@1.7.0':
     resolution: {integrity: sha512-/1ZryrMYg2ckIvJKoTu5Np50JfYMVffDMlVmppw/BdbN3pBTN7e6stI5/7E/LVh9DDzz6J588s7sWqul3fy5wA==}
@@ -3817,7 +3817,7 @@ snapshots:
 
   '@exodus/bytes@1.16.0': {}
 
-  '@fontsource-variable/dm-sans@5.3.0': {}
+  '@fontsource-variable/libre-franklin@5.3.0': {}
 
   '@imgly/background-removal@1.7.0(onnxruntime-web@1.21.0)':
     dependencies:

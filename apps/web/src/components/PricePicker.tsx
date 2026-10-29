@@ -14,6 +14,7 @@ import {
 } from '@pilego/core';
 import { Lightbulb, X } from 'lucide-react';
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import { MarketIcon } from './bits';
 import { cx, money } from '~/lib/format';
 import { useProfile } from '~/lib/queries';
 
@@ -205,7 +206,10 @@ export function PricePicker({
         <ul className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4" aria-label="What you keep after fees">
           {advice.take_home.map(t => (
             <li key={t.marketplace} className="rounded-xl bg-paper-2 px-3 py-2">
-              <span className="block text-xs text-muted">{MARKETPLACES[t.marketplace].name}, you keep</span>
+              <span className="flex items-center gap-1.5 text-xs text-muted">
+                <MarketIcon id={t.marketplace} className="size-3.5" />
+                {MARKETPLACES[t.marketplace].name}, you keep
+              </span>
               <span className="font-semibold tabular">{money(t.keep, currency)}</span>
             </li>
           ))}

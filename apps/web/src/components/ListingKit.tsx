@@ -142,7 +142,7 @@ export function ListingKit({ item, listing, generated }: { item: Item; listing?:
           }}
         >
           <label className="text-sm font-semibold" htmlFor={`kit-url-${listing.id}`}>
-            Listed it? Paste the link so pileGo can track it.
+            Listed it? Paste the link so pileGo! can track it.
           </label>
           <div className="flex gap-2">
             <Input

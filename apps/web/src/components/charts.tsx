@@ -125,6 +125,8 @@ export interface BarDatum {
   value: number;
   detail?: string;
   swatch?: string;
+  /** A small icon before the label, such as the marketplace's own. */
+  icon?: React.ReactNode;
 }
 
 /** Horizontal bars with the value at the tip. Sorted by the caller. */
@@ -137,6 +139,7 @@ export function BarList({ data, format, label }: { data: BarDatum[]; format: (v:
       {data.map((d, i) => (
         <li key={d.key} className="group" title={d.detail ? `${d.label}: ${format(d.value)}, ${d.detail}` : undefined}>
           <div className="mb-1 flex items-center gap-2 text-sm">
+            {d.icon}
             {d.swatch && <span className="size-2.5 shrink-0 rounded-full" style={{ background: d.swatch }} aria-hidden />}
             <span id={`${id}-${d.key}`} className="min-w-0 flex-1 truncate text-ink">
               {d.label}

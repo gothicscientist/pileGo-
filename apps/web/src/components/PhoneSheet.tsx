@@ -97,7 +97,7 @@ export function PhoneSheet({
 
           {local && (
             <p className="kraft rounded-xl px-3 py-2 text-sm" role="note" data-testid="phone-local">
-              This tab is on <strong>{new URL(session!.url).host}</strong>, which only this computer can open. Open pileGo from its web
+              This tab is on <strong>{new URL(session!.url).host}</strong>, which only this computer can open. Open pileGo! from its web
               address and make the code there.
             </p>
           )}

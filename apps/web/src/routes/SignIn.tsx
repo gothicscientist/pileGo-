@@ -5,7 +5,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import { Sticker } from '~/components/bits';
 import { CutoutPiece, LooseTag, Polaroid, type Placement } from '~/components/Scrapbook';
 import { Button, ErrorNote, TextField } from '~/components/ui';
-import { Wordmark } from '~/app/Shell';
+import { ThemeToggle, Wordmark } from '~/app/Shell';
 import { PHOTOS, type CutoutId } from '~/lib/art';
 import { errorMessage, supabase } from '~/lib/supabase';
 
@@ -13,18 +13,18 @@ import { errorMessage, supabase } from '~/lib/supabase';
 // basics overlapping like clothes thrown on a bed. Positions are a share of
 // the board, so the same layout scales from a phone to a wide screen.
 const PIECES: Array<{ id: CutoutId; at: Placement }> = [
-  { id: 'whiteHoodie', at: { x: '25%', y: '3%', w: '40%', r: -3, z: 3, phone: true } },
-  { id: 'denimJacket', at: { x: '60%', y: '0%', w: '36%', r: 8, z: 2, phone: true } },
-  { id: 'yellowHoodie', at: { x: '54%', y: '46%', w: '31%', r: -8, z: 4, phone: true } },
-  { id: 'flannel', at: { x: '79%', y: '40%', w: '21%', r: 11, z: 3 } },
-  { id: 'lightJeans', at: { x: '30%', y: '50%', w: '25%', r: 6, z: 2 } },
-  { id: 'cap', at: { x: '39%', y: '79%', w: '20%', r: -14, z: 6, phone: true } },
-  { id: 'beanie', at: { x: '4%', y: '73%', w: '13%', r: -9, z: 5 } },
+  { id: 'lilacHoodie', at: { x: '24%', y: '2%', w: '38%', r: -4, z: 3, phone: true } },
+  { id: 'selvedgeJacket', at: { x: '58%', y: '1%', w: '40%', r: 7, z: 2, phone: true } },
+  { id: 'bananaHoodie', at: { x: '55%', y: '40%', w: '31%', r: -7, z: 4, phone: true } },
+  { id: 'rawSelvedge', at: { x: '33%', y: '40%', w: '19%', r: 5, z: 2 } },
+  { id: 'pineHoodie', at: { x: '80%', y: '42%', w: '22%', r: 10, z: 3 } },
+  { id: 'mexico66Yellow', at: { x: '30%', y: '78%', w: '30%', r: -9, z: 6, phone: true } },
+  { id: 'cap', at: { x: '63%', y: '74%', w: '15%', r: 12, z: 5 } },
 ];
 
 const PRINTS: Array<{ photo: keyof typeof PHOTOS; caption: string; at: Placement }> = [
-  { photo: 'navyHoodie', caption: 'Weekend fit', at: { x: '2%', y: '8%', w: '27%', r: -7, z: 1, phone: true } },
-  { photo: 'greyHoodie', caption: 'Graphic hoodies / Y2K', at: { x: '11%', y: '45%', w: '24%', r: 5, z: 4, phone: true } },
+  { photo: 'bananaFit', caption: 'Baggy and soft', at: { x: '1%', y: '6%', w: '26%', r: -7, z: 1, phone: true } },
+  { photo: 'selvedgeFit', caption: 'Selvedge, broken in', at: { x: '10%', y: '42%', w: '23%', r: 5, z: 4, phone: true } },
 ];
 
 export function SignIn() {
@@ -54,27 +54,21 @@ export function SignIn() {
   return (
     <div className="grain relative min-h-dvh overflow-x-clip bg-paper">
       <div className="mx-auto flex min-h-dvh max-w-[1400px] flex-col px-4 py-5 sm:px-8 lg:py-7">
-        <header className="flex items-end justify-between gap-4 border-b border-line pb-4">
-          <div>
-            <Wordmark />
-            <p className="label-caps mt-1.5 text-muted">Everyday secondhand</p>
-          </div>
-          <p className="label-caps hidden text-muted sm:block">Basics / Y2K / Streetwear / Your style</p>
+        <header className="flex items-center justify-between gap-4 border-b border-line pb-4">
+          <Wordmark />
+          <ThemeToggle />
         </header>
 
         <div className="grid flex-1 items-center gap-8 py-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-12 lg:py-10">
           <div className="order-2 flex max-w-xl flex-col lg:order-1">
-            <motion.p className="label-caps" {...rise(0.05)}>
-              01 / Different styles. Same easy pile.
-            </motion.p>
-            <motion.h1 className="font-display mt-4 text-[clamp(2.7rem,6.4vw,5.6rem)] leading-[0.95]" {...rise(0.12)}>
+            <motion.h1 className="font-display text-[clamp(3rem,7vw,6.2rem)] leading-[0.9]" {...rise(0.08)}>
               Your closet.
               <br />
-              <span className="text-accent">All of it.</span>
+              <span className="text-accent italic">All of it.</span>
             </motion.h1>
             <motion.p className="mt-5 max-w-md text-lg leading-relaxed text-ink-2" {...rise(0.2)}>
-              Plain hoodies, simple jackets, fun finds. Photograph a piece once and pileGo writes the listing, prices it and puts it up
-              where you sell. When it sells, it comes down everywhere else.
+              Heavyweight hoodies, broken-in selvedge, the sneakers you never wear. Snap it once and pileGo! writes the listing, prices
+              it and puts it up everywhere you sell. When it sells, it comes down everywhere else.
             </motion.p>
             <motion.div className="mt-5 flex max-w-md flex-wrap gap-1.5" {...rise(0.26)}>
               {MARKETPLACE_IDS.map(id => (
@@ -149,14 +143,16 @@ export function SignIn() {
             {PIECES.map((p, i) => (
               <CutoutPiece key={p.id} id={p.id} at={p.at} board={board} index={i} />
             ))}
-            <LooseTag price="$18" note="Your find" className="right-[6%] bottom-[6%] z-10 max-sm:scale-75" />
-            <p className="label-caps absolute right-0 -bottom-2 hidden text-muted lg:block">Drag anything</p>
+            <LooseTag price="$18" note="Your find" className="right-[6%] bottom-[4%] z-10 max-sm:scale-75" />
+            <span className="absolute bottom-[10%] left-[3%] z-10 hidden -rotate-6 rounded-full bg-butter px-3 py-1 text-sm font-bold text-[#22241e] shadow-[0_6px_14px_-8px_rgb(0_0_0/0.5)] lg:block">
+              Go on, drag them
+            </span>
           </div>
         </div>
 
         <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 text-xs text-muted">
-          <span className="label-caps text-muted">Real photos and cutouts / No AI recreations</span>
-          <span>pileGo · everyday mix</span>
+          <span>Real photos, real cutouts. No AI recreations.</span>
+          <span>pileGo! is free and open source.</span>
         </footer>
       </div>
     </div>

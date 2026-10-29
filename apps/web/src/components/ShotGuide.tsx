@@ -37,7 +37,7 @@ export function CoverPreview({
         <motion.img
           src={cut.preview}
           alt="Cutout of the cover photo"
-          className="absolute inset-0 m-auto max-h-[84%] max-w-[84%] object-contain cutout-sticker"
+          className="absolute inset-0 m-auto max-h-[84%] max-w-[84%] object-contain cutout-shadow"
           initial={{ scale: 0.8, rotate: -8, opacity: 0 }}
           animate={{ scale: 1, rotate: -3, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 180, damping: 14 }}

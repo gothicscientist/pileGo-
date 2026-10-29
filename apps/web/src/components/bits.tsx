@@ -4,6 +4,15 @@
 import { AUTO_POST_EXPLAINER, AUTO_POST_LABEL, MARKETPLACES, TIER_EXPLAINER, TIER_LABEL, type ItemStatus, type ListingStatus, type MarketplaceId, type Photo, type Tier } from '@pilego/core';
 import { ClipboardCopy, Hand, ImageOff, MousePointerClick, Shirt, Zap } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
+import depopIcon from '~/assets/marketplaces/depop.png';
+import ebayIcon from '~/assets/marketplaces/ebay.png';
+import etsyIcon from '~/assets/marketplaces/etsy.png';
+import facebookIcon from '~/assets/marketplaces/facebook.png';
+import grailedIcon from '~/assets/marketplaces/grailed.png';
+import mercariIcon from '~/assets/marketplaces/mercari.png';
+import poshmarkIcon from '~/assets/marketplaces/poshmark.png';
+import vestiaireIcon from '~/assets/marketplaces/vestiaire.png';
+import vintedIcon from '~/assets/marketplaces/vinted.png';
 import { cx, seeded } from '~/lib/format';
 import { usePhotoUrls } from '~/lib/queries';
 
@@ -16,7 +25,33 @@ export function marketName(id: MarketplaceId, short = false): string {
   return (short && SHORT_NAME[id]) || MARKETPLACES[id].name;
 }
 
-/** A marketplace as a small paper label: a dot of its colour, its name, a slight tilt. */
+const ICON: Record<MarketplaceId, string> = {
+  ebay: ebayIcon,
+  vinted: vintedIcon,
+  depop: depopIcon,
+  poshmark: poshmarkIcon,
+  mercari: mercariIcon,
+  grailed: grailedIcon,
+  facebook: facebookIcon,
+  etsy: etsyIcon,
+  vestiaire: vestiaireIcon,
+};
+
+/** The marketplace's own app icon, as a small coin. */
+export function MarketIcon({ id, className, title }: { id: MarketplaceId; className?: string; title?: boolean }) {
+  return (
+    <img
+      src={ICON[id]}
+      alt={title ? MARKETPLACES[id].name : ''}
+      title={title ? MARKETPLACES[id].name : undefined}
+      aria-hidden={title ? undefined : true}
+      draggable={false}
+      className={cx('inline-block size-4 shrink-0 rounded-full bg-white object-cover shadow-[0_0_0_1px_rgb(0_0_0/0.08)]', className)}
+    />
+  );
+}
+
+/** A marketplace as a small paper label: its icon, its name, a slight tilt. */
 export function Sticker({
   id,
   size = 'md',
@@ -30,7 +65,6 @@ export function Sticker({
   className?: string;
   muted?: boolean;
 }) {
-  const color = MARKETPLACES[id].color;
   const rotate = tilt ? (seeded(id) - 0.5) * 5 : 0;
   return (
     <span
@@ -44,7 +78,7 @@ export function Sticker({
       )}
       style={{ transform: `rotate(${rotate.toFixed(1)}deg)` }}
     >
-      <span className={cx('shrink-0 rounded-full', size === 'sm' ? 'size-1.5' : 'size-2')} style={{ background: color }} aria-hidden />
+      <MarketIcon id={id} className={cx(size === 'sm' ? 'size-3.5' : size === 'md' ? 'size-4' : 'size-5', '-ml-0.5')} />
       {marketName(id, true)}
     </span>
   );
@@ -206,7 +240,7 @@ export function HangTag({
       >
         <span className="absolute top-1 left-1/2 size-[7px] -translate-x-1/2 rounded-full bg-paper shadow-[inset_0_1px_1.5px_rgb(0_0_0/0.4)] ring-1 ring-[rgb(0_0_0/0.06)]" />
         <span className="text-[0.82rem] leading-none font-semibold tracking-tight tabular">{price}</span>
-        {note && <span className="mt-0.5 text-[0.46rem] leading-none font-semibold tracking-[0.12em] uppercase opacity-70">{note}</span>}
+        {note && <span className="mt-0.5 text-[0.55rem] leading-none font-semibold opacity-75">{note}</span>}
       </span>
     </span>
   );

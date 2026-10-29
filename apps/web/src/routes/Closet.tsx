@@ -12,7 +12,7 @@ import { Check, LayoutGrid, Rows3, Search, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { ItemStatusTag, PhotoImg, PriceTag, Sticker, TierLabel } from '~/components/bits';
+import { ItemStatusTag, MarketIcon, PhotoImg, PriceTag, Sticker, TierLabel } from '~/components/bits';
 import { Sheet, useToast } from '~/components/overlay';
 import { Button, Empty, ErrorNote, PageHeader, Select, Spinner } from '~/components/ui';
 import { cx, daysSince, money, plural, seeded } from '~/lib/format';
@@ -119,7 +119,7 @@ export function Closet() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
-      <PageHeader label={`02 / Everything you own / ${plural(counts.all ?? 0, 'piece')}`} title="Closet">
+      <PageHeader title="Closet" note={`${plural(counts.all ?? 0, 'piece')} in all`}>
         <div className="flex items-center gap-1 rounded-full bg-paper-2 p-1" role="group" aria-label="View">
           <ViewButton on={view === 'rack'} label="Rack" onClick={() => set('view', null)}>
             <LayoutGrid className="size-4" aria-hidden />
@@ -219,7 +219,7 @@ export function Closet() {
           </div>
         ) : !filtered.length ? (
           (items?.length ?? 0) === 0 ? (
-            <Empty title="Your closet is empty" art="whiteHoodie" action={<Link to="/scan" className="btn btn-tag">Scan an item</Link>}>
+            <Empty title="Your closet is empty" art="lilacHoodie" action={<Link to="/scan" className="btn btn-tag">Scan an item</Link>}>
               Everything you scan or import lands here.
             </Empty>
           ) : (
@@ -352,7 +352,7 @@ function RackCard({ item, picked, onPick }: { item: Item; picked: boolean; onPic
             alt=""
           />
           {item.status === 'sold' && (
-            <span className="stamp-in absolute top-1/3 left-1/2 -translate-x-1/2 -rotate-12 rounded-md border-[3px] border-rose bg-paper/85 px-2 font-display text-2xl text-rose">
+            <span className="stamp-in absolute top-1/3 left-1/2 -translate-x-1/2 -rotate-12 rounded-md border-[3px] border-tomato bg-paper/85 px-2 font-display text-2xl text-tomato">
               SOLD
             </span>
           )}
@@ -372,9 +372,9 @@ function RackCard({ item, picked, onPick }: { item: Item; picked: boolean; onPic
           <div className="flex min-h-4 items-center gap-2">
             {line && <span className="truncate text-xs text-muted">{line}</span>}
             {live.length > 0 && (
-              <span className="ml-auto flex shrink-0 -space-x-1" aria-label={`Live on ${live.map(l => MARKETPLACES[l.marketplace].name).join(', ')}`}>
+              <span className="ml-auto flex shrink-0 -space-x-1.5" aria-label={`Live on ${live.map(l => MARKETPLACES[l.marketplace].name).join(', ')}`}>
                 {live.map(l => (
-                  <span key={l.id} className="size-3 rounded-full ring-2 ring-paper" style={{ background: MARKETPLACES[l.marketplace].color }} />
+                  <MarketIcon key={l.id} id={l.marketplace} className="ring-2 ring-paper" />
                 ))}
               </span>
             )}

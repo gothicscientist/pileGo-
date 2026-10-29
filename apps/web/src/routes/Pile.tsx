@@ -142,8 +142,7 @@ export function Pile() {
         <section aria-labelledby="pile-title" className="flex min-h-[70dvh] flex-col">
           <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line pb-4">
             <div>
-              <p className="label-caps">01 / Everything you are selling</p>
-              <h1 id="pile-title" className="font-display mt-2 text-[clamp(2.8rem,7vw,5.5rem)] leading-[0.9]">
+              <h1 id="pile-title" className="font-display text-[clamp(2.8rem,7vw,5.5rem)] leading-[0.9]">
                 The pile
               </h1>
               <p className="mt-2 max-w-xl text-ink-2">
@@ -308,7 +307,9 @@ function Piece({
   // Sizing by area keeps a cap from shrinking to nothing and jeans from towering.
   const [ratio, setRatio] = useState<number | null>(null);
   const base = pieceWidth(size.w, cutout);
-  const width = cutout && ratio ? Math.round(base * Math.min(1.35, Math.max(0.62, Math.sqrt(ratio / 0.78)))) : base;
+  // Caps, bags and trainers are small things next to a hoodie, so they sit smaller on the floor.
+  const small = ['shoes', 'bags', 'accessories'].includes(item.category ?? '') ? 0.72 : 1;
+  const width = cutout && ratio ? Math.round(base * small * Math.min(1.35, Math.max(0.62, Math.sqrt(ratio / 0.78)))) : base;
   const tilt = (seeded(item.id, 3) - 0.5) * (cutout ? 22 : 14);
   const depth = 0.35 + seeded(item.id, 5) * 0.65;
   const dragged = useRef(false);
@@ -374,7 +375,7 @@ function Piece({
           <PhotoImg
             photo={cover}
             cutout
-            className={cx('h-auto w-full cutout-sticker', sold && 'opacity-80 saturate-50')}
+            className={cx('h-auto w-full cutout-shadow', sold && 'opacity-80 saturate-50')}
             alt=""
             onLoad={e => setRatio(e.currentTarget.naturalWidth / Math.max(1, e.currentTarget.naturalHeight))}
           />
@@ -413,7 +414,7 @@ function Piece({
           </span>
         </span>
         {sold && (
-          <span className="stamp-in absolute inset-x-0 top-1/3 mx-auto w-fit rounded-md border-[3px] border-rose bg-paper/70 px-2 py-0.5 text-xl font-semibold tracking-[0.12em] text-rose backdrop-blur-[1px]">
+          <span className="stamp-in absolute inset-x-0 top-1/3 mx-auto w-fit rounded-md border-[3px] border-tomato bg-paper/70 px-2 py-0.5 text-xl font-black tracking-[0.06em] text-tomato backdrop-blur-[1px]">
             SOLD
           </span>
         )}
@@ -427,7 +428,6 @@ function EmptyFloor() {
   return (
     <div className="relative mt-6 grid flex-1 items-center gap-8 lg:grid-cols-[1fr_1.1fr]">
       <div className="flex flex-col items-start gap-4">
-        <p className="label-caps">02 / Start small</p>
         <h2 className="font-display text-[clamp(1.9rem,3.2vw,2.6rem)] leading-[1.04]">Start with one thing from the pile</h2>
         <p className="max-w-md text-ink-2">
           A plain hoodie counts. Lay it flat in good light and take three photos: the front, the back and the label. Or drop photos
@@ -445,10 +445,10 @@ function EmptyFloor() {
         </div>
       </div>
       <div ref={board} className="relative aspect-[5/4] w-full rounded-[28px] border border-dashed border-line" aria-hidden>
-        <CutoutPiece id="whiteHoodie" at={{ x: '8%', y: '8%', w: '38%', r: -6, z: 2, phone: true }} board={board} />
-        <CutoutPiece id="lightJeans" at={{ x: '44%', y: '14%', w: '24%', r: 7, z: 1, phone: true }} board={board} index={1} />
-        <CutoutPiece id="denimJacket" at={{ x: '62%', y: '4%', w: '34%', r: 9, z: 3, phone: true }} board={board} index={2} />
-        <CutoutPiece id="cap" at={{ x: '30%', y: '66%', w: '22%', r: -12, z: 4, phone: true }} board={board} index={3} />
+        <CutoutPiece id="lilacHoodie" at={{ x: '6%', y: '6%', w: '38%', r: -6, z: 2, phone: true }} board={board} />
+        <CutoutPiece id="rawSelvedge" at={{ x: '42%', y: '10%', w: '22%', r: 7, z: 1, phone: true }} board={board} index={1} />
+        <CutoutPiece id="selvedgeJacket" at={{ x: '60%', y: '4%', w: '36%', r: 9, z: 3, phone: true }} board={board} index={2} />
+        <CutoutPiece id="mexico66Yellow" at={{ x: '22%', y: '68%', w: '28%', r: -10, z: 4, phone: true }} board={board} index={3} />
         <LooseTag price="$18" note="Your find" className="right-[8%] bottom-[8%] z-10 max-sm:scale-75" />
       </div>
     </div>

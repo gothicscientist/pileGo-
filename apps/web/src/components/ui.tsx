@@ -288,23 +288,23 @@ export function Paper({
   );
 }
 
-/** The top of a page: a small numbered label over a big, calm headline. */
+/** The top of a page: one big, loud headline and whatever goes beside it. */
 export function PageHeader({
-  label,
   title,
+  note,
   children,
   className,
 }: {
-  label?: ReactNode;
   title: ReactNode;
+  note?: ReactNode;
   children?: ReactNode;
   className?: string;
 }) {
   return (
     <header className={cx('flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5', className)}>
       <div className="min-w-0">
-        {label && <p className="label-caps">{label}</p>}
-        <h1 className="font-display mt-2 text-[clamp(2.6rem,6vw,4.6rem)] leading-[0.92]">{title}</h1>
+        <h1 className="font-display text-[clamp(2.8rem,6.5vw,5rem)] leading-[0.9]">{title}</h1>
+        {note && <p className="mt-2 text-ink-2">{note}</p>}
       </div>
       {children}
     </header>
@@ -314,18 +314,15 @@ export function PageHeader({
 export function SectionTitle({
   children,
   action,
-  label,
   className,
 }: {
   children: ReactNode;
   action?: ReactNode;
-  label?: ReactNode;
   className?: string;
 }) {
   return (
     <div className={cx('mb-3 flex items-end justify-between gap-3', className)}>
       <div>
-        {label && <p className="label-caps mb-1.5">{label}</p>}
         <h2 className="font-display text-2xl leading-none">{children}</h2>
       </div>
       {action}
@@ -358,7 +355,7 @@ export function Empty({
           src={c.src}
           alt=""
           aria-hidden
-          className="cutout-sticker relative z-[1] hidden w-24 shrink-0 rotate-6 transition-transform duration-500 ease-[var(--ease-spring)] group-hover:-translate-y-1 group-hover:rotate-0 sm:block"
+          className="cutout-shadow relative z-[1] hidden w-24 shrink-0 rotate-6 transition-transform duration-500 ease-[var(--ease-spring)] group-hover:-translate-y-1 group-hover:rotate-0 sm:block"
           style={{ aspectRatio: String(c.ratio) }}
         />
       )}

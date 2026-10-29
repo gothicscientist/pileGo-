@@ -12,9 +12,10 @@ const now = Date.now();
 const daysAgo = (d: number) => new Date(now - d * 86_400_000).toISOString();
 
 type Art =
-  | 'anorak' | 'beanie' | 'camel-blazer' | 'cap' | 'dark-jeans' | 'denim-jacket' | 'flannel' | 'light-jeans'
-  | 'longsleeve' | 'navy-bomber' | 'rust-bomber' | 'sweatshirt' | 'white-hoodie' | 'white-tee' | 'yellow-hoodie';
-type Print = 'denim-pair' | 'grey-hoodie' | 'hanging-hoodie' | 'knit' | 'navy-hoodie' | 'tan-hoodie';
+  | 'anorak' | 'banana-hoodie' | 'cap' | 'coffee-longsleeve' | 'cream-cargos' | 'denim-jacket'
+  | 'flannel' | 'mesh-shorts' | 'mexico66-yellow' | 'navy-bomber' | 'pine-hoodie' | 'raw-selvedge'
+  | 'rust-bomber' | 'shroud-selvedge' | 'white-tee';
+type Print = 'banana-fit' | 'cargo-fit' | 'denim-pair' | 'grey-fit' | 'knit' | 'lilac-fit' | 'pine-fit' | 'selvedge-fit';
 
 interface Seed {
   id: string;
@@ -37,22 +38,24 @@ interface Seed {
 
 // Everyday pieces: mostly unbranded basics, denim and a few fun finds.
 const SEEDS: Seed[] = [
-  { id: 'a1', title: 'Baggy light wash jeans', brand: '', art: 'light-jeans', print: 'denim-pair', category: 'bottoms', subcategory: 'jeans', size: 'W30 L32', price: 45, status: 'listed', created: 48, cost: 8, listings: [{ m: 'ebay', status: 'listed', days: 41 }, { m: 'vinted', status: 'listed', days: 41 }] },
-  { id: 'a2', title: 'Rust bomber jacket', brand: '', art: 'rust-bomber', print: 'tan-hoodie', category: 'outerwear', subcategory: 'jackets', size: 'L', price: 38, status: 'listed', created: 20, cost: 9, listings: [{ m: 'depop', status: 'listed', days: 12 }, { m: 'ebay', status: 'queued', days: 0 }] },
-  { id: 'a3', title: 'Plain white hoodie', brand: '', art: null, print: 'hanging-hoodie', category: 'knitwear', subcategory: 'hoodies', size: 'M', price: null, status: 'draft', created: 1 },
-  { id: 'a4', title: 'Grey check flannel shirt', brand: '', art: 'flannel', print: 'navy-hoodie', category: 'tops', subcategory: 'shirts', size: 'M', price: 24, status: 'ready', created: 3 },
+  { id: 'a1', title: 'Raw selvedge straight jeans', brand: '', art: 'raw-selvedge', print: 'selvedge-fit', category: 'bottoms', subcategory: 'jeans', size: 'W30 L32', price: 45, status: 'listed', created: 48, cost: 8, listings: [{ m: 'ebay', status: 'listed', days: 41 }, { m: 'vinted', status: 'listed', days: 41 }] },
+  { id: 'a2', title: 'Rust bomber jacket', brand: '', art: 'rust-bomber', print: 'cargo-fit', category: 'outerwear', subcategory: 'jackets', size: 'L', price: 38, status: 'listed', created: 20, cost: 9, listings: [{ m: 'depop', status: 'listed', days: 12 }, { m: 'ebay', status: 'queued', days: 0 }] },
+  { id: 'a3', title: 'Heavyweight lilac hoodie', brand: '', art: null, print: 'lilac-fit', category: 'knitwear', subcategory: 'hoodies', size: 'M', price: null, status: 'draft', created: 1 },
+  { id: 'a4', title: 'Grey check flannel shirt', brand: '', art: 'flannel', print: 'grey-fit', category: 'tops', subcategory: 'shirts', size: 'M', price: 24, status: 'ready', created: 3 },
   { id: 'a5', title: 'Cord collar denim jacket', brand: 'Lee', art: 'denim-jacket', print: 'denim-pair', category: 'outerwear', subcategory: 'denim-jackets', size: 'M', price: 55, status: 'sold', created: 60, cost: 15, listings: [{ m: 'vinted', status: 'sold', days: 30 }, { m: 'depop', status: 'delisted', days: 30 }], sold: { days: 2, price: 50, m: 'vinted' } },
-  { id: 'a6', title: 'White crew neck tee', brand: '', art: 'white-tee', print: 'hanging-hoodie', category: 'tops', subcategory: 't-shirts', size: 'S', price: 12, status: 'listed', created: 9, listings: [{ m: 'vinted', status: 'listed', days: 8 }, { m: 'poshmark', status: 'needs_action', days: 0 }] },
-  { id: 'a7', title: 'Yellow pullover hoodie', brand: '', art: 'yellow-hoodie', print: 'grey-hoodie', category: 'knitwear', subcategory: 'hoodies', size: 'L', price: 22, status: 'listed', created: 15, listings: [{ m: 'poshmark', status: 'listed', days: 14 }] },
+  { id: 'a6', title: 'White crew neck tee', brand: '', art: 'white-tee', print: 'grey-fit', category: 'tops', subcategory: 't-shirts', size: 'S', price: 12, status: 'listed', created: 9, listings: [{ m: 'vinted', status: 'listed', days: 8 }, { m: 'poshmark', status: 'needs_action', days: 0 }] },
+  { id: 'a7', title: 'Baggy banana hoodie', brand: '', art: 'banana-hoodie', print: 'banana-fit', category: 'knitwear', subcategory: 'hoodies', size: 'L', price: 34, status: 'listed', created: 15, listings: [{ m: 'poshmark', status: 'listed', days: 14 }] },
   { id: 'a8', title: 'Chunky brown knit', brand: '', art: null, print: 'knit', category: 'knitwear', subcategory: 'sweaters', size: 'M', price: 30, status: 'shipped', created: 90, cost: 6, listings: [{ m: 'ebay', status: 'sold', days: 70 }], sold: { days: 40, price: 28, m: 'ebay' } },
-  { id: 'a9', title: 'Black long sleeve tee', brand: '', art: 'longsleeve', print: 'navy-hoodie', category: 'tops', subcategory: 't-shirts', size: 'L', price: 14, status: 'draft', created: 2 },
-  { id: 'a10', title: 'Colour block anorak', brand: '', art: 'anorak', print: 'navy-hoodie', category: 'outerwear', subcategory: 'jackets', size: 'M', price: 48, status: 'listed', created: 70, cost: 12, listings: [{ m: 'ebay', status: 'listed', days: 66 }, { m: 'grailed', status: 'listed', days: 66 }] },
-  { id: 'a11', title: 'Smiley graphic hoodie', brand: '', art: null, print: 'grey-hoodie', category: 'knitwear', subcategory: 'hoodies', size: 'XL', price: 28, status: 'sold', created: 130, cost: 4, listings: [{ m: 'depop', status: 'sold', days: 120 }], sold: { days: 100, price: 25, m: 'depop' } },
-  { id: 'a12', title: 'Navy sherpa collar jacket', brand: '', art: 'navy-bomber', print: 'navy-hoodie', category: 'outerwear', subcategory: 'jackets', size: 'M', price: 42, status: 'shipped', created: 200, cost: 10, listings: [{ m: 'vinted', status: 'sold', days: 190 }], sold: { days: 160, price: 40, m: 'vinted' } },
-  { id: 'a13', title: 'Camel wool blend blazer', brand: '', art: 'camel-blazer', print: 'tan-hoodie', category: 'outerwear', subcategory: 'blazers', size: '40R', price: 35, status: 'listed', created: 26, listings: [{ m: 'ebay', status: 'listed', days: 24 }] },
-  { id: 'a14', title: 'Yellow dad cap', brand: '', art: 'cap', print: 'grey-hoodie', category: 'accessories', subcategory: 'hats', size: '', price: 9, status: 'ready', created: 4 },
-  { id: 'a15', title: 'Dark wash straight jeans', brand: '', art: 'dark-jeans', print: 'denim-pair', category: 'bottoms', subcategory: 'jeans', size: 'W32 L30', price: 26, status: 'listed', created: 11, listings: [{ m: 'depop', status: 'listed', days: 10 }, { m: 'vinted', status: 'listed', days: 10 }] },
-  { id: 'a16', title: 'Plain white crewneck', brand: '', art: 'sweatshirt', print: 'hanging-hoodie', category: 'knitwear', subcategory: 'sweatshirts', size: 'M', price: 16, status: 'draft', created: 1 },
+  { id: 'a9', title: 'Boxy coffee long sleeve', brand: '', art: 'coffee-longsleeve', print: 'grey-fit', category: 'tops', subcategory: 't-shirts', size: 'L', price: 18, status: 'draft', created: 2 },
+  { id: 'a10', title: 'Colour block anorak', brand: '', art: 'anorak', print: 'cargo-fit', category: 'outerwear', subcategory: 'jackets', size: 'M', price: 48, status: 'listed', created: 70, cost: 12, listings: [{ m: 'ebay', status: 'listed', days: 66 }, { m: 'grailed', status: 'listed', days: 66 }] },
+  { id: 'a11', title: 'Smiley graphic hoodie', brand: '', art: null, print: 'pine-fit', category: 'knitwear', subcategory: 'hoodies', size: 'XL', price: 28, status: 'sold', created: 130, cost: 4, listings: [{ m: 'depop', status: 'sold', days: 120 }], sold: { days: 100, price: 25, m: 'depop' } },
+  { id: 'a12', title: 'Navy sherpa collar jacket', brand: '', art: 'navy-bomber', print: 'cargo-fit', category: 'outerwear', subcategory: 'jackets', size: 'M', price: 42, status: 'shipped', created: 200, cost: 10, listings: [{ m: 'vinted', status: 'sold', days: 190 }], sold: { days: 160, price: 40, m: 'vinted' } },
+  { id: 'a13', title: 'Mexico 66 trainers in yellow', brand: 'Onitsuka Tiger', art: 'mexico66-yellow', print: 'selvedge-fit', category: 'shoes', subcategory: 'sneakers', size: 'UK 8', price: 65, status: 'listed', created: 26, cost: 20, listings: [{ m: 'ebay', status: 'listed', days: 24 }, { m: 'grailed', status: 'listed', days: 24 }] },
+  { id: 'a14', title: 'Yellow dad cap', brand: '', art: 'cap', print: 'grey-fit', category: 'accessories', subcategory: 'hats', size: '', price: 9, status: 'ready', created: 4 },
+  { id: 'a15', title: 'Washed indigo selvedge jeans', brand: '', art: 'shroud-selvedge', print: 'selvedge-fit', category: 'bottoms', subcategory: 'jeans', size: 'W32 L30', price: 40, status: 'listed', created: 11, listings: [{ m: 'depop', status: 'listed', days: 10 }, { m: 'vinted', status: 'listed', days: 10 }] },
+  { id: 'a16', title: 'Pine heavyweight hoodie', brand: '', art: 'pine-hoodie', print: 'pine-fit', category: 'knitwear', subcategory: 'hoodies', size: 'M', price: 32, status: 'draft', created: 1 },
+  { id: 'a17', title: 'Cream baggy cargos', brand: '', art: 'cream-cargos', print: 'cargo-fit', category: 'bottoms', subcategory: 'trousers', size: 'W32', price: 28, status: 'ready', created: 5 },
+  { id: 'a18', title: 'Carolina blue mesh shorts', brand: '', art: 'mesh-shorts', print: 'grey-fit', category: 'bottoms', subcategory: 'shorts', size: 'M', price: 15, status: 'listed', created: 7, listings: [{ m: 'depop', status: 'listed', days: 6 }] },
 ];
 
 const ASSETS = fileURLToPath(new URL('../src/assets/', import.meta.url));
@@ -230,7 +233,7 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
           reasons: ['10 similar pieces sold (6 on eBay, 4 on Poshmark). The middle is 44 USD.'], comps_used: 10, computed_at: daysAgo(0),
           sold_prices: sold, asking_prices: [], sources: { sold: 10, asking: 0, own: 0, ai: false, dropped: 2, sold_by: { ebay: 6, poshmark: 4 } },
         },
-        comps: sold.map((price, i) => ({ source: 'ebay', title: `Baggy light wash jeans W30 #${i}`, price, currency: 'USD', url: `https://www.ebay.com/itm/${i}`, sold: true })),
+        comps: sold.map((price, i) => ({ source: 'ebay', title: `Raw selvedge jeans W30 #${i}`, price, currency: 'USD', url: `https://www.ebay.com/itm/${i}`, sold: true })),
         sources: { ebay_configured: false, asking: 0, sold: 10, own_sales: 0, notes: ['eBay is not connected on this server yet, so live eBay listings are not included.'] },
         error: null,
       });

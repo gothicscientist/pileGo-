@@ -9,7 +9,6 @@ export function NotFound() {
         <LooseTag price="?" note="Not here" className="right-0 bottom-0 z-10 scale-75" />
       </div>
       <div className="flex flex-col items-start gap-4">
-        <p className="label-caps">404 / Lost property</p>
         <h1 className="font-display text-4xl">Nothing on this hanger.</h1>
         <p className="text-ink-2">The page or item may have been deleted.</p>
         <Link to="/closet" className="btn btn-ink">

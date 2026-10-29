@@ -1,10 +1,11 @@
-import { BarChart3, Layers, ScanLine, Settings, Shirt, Store } from 'lucide-react';
+import { BarChart3, Layers, Moon, ScanLine, Settings, Shirt, Store, Sun } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import { useExtension } from '~/lib/extension';
 import { extensionSetupUrl } from '~/lib/extension-flow';
 import { cx } from '~/lib/format';
 import { useJobs, useRealtime } from '~/lib/queries';
+import { useTheme } from '~/lib/theme';
 
 const NAV = [
   { to: '/', label: 'Pile', icon: Layers, end: true },
@@ -26,12 +27,46 @@ export function TagMark({ className }: { className?: string }) {
   );
 }
 
+/** pileGo! The bang is the point: loud, a little crooked, and it jumps when you touch it. */
 export function Wordmark({ className }: { className?: string }) {
   return (
-    <span className={cx('inline-flex items-center gap-1.5', className)}>
-      <TagMark className="size-7 -rotate-[10deg]" />
-      <span className="font-display text-[1.55rem] leading-none tracking-[-0.045em] text-accent">pileGo</span>
+    <span className={cx('group/mark inline-flex items-center gap-1.5', className)}>
+      <TagMark className="size-7 -rotate-[10deg] transition-transform duration-500 ease-[var(--ease-spring)] group-hover/mark:-rotate-[22deg]" />
+      <span className="text-[1.6rem] leading-none font-black tracking-[-0.055em] text-ink italic">
+        pileGo
+        <span className="inline-block origin-bottom text-tomato transition-transform duration-500 ease-[var(--ease-spring)] group-hover/mark:-translate-y-1 group-hover/mark:rotate-12">
+          !
+        </span>
+      </span>
     </span>
+  );
+}
+
+/** Sun or moon. Flips the whole app between light and dark. */
+export function ThemeToggle({ className }: { className?: string }) {
+  const [theme, toggle] = useTheme();
+  const dark = theme === 'dark';
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+      title={dark ? 'Light mode' : 'Dark mode'}
+      className={cx(
+        'relative inline-flex size-10 items-center justify-center overflow-hidden rounded-full text-ink-2 transition duration-300 ease-[var(--ease-spring)] hover:bg-paper-2 hover:text-ink active:scale-90',
+        className,
+      )}
+    >
+      <motion.span
+        key={theme}
+        initial={{ rotate: -90, scale: 0.4, opacity: 0 }}
+        animate={{ rotate: 0, scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 420, damping: 18 }}
+        className="flex"
+      >
+        {dark ? <Moon className="size-5" aria-hidden /> : <Sun className="size-5" aria-hidden />}
+      </motion.span>
+    </button>
   );
 }
 
@@ -56,7 +91,7 @@ function ExtensionDot() {
     <NavLink
       to={ext.installed ? '/settings#extension' : extensionSetupUrl(`${pathname}${search}${hash}`)}
       className="flex items-center gap-2 rounded-full px-3 py-2 text-xs text-ink-2 transition hover:bg-paper-2"
-      title={ext.installed ? 'The pileGo browser extension in this browser' : 'Install the pileGo browser extension for Vinted, Depop and the rest'}
+      title={ext.installed ? 'The pileGo! browser extension in this browser' : 'Install the pileGo! browser extension for Vinted, Depop and the rest'}
     >
       <span className="relative flex size-2" aria-hidden>
         {ext.running ? <span className="absolute inset-0 animate-ping rounded-full bg-olive opacity-60" /> : null}
@@ -99,7 +134,7 @@ export function Shell() {
               end={end}
               className={({ isActive }) =>
                 cx(
-                  'group relative flex items-center gap-3 rounded-full px-3.5 py-2.5 font-medium transition-[background-color,color,transform] duration-200 active:scale-[0.97]',
+                  'group relative flex items-center gap-3 rounded-full px-3.5 py-2.5 font-semibold transition-[background-color,color,transform] duration-200 active:scale-[0.97]',
                   isActive ? 'text-ink' : 'text-ink-2 hover:bg-paper-2 hover:text-ink',
                 )
               }
@@ -116,31 +151,30 @@ export function Shell() {
                   <Icon className={cx('relative size-[1.15rem] transition-transform duration-300 group-hover:-rotate-6', isActive && 'text-accent')} aria-hidden />
                   <span className="relative flex-1">{label}</span>
                   {to === '/out' && attention > 0 && (
-                    <span className="relative rounded-full bg-pink px-1.5 text-xs font-semibold text-[#4a2a38] tabular">{attention}</span>
+                    <span className="relative rounded-full bg-tomato px-1.5 text-xs font-bold text-white tabular">{attention}</span>
                   )}
                 </>
               )}
             </NavLink>
           ))}
         </nav>
-        <p className="label-caps mt-2 px-3.5 leading-relaxed text-muted">
-          Basics / Denim / Y2K
-          <br />
-          Streetwear / Your style
-        </p>
-        <div className="mt-auto">
+        <div className="mt-auto flex items-center justify-between gap-2">
           <ExtensionDot />
+          <ThemeToggle />
         </div>
       </aside>
 
       {/* Phone header */}
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line/70 bg-paper/90 px-4 py-2.5 backdrop-blur-md md:hidden">
-        <NavLink to="/" aria-label="pileGo home">
+        <NavLink to="/" aria-label="pileGo! home">
           <Wordmark />
         </NavLink>
-        <NavLink to="/settings" aria-label="Settings" className="rounded-full p-2 transition hover:bg-paper-2 active:scale-90">
-          <Settings className="size-5" aria-hidden />
-        </NavLink>
+        <div className="flex items-center">
+          <ThemeToggle />
+          <NavLink to="/settings" aria-label="Settings" className="rounded-full p-2.5 transition hover:bg-paper-2 active:scale-90">
+            <Settings className="size-5" aria-hidden />
+          </NavLink>
+        </div>
       </header>
 
       <main id="main" className="min-w-0 pb-24 md:pb-0">
@@ -167,7 +201,7 @@ export function Shell() {
         <NavLink
           to="/scan"
           aria-label="Scan an item"
-          className="relative -top-4 mx-auto flex size-16 items-center justify-center rounded-full bg-accent text-accent-ink shadow-[0_10px_22px_-8px_rgb(64_93_117/0.75)] ring-4 ring-paper transition duration-300 ease-[var(--ease-spring)] active:scale-90"
+          className="relative -top-4 mx-auto flex size-16 items-center justify-center rounded-full bg-accent text-accent-ink shadow-[0_10px_22px_-8px_rgb(86_112_63/0.75)] ring-4 ring-paper transition duration-300 ease-[var(--ease-spring)] active:scale-90"
         >
           <ScanLine className="size-7" aria-hidden />
         </NavLink>
@@ -196,7 +230,7 @@ function TabLink({ to, label, icon: Icon, end, badge }: (typeof NAV)[number] & {
           {label}
           {isActive && <motion.span layoutId="tab-active" className="absolute -bottom-0.5 h-[3px] w-5 rounded-full bg-accent" />}
           {badge ? (
-            <span className="absolute top-0.5 right-[22%] rounded-full bg-pink px-1 text-[0.6rem] font-semibold text-[#4a2a38]">{badge}</span>
+            <span className="absolute top-0.5 right-[22%] rounded-full bg-tomato px-1 text-[0.6rem] font-bold text-white">{badge}</span>
           ) : null}
         </>
       )}

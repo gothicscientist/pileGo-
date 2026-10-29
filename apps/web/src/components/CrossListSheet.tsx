@@ -23,7 +23,7 @@ import { extensionSetupUrl } from '~/lib/extension-flow';
 import { cx, money } from '~/lib/format';
 import { useEbayActions, useEbayStatus, useProfile, useQueuePublish, type ListingOverride } from '~/lib/queries';
 import { errorMessage } from '~/lib/supabase';
-import { listingStatusLabel, Sticker, TierLabel } from './bits';
+import { listingStatusLabel, MarketIcon, Sticker, TierLabel } from './bits';
 import { ListingKit } from './ListingKit';
 import { Sheet, useToast } from './overlay';
 import { Button, ErrorNote, Field, Input, TextArea } from './ui';
@@ -184,7 +184,7 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
     return (
       <Sheet open={open} onClose={close} title="Paste these by hand" wide>
         <p className="mb-4 text-ink-2">
-          {sentKits.map(k => MARKETPLACES[k].name).join(' and ')} {sentKits.length === 1 ? 'has' : 'have'} no way for pileGo to post for you yet.
+          {sentKits.map(k => MARKETPLACES[k].name).join(' and ')} {sentKits.length === 1 ? 'has' : 'have'} no way for pileGo! to post for you yet.
           Here is everything to copy.
         </p>
         {sentKits.length > 1 && (
@@ -277,8 +277,8 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
         <div className="flex min-w-0 flex-col gap-4">
           {needsExtension.length > 0 && !ext.installed && (
             <Notice icon={<PlugZap className="size-5" aria-hidden />}>
-              {needsExtension.map(m => MARKETPLACES[m].name).join(', ')} {needsExtension.length === 1 ? 'needs' : 'need'} the pileGo browser
-              extension. They will wait in the queue until you open pileGo in a browser that has it.{' '}
+              {needsExtension.map(m => MARKETPLACES[m].name).join(', ')} {needsExtension.length === 1 ? 'needs' : 'need'} the pileGo! browser
+              extension. They will wait in the queue until you open pileGo! in a browser that has it.{' '}
               <Link to={extensionUrl} className="font-semibold underline" onClick={rememberDraft}>
                 Get the extension
               </Link>
@@ -294,7 +294,7 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
                   </button>
                 </>
               ) : (
-                'eBay is not set up on this copy of pileGo yet. The listing will wait until it is.'
+                'eBay is not set up on this copy of pileGo! yet. The listing will wait until it is.'
               )}
             </Notice>
           )}
@@ -321,7 +321,10 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
                       aria-hidden
                     />
                   )}
-                  <span className="relative">{MARKETPLACES[m].name}</span>
+                  <span className="relative flex items-center gap-1.5">
+                    <MarketIcon id={m} />
+                    {MARKETPLACES[m].name}
+                  </span>
                 </button>
               ))}
             </div>

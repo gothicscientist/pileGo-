@@ -73,15 +73,14 @@ export function ExtensionPage() {
           <Wordmark />
         </Link>
         <Link to={returnTo ?? (session ? '/settings#extension' : '/')} className="text-sm font-semibold text-ink-2 underline">
-          {returnTo ? returnLabel : session ? 'Back to Settings' : 'Back to pileGo'}
+          {returnTo ? returnLabel : session ? 'Back to Settings' : 'Back to pileGo!'}
         </Link>
       </div>
 
       <header className="mt-8">
-        <p className="label-caps">Two minutes, once</p>
-        <h1 className="font-display mt-2 text-[clamp(2.4rem,6vw,4.2rem)] leading-[0.92]">Get the browser extension</h1>
+        <h1 className="font-display text-[clamp(2.4rem,6vw,4.2rem)] leading-[0.92]">Get the browser extension</h1>
         <p className="mt-3 max-w-2xl text-ink-2">
-          Vinted, Depop, Poshmark, Mercari, Grailed and Facebook have no public API for sellers. The pileGo extension does that work
+          Vinted, Depop, Poshmark, Mercari, Grailed and Facebook have no public API for sellers. The pileGo! extension does that work
           in tabs where you are already logged in: Vinted in one click, a filled-in sell form on the others. It also reads eBay’s
           sold listings so price suggestions use what things actually sold for. It takes about two minutes to install.
         </p>
@@ -130,7 +129,7 @@ export function ExtensionPage() {
             inside it.
           </Trouble>
           <Trouble q="This page still says “Not detected”">
-            Refresh this tab after installing. On {pages}, check that the pileGo switch is on. The extension only talks to
+            Refresh this tab after installing. On {pages}, check that the pileGo! switch is on. The extension only talks to
             pilego.app, so make sure that is the address in your address bar.
           </Trouble>
           <Trouble q="Chrome warns about “developer mode extensions”">
@@ -138,16 +137,16 @@ export function ExtensionPage() {
             press Remove or turn off Developer mode.
           </Trouble>
           <Trouble q="It says “Installed” but never “linked”">
-            Sign in to pileGo in this same browser and keep this page open for a few seconds. If it still does not link, open the
+            Sign in to pileGo! in this same browser and keep this page open for a few seconds. If it still does not link, open the
             extension from the toolbar to see the error.
           </Trouble>
           <Trouble q="The toolbar icon shows “!”">
-            You opened a copy of pileGo at another address. Click the icon and choose Allow if it is yours.
+            You opened a copy of pileGo! at another address. Click the icon and choose Allow if it is yours.
           </Trouble>
           <Trouble q="Updating to a new version">
             {firefox
               ? 'Download the new zip and load it on about:debugging the same way.'
-              : `Download the new zip, unzip it over the old folder, then press the reload arrow on the pileGo card on ${pages}. Your link to pileGo is kept.`}
+              : `Download the new zip, unzip it over the old folder, then press the reload arrow on the pileGo! card on ${pages}. Your link to pileGo! is kept.`}
           </Trouble>
           <Trouble q="Safari">Safari is not supported. Use Chrome, Edge, Brave or Firefox on a computer.</Trouble>
         </dl>
@@ -164,7 +163,7 @@ function StatusCard({ ext, checking, signedIn }: { ext: ReturnType<typeof useExt
   if (ext.installed && ext.needs_approval) {
     tone = 'wait';
     title = 'Installed. It needs your OK';
-    detail = 'Click the pileGo icon in your browser’s toolbar and choose Allow.';
+    detail = 'Click the pileGo! icon in your browser’s toolbar and choose Allow.';
   } else if (ext.installed && ext.linked) {
     tone = 'good';
     title = 'Installed and linked';
@@ -242,7 +241,7 @@ function ChromeSteps({ pages, browser }: { pages: string; browser: Browser }) {
           <strong>Click Load unpacked</strong> and choose the <code>pilego-extension-chrome</code> folder from step 2.
         </Step>
         <Step n={6}>
-          <strong>Pin it.</strong> Click the puzzle-piece icon next to the address bar and the pin beside pileGo, so you can see
+          <strong>Pin it.</strong> Click the puzzle-piece icon next to the address bar and the pin beside pileGo!, so you can see
           when it has work waiting.
         </Step>
         <Step n={7}>

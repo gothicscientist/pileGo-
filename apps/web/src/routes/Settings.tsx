@@ -27,7 +27,7 @@ import {
   type FullProfile,
 } from '~/lib/queries';
 import { errorMessage, supabase } from '~/lib/supabase';
-import { applyTheme, savedTheme, type Theme } from '~/lib/theme';
+import { applyTheme, savedTheme, THEME_EVENT, type Theme } from '~/lib/theme';
 import { EXTENSION_VERSION, older } from '~/routes/ExtensionPage';
 
 const CURRENCIES = ['USD', 'GBP', 'EUR', 'CAD', 'AUD'];
@@ -65,8 +65,7 @@ export function SettingsPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 lg:py-8">
       <header className="border-b border-line pb-5">
-        <p className="label-caps">06 / How pileGo works for you</p>
-        <h1 className="font-display mt-2 text-[clamp(2.6rem,6vw,4.6rem)] leading-[0.92]">Settings</h1>
+        <h1 className="font-display text-[clamp(2.6rem,6vw,4.6rem)] leading-[0.92]">Settings</h1>
       </header>
       <div className="mt-8 flex flex-col gap-8">
         <Marketplaces profile={profile} />
@@ -110,7 +109,7 @@ function Marketplaces({ profile }: { profile: FullProfile }) {
     <Section
       id="marketplaces"
       title="Where you sell"
-      intro="These are picked by default when you cross-list. How pileGo reaches each one is shown under its name."
+      intro="These are picked by default when you cross-list. How pileGo! reaches each one is shown under its name."
     >
       <ul className="flex flex-col divide-y divide-dashed divide-line">
         {MARKETPLACE_IDS.map(m => {
@@ -229,7 +228,7 @@ function Ebay() {
     <Section
       id="ebay"
       title="eBay"
-      intro="eBay has an official API, so pileGo lists, ends, relists and checks for sales from the server, even when your browser is closed."
+      intro="eBay has an official API, so pileGo! lists, ends, relists and checks for sales from the server, even when your browser is closed."
     >
       {status.isLoading ? (
         <Spinner />
@@ -240,12 +239,12 @@ function Ebay() {
       ) : !connected ? (
         <div className="flex flex-col items-start gap-3">
           {status.data.account?.status === 'expired' && (
-            <ErrorNote error="eBay signed pileGo out. Connect again to keep listings in sync." />
+            <ErrorNote error="eBay signed pileGo! out. Connect again to keep listings in sync." />
           )}
           <Button variant="tag" busy={connect.isPending} onClick={() => connect.mutate(undefined, { onError: e => toast(errorMessage(e), { tone: 'error' }) })}>
             Connect eBay
           </Button>
-          <p className="text-xs text-muted">You sign in on eBay. pileGo never sees your password.</p>
+          <p className="text-xs text-muted">You sign in on eBay. pileGo! never sees your password.</p>
         </div>
       ) : (
         <div className="flex flex-col gap-5">
@@ -298,7 +297,7 @@ function Ebay() {
           </div>
           {policies.isError && <ErrorNote error={policies.error} />}
           <p className="-mt-2 text-xs text-muted">
-            Leave a policy on “First one” and pileGo uses your first eBay policy. Without payment or returns policies, pileGo makes
+            Leave a policy on “First one” and pileGo! uses your first eBay policy. Without payment or returns policies, pileGo! makes
             simple ones (30-day returns, buyer pays return postage). The shipping policy sets postage, so create that one in eBay
             Seller Hub.
           </p>
@@ -340,7 +339,7 @@ function Ebay() {
 const EBAY_RETURN_MESSAGE: Record<string, string> = {
   declined: 'eBay was not connected: the sign-in was cancelled on eBay.',
   expired: 'The eBay sign-in took too long. Press Connect eBay to try again.',
-  error: 'eBay signed you in but pileGo could not finish connecting. Try again in a minute.',
+  error: 'eBay signed you in but pileGo! could not finish connecting. Try again in a minute.',
 };
 
 /** Shown while the server has no eBay keys: what the seller can do now, and what whoever runs pileGo still has to add. */
@@ -354,11 +353,11 @@ function EbaySetupNeeded({ setup }: { setup?: EbayStatus['setup'] }) {
   return (
     <div className="flex flex-col gap-3 text-sm text-ink-2">
       <p>
-        eBay isn’t switched on for this copy of pileGo yet, so the Connect button is hidden. Until it is, use the listing kit on an
+        eBay isn’t switched on for this copy of pileGo! yet, so the Connect button is hidden. Until it is, use the listing kit on an
         item’s eBay listing: it copies the title, description and photos for eBay’s own sell form.
       </p>
       <details className="rounded-xl bg-paper-2 px-3 py-2">
-        <summary className="cursor-pointer font-semibold text-ink">For whoever runs pileGo</summary>
+        <summary className="cursor-pointer font-semibold text-ink">For whoever runs pileGo!</summary>
         <p className="mt-2">
           Add these eBay developer keys to the Supabase function secrets ({setup?.environment ?? 'production'} keys). The steps are in{' '}
           <a className="underline" href="https://github.com/gothicscientist/pileGo-/blob/main/docs/ebay-setup.md" target="_blank" rel="noreferrer">
@@ -426,12 +425,12 @@ function Extension() {
     <Section
       id="extension"
       title="Browser extension"
-      intro="Vinted, Depop, Poshmark, Mercari, Grailed and Facebook have no public API for sellers. The pileGo extension works in your own logged-in tabs: one click on Vinted, a filled-in form on the others."
+      intro="Vinted, Depop, Poshmark, Mercari, Grailed and Facebook have no public API for sellers. The pileGo! extension works in your own logged-in tabs: one click on Vinted, a filled-in form on the others."
     >
       {ext.installed && ext.needs_approval ? (
         <p className="flex items-start gap-2 kraft rounded-xl p-3 text-sm font-semibold">
           <PlugZap className="mt-0.5 size-5 shrink-0" aria-hidden />
-          The extension wants your OK before it links to this copy of pileGo. Click the pileGo icon in your browser’s toolbar and choose Allow.
+          The extension wants your OK before it links to this copy of pileGo! Click the pileGo! icon in your browser’s toolbar and choose Allow.
         </p>
       ) : ext.installed ? (
         <div className="flex flex-col gap-4">
@@ -447,7 +446,7 @@ function Extension() {
               <Link to="/extension" className="font-semibold underline">
                 Download it
               </Link>{' '}
-              and press reload on the pileGo card in your browser’s extensions page.
+              and press reload on the pileGo! card in your browser’s extensions page.
             </p>
           )}
           <ul className="flex flex-wrap gap-2" aria-label="Marketplace tabs open in this browser">
@@ -495,7 +494,7 @@ function Extension() {
             Not installed in this browser
           </p>
           <p className="text-ink-2">
-            Download it from pileGo, unzip it and load it in Chrome, Edge, Brave or Firefox. It takes about two minutes, and it links
+            Download it from pileGo!, unzip it and load it in Chrome, Edge, Brave or Firefox. It takes about two minutes, and it links
             to your account by itself.
           </p>
           <Link className="btn btn-tag self-start" to={extensionSetupUrl('/settings#extension')}>
@@ -554,7 +553,7 @@ function Voice({ profile }: { profile: FullProfile }) {
   const [signOff, setSignOff] = useState(voice.sign_off ?? '');
   const setVoice = (patch: Partial<SellerVoice>) => save({ voice: { ...voice, ...patch } });
   return (
-    <Section id="voice" title="How your listings sound" intro="Used when pileGo writes each marketplace’s description.">
+    <Section id="voice" title="How your listings sound" intro="Used when pileGo! writes each marketplace’s description.">
       <div className="flex flex-col gap-5">
         <ChoiceChips<SellerVoice['tone']> label="Tone" value={voice.tone} onChange={v => v && setVoice({ tone: v })} options={TONES} />
         <TextField
@@ -580,6 +579,12 @@ function Basics({ profile }: { profile: FullProfile }) {
   const save = useSave();
   const [name, setName] = useState(profile.display_name ?? '');
   const [theme, setTheme] = useState<Theme>(savedTheme);
+  // The switch in the header can change it too.
+  useEffect(() => {
+    const on = () => setTheme(savedTheme());
+    window.addEventListener(THEME_EVENT, on);
+    return () => window.removeEventListener(THEME_EVENT, on);
+  }, []);
   const ids = { cur: useId(), reg: useId() };
   return (
     <Section id="basics" title="Basics">

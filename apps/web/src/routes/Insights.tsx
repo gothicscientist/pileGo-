@@ -2,6 +2,7 @@ import { computeAnalytics, findCategory, MARKETPLACES, isMarketplaceId } from '@
 import { motion } from 'motion/react';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
+import { MarketIcon } from '~/components/bits';
 import { BarList, ColumnChart, StatTile } from '~/components/charts';
 import { Empty, Paper, SectionTitle, Spinner } from '~/components/ui';
 import { cx, money, plural } from '~/lib/format';
@@ -51,8 +52,7 @@ export function Insights() {
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
         <div>
-          <p className="label-caps">05 / What sold, where, for how much</p>
-          <h1 className="font-display mt-2 text-[clamp(2.6rem,6vw,4.6rem)] leading-[0.92]">Insights</h1>
+          <h1 className="font-display text-[clamp(2.6rem,6vw,4.6rem)] leading-[0.92]">Insights</h1>
         </div>
         <div className="flex gap-1 rounded-full bg-paper-2 p-1" role="group" aria-label="Period">
           {PERIODS.map(p => (
@@ -171,6 +171,7 @@ export function Insights() {
                     data={a.by_marketplace.map(b => ({
                       key: b.key,
                       label: isMarketplaceId(b.key) ? MARKETPLACES[b.key].name : 'Elsewhere',
+                      icon: isMarketplaceId(b.key) ? <MarketIcon id={b.key} /> : undefined,
                       value: b.revenue,
                       detail: `${plural(b.count, 'sale')}, ${fmt(b.revenue / b.count)} each`,
                     }))}

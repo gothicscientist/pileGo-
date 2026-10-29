@@ -26,7 +26,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { JobRow } from '~/components/JobRow';
-import { HangTag, ItemStatusTag, ListingStatusText, PhotoImg, PriceTag, Sticker, TierLabel } from '~/components/bits';
+import { HangTag, ItemStatusTag, ListingStatusText, MarketIcon, PhotoImg, PriceTag, Sticker, TierLabel } from '~/components/bits';
 import { CrossListSheet } from '~/components/CrossListSheet';
 import { EbayAspects, missingEbayAspects } from '~/components/EbayAspects';
 import { diffForm, formFromItem, ItemForm, type FormValue } from '~/components/ItemForm';
@@ -247,7 +247,7 @@ export function ItemPage() {
         }
       >
         <p className="text-ink-2">
-          This deletes the photos and pileGo’s records. {liveCount > 0 && 'Listings that are live stay live on the marketplaces; end them first.'}
+          This deletes the photos and everything pileGo! keeps about it. {liveCount > 0 && 'Listings that are live stay live on the marketplaces; end them first.'}
         </p>
       </Sheet>
     </div>
@@ -305,7 +305,7 @@ function Photos({ item }: { item: Item }) {
               <PhotoImg
                 photo={current}
                 cutout={showCut}
-                className={cx('absolute inset-0 size-full', onCutout ? 'object-contain p-8 cutout-sticker' : 'object-cover')}
+                className={cx('absolute inset-0 size-full', onCutout ? 'object-contain p-8 cutout-shadow' : 'object-cover')}
                 alt={item.title}
               />
             </motion.div>
@@ -494,7 +494,7 @@ function Listings({ item, onCrossList }: { item: Item; onCrossList: () => void }
   if (!listings.length) {
     return (
       <Empty title="Not listed anywhere yet" action={item.status !== 'sold' && <Button variant="tag" onClick={onCrossList}>Cross-list</Button>}>
-        Pick marketplaces, check each version, and pileGo sends them out.
+        Pick marketplaces, check each version, and pileGo! sends them out.
       </Empty>
     );
   }
@@ -781,7 +781,10 @@ function PriceTab({ item }: { item: Item }) {
                   )}
                 </span>
                 {c.source !== 'own_sales' && MARKETPLACES[c.source] && (
-                  <span className="hidden shrink-0 text-xs text-muted sm:inline">{MARKETPLACES[c.source].name}</span>
+                  <span className="hidden shrink-0 items-center gap-1.5 text-xs text-muted sm:inline-flex">
+                    <MarketIcon id={c.source} className="size-3.5" />
+                    {MARKETPLACES[c.source].name}
+                  </span>
                 )}
                 <span className="font-semibold tabular">{money(c.price, c.currency)}</span>
               </li>
@@ -808,7 +811,12 @@ function PriceTab({ item }: { item: Item }) {
                 const p = priceOn(item.price!, m, region, profile?.price_strategy ?? 'same', profile?.fee_overrides);
                 return (
                   <tr key={m}>
-                    <td className="py-2">{MARKETPLACES[m].name}</td>
+                    <td className="py-2">
+                      <span className="flex items-center gap-2">
+                        <MarketIcon id={m} />
+                        {MARKETPLACES[m].name}
+                      </span>
+                    </td>
                     <td className="py-2 text-right tabular">{money(p, item.currency)}</td>
                     <td className="py-2 text-right text-muted tabular">{money(feeFor(p, rule), item.currency)}</td>
                     <td className="py-2 text-right font-semibold tabular">{money(takeHome(p, rule), item.currency)}</td>

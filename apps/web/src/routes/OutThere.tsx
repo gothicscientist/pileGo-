@@ -90,8 +90,7 @@ export function OutThere() {
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
         <div>
-          <p className="label-caps">04 / On the marketplaces</p>
-          <h1 className="font-display mt-2 text-[clamp(2.6rem,6vw,4.6rem)] leading-[0.92]">Out there</h1>
+          <h1 className="font-display text-[clamp(2.6rem,6vw,4.6rem)] leading-[0.92]">Out there</h1>
           <p className="mt-3 text-ink-2">
             {plural(live.length, 'live listing')} across {new Set(live.map(r => r.listing.marketplace)).size} marketplaces.
           </p>
@@ -135,7 +134,7 @@ export function OutThere() {
               </ul>
               {moving.some(j => j.runner === 'extension') && !ext.installed && (
                 <p className="mt-3 text-sm text-muted">
-                  Some of these run in the browser extension. Open pileGo in a browser that has it, or{' '}
+                  Some of these run in the browser extension. Open pileGo! in a browser that has it, or{' '}
                   <Link to={extensionSetupUrl('/out')} className="underline">
                     install it
                   </Link>

@@ -61,7 +61,7 @@ test('the pile shows unsold pieces and the receipt', async ({ page }, info) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'The pile' })).toBeVisible();
   const pile = page.getByRole('region', { name: 'The pile' });
-  await expect(pile.getByRole('link', { name: /Baggy light wash jeans/ })).toBeVisible();
+  await expect(pile.getByRole('link', { name: /Raw selvedge straight jeans/ })).toBeVisible();
   await expect(page.getByText('Taken this month')).toBeVisible();
   // Sold more than a week ago: not on the pile, but the receipt says to ship it.
   await expect(pile.getByRole('link', { name: /Smiley graphic hoodie/ })).toHaveCount(0);
@@ -101,7 +101,7 @@ test('closet filters by status and search', async ({ page }, info) => {
 test('item page shows listings, price and cross-list sheet', async ({ page }, info) => {
   await mockSupabase(page);
   await page.goto('/item/a1');
-  await expect(page.getByRole('heading', { name: 'Baggy light wash jeans' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Raw selvedge straight jeans' })).toBeVisible();
   await page.waitForTimeout(500);
   await snap(page, 'item', info.project.name);
   await page.getByRole('tab', { name: 'Listings' }).click();

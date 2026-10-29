@@ -58,7 +58,7 @@ export function CutoutPiece({
         src={c.src}
         alt=""
         draggable={false}
-        className={cx('pointer-events-none h-auto w-full', sticker ? 'cutout-sticker' : 'cutout-shadow')}
+        className={cx('pointer-events-none h-auto w-full', sticker ? 'cutout-shadow' : 'cutout-shadow')}
         style={{ aspectRatio: String(c.ratio) }}
         decoding="async"
       />
@@ -133,7 +133,7 @@ export function LooseTag({ price, note, className, style }: { price: ReactNode; 
         >
           <span className="absolute top-2 left-1/2 size-2.5 -translate-x-1/2 rounded-full bg-paper shadow-[inset_0_1px_2px_rgb(0_0_0/0.4)]" />
           <span className="text-2xl leading-none font-semibold tracking-tight tabular">{price}</span>
-          {note && <span className="mt-1.5 text-[0.55rem] font-semibold tracking-[0.14em] uppercase opacity-75">{note}</span>}
+          {note && <span className="mt-1.5 text-[0.7rem] font-semibold opacity-75">{note}</span>}
         </div>
       </div>
     </motion.div>

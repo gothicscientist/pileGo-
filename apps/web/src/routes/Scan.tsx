@@ -251,8 +251,7 @@ export function Scan() {
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-10">
       <header className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
         <div>
-          <p className="label-caps">{phase === 'review' ? '03 / Almost on the rail' : '03 / Photograph it once'}</p>
-          <h1 className="font-display mt-2 text-[clamp(2.6rem,6vw,4.6rem)] leading-[0.92]">
+          <h1 className="font-display text-[clamp(2.6rem,6vw,4.6rem)] leading-[0.92]">
             {phase === 'review' ? 'Check it over' : 'Scan an item'}
           </h1>
           <p className="mt-3 max-w-xl text-ink-2">

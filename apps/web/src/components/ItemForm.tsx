@@ -191,7 +191,7 @@ export function ItemForm({
           value={value.title}
           maxLength={120}
           onChange={e => set('title', e.target.value)}
-          hint={`${value.title.length} characters. eBay shows 80, Vinted and Poshmark fewer. pileGo trims per marketplace.`}
+          hint={`${value.title.length} characters. eBay shows 80, Vinted and Poshmark fewer. pileGo! trims per marketplace.`}
           placeholder="Levi's 501 straight leg jeans"
         />
         <div className="grid gap-4 sm:grid-cols-3">
@@ -312,7 +312,7 @@ export function ItemForm({
                   <span className="flex items-center gap-1">
                     {label}
                     {guess && (
-                      <span className="rounded bg-accent/15 px-1 text-[0.6rem] font-semibold tracking-wide text-accent uppercase" title="Estimated by the AI">
+                      <span className="rounded bg-accent/15 px-1 text-[0.65rem] font-semibold text-accent" title="Estimated by the AI">
                         AI est.
                       </span>
                     )}
