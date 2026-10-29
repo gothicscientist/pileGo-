@@ -1,0 +1,29 @@
+name: Release extension
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build Chrome and Firefox zips
+        run: pnpm --filter @pilego/extension build:zip
+        env:
+          # The deployed web app, set under Settings > Secrets and variables > Actions > Variables.
+          PILEGO_APP_ORIGINS: ${{ vars.PILEGO_APP_ORIGINS }}
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: apps/extension/dist/*.zip
+          generate_release_notes: true

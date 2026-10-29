@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: Typecheck, unit tests and builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Edge functions use the same core as the app
+        run: node scripts/sync-core.mjs --check
+      - run: pnpm -r typecheck
+      - run: pnpm -r test
+      - name: Build the web app
+        run: pnpm --filter @pilego/web build
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_ANON_KEY: ci-placeholder
+      - name: Build the extension
+        run: pnpm --filter @pilego/extension build:zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension
+          path: apps/extension/dist/*.zip
+          retention-days: 14
+
+  browser:
+    name: Browser tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @pilego/web exec playwright install --with-deps chromium
+      - name: Web app against a mocked backend
+        run: pnpm --filter @pilego/web test:e2e
+      - name: Extension against mock marketplace pages
+        run: pnpm --filter @pilego/extension test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: |
+            apps/web/test-results
+            apps/extension/test-results
+          retention-days: 7
+
+  functions:
+    name: Edge functions
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: supabase/functions
+    env:
+      DENO_NO_PACKAGE_JSON: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check --config deno.json */index.ts
+      - run: deno test --config deno.json --allow-env _shared/
+
+  database:
+    name: Database migrations and policies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Postgres
+        run: sudo apt-get update -q && sudo apt-get install -yq postgresql
+      - name: Migrate and test
+        run: sudo -E bash supabase/tests/run-local.sh
