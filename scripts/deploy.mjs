@@ -86,7 +86,10 @@ async function migrations() {
 async function apiKeys() {
   const keys = (await api('GET', `/projects/${ref}/api-keys?reveal=true`)) ?? [];
   const pick = name => keys.find(k => k.name === name)?.api_key;
-  return { anon: pick('anon'), service: pick('service_role') };
+  // Projects with the newer API keys give edge functions an sb_secret_ key, not
+  // the legacy service_role JWT, so the schedules must call with that one.
+  const secret = keys.find(k => k.type === 'secret' && k.name === 'default') ?? keys.find(k => k.type === 'secret');
+  return { anon: pick('anon'), service: secret?.api_key ?? pick('service_role') };
 }
 
 async function vault(keys) {

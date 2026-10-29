@@ -52,7 +52,7 @@ async function pickGeminiModel(key: string): Promise<string> {
   } catch (err) {
     console.warn('Could not list Gemini models', err);
   }
-  return (resolvedModel = 'gemini-2.5-flash');
+  return (resolvedModel = 'gemini-flash-latest');
 }
 
 function versionOf(name: string): number {
