@@ -10,7 +10,7 @@ async function snap(page: import('@playwright/test').Page, name: string, project
 test('signed-out visitors see the sign-in floor', async ({ page }, info) => {
   await mockSupabase(page, { signedIn: false });
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: /Your closet\. All of it\./ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Clear the pile\. Keep the cash\./ })).toBeVisible();
   await expect(page.getByLabel('Email')).toBeVisible();
   await page.waitForLoadState('networkidle');
   await page.waitForTimeout(1200);

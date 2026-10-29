@@ -10,23 +10,23 @@ import { PHOTOS, type CutoutId } from '~/lib/art';
 import { cx } from '~/lib/format';
 import { errorMessage, supabase } from '~/lib/supabase';
 
-// The board: a weekend haul thrown onto a green cutting mat. Heavyweight
-// hoodies, selvedge and a pair of Mexico 66s pile up and spill over the edges,
+// The board: a weekend haul thrown onto a green cutting mat. A hoodie, a
+// flannel, selvedge, cargos and a pair of Mexico 66s pile up and spill over the edges,
 // with a polaroid, a price tag and a sold sticker on top. Positions are a share
 // of the board, so the same layout scales from a phone to a wide screen.
 const PIECES: Array<{ id: CutoutId; at: Placement }> = [
   { id: 'selvedgeJacket', at: { x: '1%', y: '9%', w: '50%', r: -9, z: 2, phone: true } },
   { id: 'meshShorts', at: { x: '49%', y: '53%', w: '22%', r: 9, z: 2 } },
-  { id: 'pineHoodie', at: { x: '69%', y: '45%', w: '30%', r: 13, z: 3 } },
+  { id: 'flannel', at: { x: '72%', y: '41%', w: '26%', r: 12, z: 3 } },
   { id: 'rawSelvedge', at: { x: '29%', y: '37%', w: '21%', r: -17, z: 3, phone: true } },
   { id: 'lilacHoodie', at: { x: '41%', y: '3%', w: '44%', r: 7, z: 4, phone: true } },
-  { id: 'bananaHoodie', at: { x: '5%', y: '45%', w: '36%', r: -6, z: 5, phone: true } },
+  { id: 'creamCargos', at: { x: '7%', y: '44%', w: '30%', r: -8, z: 5, phone: true } },
   { id: 'cap', at: { x: '-1%', y: '2%', w: '19%', r: -20, z: 6 } },
   { id: 'mexico66Yellow', at: { x: '37%', y: '73%', w: '40%', r: -7, z: 8, phone: true } },
 ];
 
 const PRINTS: Array<{ photo: keyof typeof PHOTOS; caption: string; at: Placement }> = [
-  { photo: 'cargoFit', caption: 'Saturday haul', at: { x: '79%', y: '4%', w: '21%', r: 8, z: 6 } },
+  { photo: 'knit', caption: 'Saturday haul', at: { x: '79%', y: '4%', w: '21%', r: 8, z: 6 } },
 ];
 
 // A sticker with a scalloped edge, like the ones on a shop window.
@@ -96,14 +96,14 @@ export function SignIn() {
 
         <div className="grid flex-1 items-center gap-8 py-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-12 lg:py-10">
           <div className="order-2 flex max-w-xl flex-col lg:order-1">
-            <motion.h1 className="font-display text-[clamp(3rem,7vw,6.2rem)] leading-[0.9]" {...rise(0.08)}>
-              Your closet.
+            <motion.h1 className="font-display text-[clamp(2.7rem,5.2vw,4.7rem)] leading-[0.92]" {...rise(0.08)}>
+              Clear the pile.
               <br />
-              <span className="text-accent italic">All of it.</span>
+              <span className="text-accent italic">Keep the cash.</span>
             </motion.h1>
             <motion.p className="mt-5 max-w-md text-lg leading-relaxed text-ink-2" {...rise(0.2)}>
-              Snap it once and pileGo! writes the listing, prices it and puts it up everywhere you sell. When it sells, it comes down
-              everywhere else.
+              Snap the clothes piling up on your chair and pileGo! lists them everywhere you sell. When one sells, it comes down
+              everywhere else, and the pile gets smaller.
             </motion.p>
             <motion.div className="mt-5 flex max-w-md flex-wrap gap-1.5" {...rise(0.26)}>
               {MARKETPLACE_IDS.map(id => (

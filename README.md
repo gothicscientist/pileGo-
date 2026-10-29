@@ -35,7 +35,7 @@ somewhere, pileGo! takes it down everywhere else.
 |---|---|
 | ![An item page with photos, details and the listings on each marketplace](docs/screenshots/item.webp) | ![The cross-list sheet with a per-marketplace preview](docs/screenshots/crosslist.webp) |
 | ![Out there: listings grouped by what they need from you](docs/screenshots/out.webp) | ![Insights: profit receipt and sales charts](docs/screenshots/insights.webp) |
-| ![The pile in dark mode](docs/screenshots/pile-dark.webp) | ![The sign-in page in dark mode, with heavyweight hoodies, selvedge denim and Onitsuka Tiger trainers](docs/screenshots/signin-dark.webp) |
+| ![The pile in dark mode](docs/screenshots/pile-dark.webp) | ![The sign-in page in dark mode, with a hoodie, flannel, selvedge, cargos and Onitsuka Tiger trainers on a green mat](docs/screenshots/signin-dark.webp) |
 
 ## How pileGo reaches each marketplace
 
