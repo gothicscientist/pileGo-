@@ -160,7 +160,7 @@ test('fills every field on Depop, removes its colour guess and posts', async ({ 
       source: ['Preloved'],
       age: ['Modern'],
       style: ['Utility'],
-      shippingMethods: 'Extra large',
+      shippingMethods: 'Large',
       variants: 'M',
     },
     price: '32',
@@ -169,6 +169,20 @@ test('fills every field on Depop, removes its colour guess and posts', async ({ 
     photos: 2,
   });
   expect(page.url()).toBe('https://www.depop.com/products/seller-gap-jacket-1234/');
+  await expect(page.locator('pilego-panel')).toHaveCount(0);
+});
+
+test('a fill that reaches the closet after posting is ignored, not reported as stuck', async ({ context, worker }) => {
+  await context.route('https://poshmark.com/**', route => route.fulfill({ contentType: 'text/html', body: '<html><body><main>Bharat B @buyer341 3 Listings</main></body></html>' }));
+  const page = await context.newPage();
+  await page.goto('https://poshmark.com/closet/buyer341');
+  const id = await tabId(worker, 'https://poshmark.com/*');
+  const base = work();
+  const out = await worker.evaluate(({ id, work }) => chrome.tabs.sendMessage(id, { type: 'assist:fill', work }), {
+    id,
+    work: work({ marketplace: 'poshmark', listing: { ...base.listing, marketplace: 'poshmark' } }),
+  });
+  expect(out).toMatchObject({ ok: false, posted: false, error: 'Not on the sell page.' });
   await expect(page.locator('pilego-panel')).toHaveCount(0);
 });
 

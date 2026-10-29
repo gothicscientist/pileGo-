@@ -389,21 +389,44 @@ async function runAssist(sb: SupabaseClient, job: Job, first: boolean) {
   await setWaiting(list);
 
   await waitForLoad(tab.id);
+  if (posting) await backToForm(tab.id, url);
+  // Wait for the content script with pings, then send the job once. Resending
+  // it after posting has moved the tab on would start a second fill there.
+  const ready = await sendToTab(tab.id, { type: 'assist:ping' }, 30_000).then(
+    () => true,
+    err => (console.warn('[pileGo] assist tab did not answer', errorText(err)), false),
+  );
   if (!auto) {
-    await sendToTab(tab.id, posting ? { type: 'assist:fill', work } : { type: 'assist:remove', work, reason }, 30_000).catch(err =>
-      console.warn('[pileGo] assist tab did not answer', errorText(err)),
-    );
+    if (ready) void ext.tabs.sendMessage(tab.id, posting ? { type: 'assist:fill', work } : { type: 'assist:remove', work, reason }).catch(() => {});
     return;
   }
 
   await activate(tab.id).catch(() => {});
   state.lastMessage = `Listing on ${info.name}…`;
-  const reply = await sendToTab<FillResult>(tab.id, { type: 'assist:fill', work }, 30_000).catch(err => {
-    // Posting navigates away, which closes the channel before the tab answers.
-    console.debug('[pileGo] assist tab closed the channel', errorText(err));
-    return null;
-  });
+  const reply = ready
+    ? ((await ext.tabs.sendMessage(tab.id, { type: 'assist:fill', work }).catch(err => {
+        // Posting navigates away, which closes the channel before the tab answers.
+        console.debug('[pileGo] assist tab closed the channel', errorText(err));
+        return null;
+      })) as FillResult | null)
+    : null;
   await settleAuto(sb, job.id, tab.id, reply);
+}
+
+/**
+ * Marketplaces sometimes bounce the sell page somewhere else on first load
+ * (Poshmark to the seller's closet), so go back to the form once.
+ */
+async function backToForm(tabId: number, url: string) {
+  const want = new URL(url).pathname.replace(/\/+$/, '');
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const now = await ext.tabs.get(tabId).catch(() => null);
+    if (!now?.url) return;
+    if (new URL(now.url).pathname.replace(/\/+$/, '').startsWith(want)) return;
+    await ext.tabs.update(tabId, { url }).catch(() => {});
+    await sleep(500);
+    await waitForLoad(tabId);
+  }
 }
 
 /** Jobs already marked posted, so a report and a URL change do not both count. */
@@ -471,6 +494,7 @@ export async function onAssistReport(sb: SupabaseClient, report: AssistReport, t
   const w = list[report.job_id];
   if (!w) return;
   if (report.type === 'assist:stuck') {
+    if (settled.has(report.job_id)) return;
     // Still waiting: the seller finishes the form, and posting it settles the job.
     w.stuck = true;
     await setWaiting(list);

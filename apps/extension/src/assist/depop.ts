@@ -64,6 +64,9 @@ function chips(name: string): Array<{ label: string; remove: HTMLElement }> {
   }));
 }
 
+/** The options each menu last showed, for saying why a field could not be filled. */
+const seen = new Map<string, string[]>();
+
 /**
  * Pick one or more options of a Downshift combobox. Chips the item does not
  * want are removed first. Returns what is selected at the end.
@@ -82,23 +85,32 @@ async function choose(name: string, wants: string[][], max = wants.length): Prom
   for (const want of wants) {
     if (picked.length >= max) break;
     if (picked.some(p => want.map(norm).includes(norm(p)))) continue;
-    const opts = await openMenu(name);
-    const hit = pickOption(opts, label, want);
+    // A menu can open empty or stale while the form redraws (after the
+    // category changes, say), so look again before giving up on it.
+    let hit: HTMLElement | null = null;
+    for (let attempt = 0; attempt < 3 && !hit; attempt += 1) {
+      if (attempt) {
+        closeMenu(name);
+        await sleep(700);
+      }
+      const opts = await openMenu(name);
+      seen.set(name, opts.map(label));
+      hit = pickOption(opts, label, want);
+    }
     if (!hit) continue;
     picked.push(label(hit));
     press(hit);
     await sleep(350);
   }
   closeMenu(name);
-  await sleep(150);
-  // A single select shows its value in the input; check it took.
-  if (!chips(name).length && picked.length === 1 && norm(input.value) !== norm(picked[0])) {
+  // A single select shows its value in the input once React catches up; check it took.
+  const took = () => norm(input.value) === norm(picked[0]);
+  if (!chips(name).length && picked.length === 1 && !(await waitFor(took, 2000))) {
     const opts = await openMenu(name);
     const hit = opts.find(o => norm(label(o)) === norm(picked[0]));
     if (hit) press(hit);
-    await sleep(350);
     closeMenu(name);
-    return norm(input.value) === norm(picked[0]) ? picked : [];
+    return (await waitFor(took, 2000)) ? picked : [];
   }
   return picked;
 }
@@ -249,13 +261,23 @@ export const fillDepop: Driver = async (work: ListingWork, files: File[], ctx: D
     await sleep(700);
   }
   tally.ok('worldwide shipping', document.querySelector<HTMLInputElement>('input[name="isInternationalShippingEnabled"]')?.checked);
-  tally.ok('package size', await choose('shippingMethods', [depopPackage(item)]));
+  // Depop suggests a package size from the category's typical weight and warns
+  // when it is overridden, so its own suggestion stays.
+  const suggested = (byId('shippingMethods-input') as HTMLInputElement | null)?.value.trim();
+  tally.ok('package size', suggested || (await choose('shippingMethods', [depopPackage(item)])));
 
   // Without these Depop refuses the listing; stop and say what is missing.
   const needed = ['photos', 'description', 'category', 'condition', 'price'];
   if (byId('variants-input') && item.size) needed.push('size');
   const blocking = needed.filter(n => tally.missing.includes(n));
-  if (blocking.length) return tally.result(false);
+  if (blocking.length) {
+    const sizes = seen.get('variants');
+    const hint =
+      blocking.includes('size') && item.size
+        ? ` The item's size is ${item.size}; Depop offered ${sizes?.length ? sizes.slice(0, 12).join(', ') : 'no sizes'}.`
+        : '';
+    return tally.result(false, hint.trim() || undefined);
+  }
 
   ctx.check();
   const post = [...document.querySelectorAll<HTMLButtonElement>('button[type="submit"]')].find(b => text(b) === 'Post' && shown(b));

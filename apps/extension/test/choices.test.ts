@@ -49,7 +49,10 @@ describe('Depop choices', () => {
     expect(depopStyles(item())).toEqual(['Casual']);
   });
   it('sizes the parcel by the kind of item', () => {
-    expect(depopPackage(item())[0]).toBe('Extra large');
+    expect(depopPackage(item())[0]).toBe('Large');
+    expect(depopPackage(item({ subcategory: 'coats' }))[0]).toBe('Extra large');
+    expect(depopPackage(item({ category: 'knitwear', subcategory: 'hoodies' }))[0]).toBe('Large');
+    expect(depopPackage(item({ category: 'dresses', subcategory: 'mini-dresses' }))[0]).toBe('Medium');
     expect(depopPackage(item({ category: 'tops', subcategory: 't-shirts' }))[0]).toBe('Small');
   });
 });

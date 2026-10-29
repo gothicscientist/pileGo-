@@ -94,7 +94,12 @@ export async function activate(tabId: number): Promise<void> {
   for (let attempt = 0; attempt < 8; attempt += 1) {
     try {
       const tab = await ext.tabs.update(tabId, { active: true });
-      if (tab?.windowId != null) await ext.windows.update(tab.windowId, { focused: true }).catch(() => {});
+      if (tab?.windowId != null) {
+        // A minimised window hides the page, and some forms stop drawing while hidden.
+        const win = await ext.windows.get(tab.windowId).catch(() => null);
+        const restore = win?.state === 'minimized' ? { state: 'normal' as const } : {};
+        await ext.windows.update(tab.windowId, { focused: true, ...restore }).catch(() => {});
+      }
       return;
     } catch (err) {
       if (!/cannot be edited|dragging/i.test(String((err as Error)?.message ?? err))) throw err;

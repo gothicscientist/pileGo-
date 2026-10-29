@@ -187,13 +187,19 @@ export function depopStyles(item: Item): string[] {
   return out;
 }
 
-/** Package size names, lightest first, to try for the item's weight. */
+/**
+ * Depop package sizes go by weight: Small and Medium under 1lb, Large under
+ * 2lb, Extra large under 10lb. Only used when Depop has not suggested one.
+ */
 export function depopPackage(item: Item): string[] {
-  const heavy = ['outerwear', 'shoes', 'bags'];
-  const light = ['tops', 'accessories'];
-  if (heavy.includes(item.category ?? '')) return ['Extra large', 'Large'];
-  if (light.includes(item.category ?? '') && item.subcategory !== 'hoodies') return ['Small', 'Medium'];
-  return ['Large', 'Medium'];
+  const sub = item.subcategory ?? '';
+  const cat = item.category ?? '';
+  if (['coats', 'puffers', 'leather-jackets'].includes(sub) || ['shoes', 'bags'].includes(cat)) return ['Extra large', 'Large'];
+  if (['outerwear', 'knitwear', 'bottoms'].includes(cat) || ['hoodies', 'sweatshirts', 'tracksuits'].includes(sub)) {
+    return ['shorts', 'skirts', 'leggings'].includes(sub) ? ['Medium', 'Large'] : ['Large', 'Medium'];
+  }
+  if (['t-shirts', 'tank-tops', 'crop-tops', 'polos'].includes(sub) || cat === 'accessories') return ['Small', 'Medium'];
+  return ['Medium', 'Large'];
 }
 
 /** Ways the item's size may be written on a size list. */
