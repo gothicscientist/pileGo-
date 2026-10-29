@@ -1,6 +1,7 @@
 import { BarChart3, Layers, ScanLine, Settings, Shirt, Store } from 'lucide-react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import { useExtension } from '~/lib/extension';
+import { extensionSetupUrl } from '~/lib/extension-flow';
 import { cx } from '~/lib/format';
 import { useJobs, useRealtime } from '~/lib/queries';
 
@@ -38,6 +39,7 @@ function useAttentionCount(): number {
 
 function ExtensionDot() {
   const ext = useExtension();
+  const { pathname, search, hash } = useLocation();
   const label = !ext.installed
     ? 'Get the extension'
     : ext.needs_approval
@@ -49,7 +51,7 @@ function ExtensionDot() {
           : 'Extension linked';
   return (
     <NavLink
-      to={ext.installed ? '/settings#extension' : '/extension'}
+      to={ext.installed ? '/settings#extension' : extensionSetupUrl(`${pathname}${search}${hash}`)}
       className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-ink-2 hover:bg-paper-2"
       title={ext.installed ? 'The pileGo browser extension in this browser' : 'Install the pileGo browser extension for Vinted, Depop and the rest'}
     >

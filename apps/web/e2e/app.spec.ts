@@ -233,13 +233,27 @@ test('the extension page can return to the listing before installation finishes'
 test('extension setup from Settings returns to Settings', async ({ page }) => {
   await mockSupabase(page);
   await page.goto('/settings#extension');
-  await page.getByRole('link', { name: 'Get the extension' }).click();
+  await page.getByRole('region', { name: 'Browser extension', exact: true }).getByRole('link', { name: 'Get the extension' }).click();
   await expect(page.getByRole('link', { name: 'Back to where you left off' })).toHaveAttribute('href', '/settings#extension');
   await page.evaluate(user_id => window.postMessage({
     source: 'pilego-ext', type: 'status',
     status: { installed: true, linked: true, user_id, needs_approval: false },
   }, location.origin), UID);
   await expect(page).toHaveURL('/settings#extension');
+});
+
+test('the sidebar extension link remembers the current item and tab', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'The extension shortcut is in the desktop rail.');
+  await mockSupabase(page);
+  await page.goto('/item/a1?tab=price');
+  await page.getByRole('complementary').getByRole('link', { name: 'Get the extension' }).click();
+  await expect(page.getByRole('link', { name: 'Back to listing' })).toHaveAttribute('href', '/item/a1?tab=price');
+  await page.evaluate(user_id => window.postMessage({
+    source: 'pilego-ext', type: 'status',
+    status: { installed: true, linked: true, user_id, needs_approval: false },
+  }, location.origin), UID);
+  await expect(page).toHaveURL('/item/a1?tab=price');
+  await expect(page.getByRole('tab', { name: 'Price', exact: true })).toHaveAttribute('aria-selected', 'true');
 });
 
 test('scan sends photo roles and marks measurement estimates', async ({ page }, info) => {
