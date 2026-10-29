@@ -11,16 +11,16 @@ import { cx } from '~/lib/format';
 import { errorMessage, supabase } from '~/lib/supabase';
 
 // The board: a weekend haul thrown onto a green cutting mat. A hoodie, a
-// flannel, selvedge, cargos and a pair of Mexico 66s pile up and spill over the edges,
+// graphic tee, a flannel, selvedge, cargo shorts and a pair of Mexico 66s pile up and spill over the edges,
 // with a polaroid, a price tag and a sold sticker on top. Positions are a share
 // of the board, so the same layout scales from a phone to a wide screen.
 const PIECES: Array<{ id: CutoutId; at: Placement }> = [
   { id: 'selvedgeJacket', at: { x: '1%', y: '9%', w: '50%', r: -9, z: 2, phone: true } },
-  { id: 'meshShorts', at: { x: '49%', y: '53%', w: '22%', r: 9, z: 2 } },
+  { id: 'cargoShorts', at: { x: '49%', y: '50%', w: '24%', r: 9, z: 2 } },
   { id: 'flannel', at: { x: '72%', y: '41%', w: '26%', r: 12, z: 3 } },
   { id: 'rawSelvedge', at: { x: '29%', y: '37%', w: '21%', r: -17, z: 3, phone: true } },
   { id: 'lilacHoodie', at: { x: '41%', y: '3%', w: '44%', r: 7, z: 4, phone: true } },
-  { id: 'creamCargos', at: { x: '7%', y: '44%', w: '30%', r: -8, z: 5, phone: true } },
+  { id: 'skullTee', at: { x: '3%', y: '50%', w: '35%', r: -10, z: 5, phone: true } },
   { id: 'cap', at: { x: '-1%', y: '2%', w: '19%', r: -20, z: 6 } },
   { id: 'mexico66Yellow', at: { x: '37%', y: '73%', w: '40%', r: -7, z: 8, phone: true } },
 ];

@@ -41,7 +41,7 @@ no white fringe is left, and cropped some.
 Most pieces come from the product pages of [Lucid Blanks](https://lucidblanks.com)
 (heavyweight hoodies, sweats, cargos, mesh shorts and selvedge jeans),
 [Naked & Famous Denim](https://nakedandfamousdenim.com) (the selvedge jacket) and
-[Onitsuka Tiger](https://www.onitsukatiger.com) (the Mexico 66 trainers). These
+[Onitsuka Tiger](https://www.onitsukatiger.com) (the Mexico 66 trainers), [Stüssy](https://www.stussy.com) (the graphic tee) and [HUF](https://www.hufworldwide.com) (the cargo shorts). These
 photos belong to those brands. They are used here as placeholders for a demo
 closet and have not been licensed; swap them before any commercial launch.
 
@@ -73,6 +73,8 @@ closet and have not been licensed; swap them before any commercial launch.
 | `photos/lilac-fit.webp` | [600 GSM 'Lilac' Core Hoodie](https://lucidblanks.com/products/600-gsm-lilac-core-hoodie-1) | [image](https://cdn.shopify.com/s/files/1/0748/8556/2674/files/600_lilac_hoodie.png) | cropped |
 | `photos/pine-fit.webp` | [600 GSM 'Pine' Core Hoodie](https://lucidblanks.com/products/600-gsm-pine-core-hoodie) | [image](https://cdn.shopify.com/s/files/1/0748/8556/2674/files/600_pine_hoodie.png) | cropped |
 | `photos/selvedge-fit.webp` | ['Shroud' Washed Indigo Selvedge Denim](https://lucidblanks.com/products/shroud-washed-indigo-selvedge-denim) | [image](https://cdn.shopify.com/s/files/1/0748/8556/2674/files/shroud2.png) | cropped |
+| `closet/skull-tee.webp` | [Stüssy Fresh Foils Tee (Rock)](https://www.stussy.com/products/1905216-fresh-foils-tee-rock) | [image](https://cdn.shopify.com/s/files/1/0087/6193/3920/files/1905216_ROCK_2.jpg) | background removed |
+| `closet/cargo-shorts.webp` | [HUF Oval Denim Cargo Short](https://www.hufworldwide.com/products/oval-denim-cargo-short-pt00389) | [image](https://cdn.shopify.com/s/files/1/0268/5180/3305/files/OVAL-DENIM-CARGO-SHORT_FROST-GRAY_PT00389_FRGRY_01.png) | trimmed |
 
 ### Unsplash and Pexels
 

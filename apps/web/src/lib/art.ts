@@ -10,6 +10,7 @@ import blackHoodie from '~/assets/closet/black-hoodie.webp';
 import blackZip from '~/assets/closet/black-zip.webp';
 import cabernetHoodie from '~/assets/closet/cabernet-hoodie.webp';
 import camelBlazer from '~/assets/closet/camel-blazer.webp';
+import cargoShorts from '~/assets/closet/cargo-shorts.webp';
 import cap from '~/assets/closet/cap.webp';
 import clayHoodie from '~/assets/closet/clay-hoodie.webp';
 import coffeeLongsleeve from '~/assets/closet/coffee-longsleeve.webp';
@@ -29,6 +30,7 @@ import pineHoodie from '~/assets/closet/pine-hoodie.webp';
 import rawSelvedge from '~/assets/closet/raw-selvedge.webp';
 import rustBomber from '~/assets/closet/rust-bomber.webp';
 import selvedgeJacket from '~/assets/closet/selvedge-jacket.webp';
+import skullTee from '~/assets/closet/skull-tee.webp';
 import shroudSelvedge from '~/assets/closet/shroud-selvedge.webp';
 import whiteTee from '~/assets/closet/white-tee.webp';
 import bananaFitPhoto from '~/assets/photos/banana-fit.webp';
@@ -57,6 +59,7 @@ export const CUTOUTS = {
   blackZip: { src: blackZip, name: 'Black heavyweight zip-up', ratio: 0.70 },
   cabernetHoodie: { src: cabernetHoodie, name: 'Cabernet heavyweight hoodie', ratio: 0.82 },
   camelBlazer: { src: camelBlazer, name: 'Camel blazer', ratio: 0.41 },
+  cargoShorts: { src: cargoShorts, name: 'Grey denim cargo shorts', ratio: 1.06 },
   cap: { src: cap, name: 'Yellow cap', ratio: 1.55 },
   clayHoodie: { src: clayHoodie, name: 'Clay heavyweight hoodie', ratio: 0.81 },
   coffeeLongsleeve: { src: coffeeLongsleeve, name: 'Coffee long sleeve tee', ratio: 1.09 },
@@ -77,6 +80,7 @@ export const CUTOUTS = {
   rustBomber: { src: rustBomber, name: 'Rust bomber', ratio: 0.83 },
   selvedgeJacket: { src: selvedgeJacket, name: 'Selvedge denim jacket', ratio: 1.21 },
   shroudSelvedge: { src: shroudSelvedge, name: 'Washed selvedge jeans', ratio: 0.58 },
+  skullTee: { src: skullTee, name: 'Skull graphic tee', ratio: 1.22 },
   whiteTee: { src: whiteTee, name: 'White tee', ratio: 0.62 },
 } satisfies Record<string, Cutout>;
 
