@@ -101,7 +101,7 @@ export function PhoneCapture() {
       <Frame>
         <div className="mt-16 flex flex-col items-start gap-3" role="alert">
           <TriangleAlert className="size-10 text-danger" aria-hidden />
-          <h1 className="font-display text-4xl leading-[0.95] font-extrabold">This code no longer works</h1>
+          <h1 className="font-display text-4xl leading-[0.95]">This code no longer works</h1>
           <p className="text-ink-2">{fatal}</p>
         </div>
       </Frame>
@@ -129,7 +129,7 @@ export function PhoneCapture() {
         <p className="inline-flex items-center gap-1.5 rounded-full bg-ink px-2.5 py-1 text-xs font-semibold text-paper">
           <Laptop className="size-3.5" aria-hidden /> Linked to the scan on your computer
         </p>
-        <h1 className="mt-3 font-display text-5xl leading-[0.9] font-extrabold">Snap it</h1>
+        <h1 className="mt-3 font-display text-6xl leading-[0.9]">Snap it</h1>
         <p className="mt-2 text-ink-2">Lay it flat in daylight. Each photo goes straight to your computer.</p>
       </header>
 
@@ -139,7 +139,7 @@ export function PhoneCapture() {
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="mt-4 rounded-lg bg-mint px-3 py-2 text-sm font-semibold text-[#16172b]"
+            className="mt-4 rounded-xl bg-olive/30 px-3 py-2 text-sm font-semibold text-[var(--olive-deep)] dark:text-olive"
             role="status"
           >
             Saved on your computer. Ready for the next piece.
@@ -151,22 +151,22 @@ export function PhoneCapture() {
         {KEY_SHOTS.map((k, i) => {
           const shot = [...live].reverse().find(s => s.role === k.role);
           return (
-            <li key={k.role} className="min-w-0">
+            <li key={k.role} className="min-w-0" style={{ rotate: `${[-1.2, 0.8, -0.6][i]}deg` }}>
               <button
                 type="button"
                 onClick={() => pick(k.role)}
                 aria-label={shot ? `Retake the ${k.label.toLowerCase()} photo` : `Take the ${k.label.toLowerCase()} photo. ${k.tip}.`}
                 className={cx(
-                  'relative flex aspect-[4/5] w-full flex-col items-center justify-center gap-1 overflow-hidden rounded-xl p-2 text-center',
-                  shot ? 'bg-paper-2' : 'border-2 border-dashed bg-paper-2/60',
-                  !shot && next?.role === k.role ? 'border-tag' : 'border-line',
+                  'relative flex aspect-[4/5] w-full flex-col items-center justify-center gap-1 overflow-hidden rounded-[18px] p-2 text-center transition duration-300 ease-[var(--ease-spring)] active:scale-95',
+                  shot ? 'bg-paper-2 lift' : 'border-2 border-dashed bg-card/60',
+                  !shot && next?.role === k.role ? 'border-accent' : 'border-line',
                 )}
               >
                 {shot ? (
                   <>
                     <img src={shot.local} alt="" className={cx('absolute inset-0 size-full object-cover', shot.state === 'sending' && 'opacity-50')} />
-                    <span className="absolute top-1 left-1 inline-flex items-center gap-0.5 rounded bg-ink px-1 text-[0.65rem] font-bold text-paper">
-                      {shot.state === 'done' && <Check className="size-3 text-tag" aria-hidden />}
+                    <span className="absolute top-1.5 left-1.5 inline-flex items-center gap-0.5 rounded-full bg-paper/90 px-1.5 py-px text-[0.65rem] font-semibold text-ink backdrop-blur">
+                      {shot.state === 'done' && <Check className="size-3 text-[var(--olive-deep)]" strokeWidth={3} aria-hidden />}
                       {i + 1}. {k.label}
                     </span>
                     {shot.state === 'sending' && <span className="skeleton absolute inset-x-0 bottom-0 h-1" />}
@@ -174,7 +174,7 @@ export function PhoneCapture() {
                 ) : (
                   <>
                     <ShotIllustration role={k.role} />
-                    <span className="font-display text-sm leading-tight font-bold">
+                    <span className="font-display text-sm leading-tight">
                       {i + 1}. {k.label}
                     </span>
                   </>
@@ -189,16 +189,16 @@ export function PhoneCapture() {
       {extras.length > 0 && (
         <ul className="mt-4 grid grid-cols-4 gap-2" aria-label="Extras">
           {extras.map(s => (
-            <li key={s.key} className="relative aspect-square overflow-hidden rounded-lg bg-paper-2">
+            <li key={s.key} className="relative aspect-square overflow-hidden rounded-xl bg-paper-2">
               <img src={s.local} alt="Extra photo" className={cx('size-full object-cover', s.state === 'sending' && 'opacity-50')} />
-              {s.state === 'done' && <Check className="absolute top-1 left-1 size-4 rounded bg-ink p-0.5 text-tag" aria-hidden />}
+              {s.state === 'done' && <Check className="absolute top-1.5 left-1.5 size-4 rounded-full bg-paper/90 p-0.5 text-[var(--olive-deep)]" strokeWidth={3} aria-hidden />}
             </li>
           ))}
         </ul>
       )}
 
       {sent.some(s => s.state === 'error') && (
-        <p role="alert" className="mt-4 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
+        <p role="alert" className="mt-4 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">
           {sent.filter(s => s.state === 'error').length === 1 ? 'One photo' : 'Some photos'} did not send:{' '}
           {sent.find(s => s.state === 'error')?.error} Take it again.
         </p>
@@ -210,7 +210,7 @@ export function PhoneCapture() {
           : `${delivered} sent. Check ${delivered === 1 ? 'it' : 'them'} on your computer, then press Scan with AI there.`}
       </p>
 
-      <div className="sticky bottom-0 -mx-5 mt-6 grid gap-2 bg-paper/95 px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur">
+      <div className="sticky bottom-0 -mx-5 mt-6 grid gap-2 bg-paper/90 px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-md">
         <Button variant="tag" className="py-4 text-base" icon={<Camera className="size-5" aria-hidden />} onClick={() => pick(next?.role ?? 'extra')}>
           {next ? `Take the ${next.label.toLowerCase()} photo` : 'Take an extra photo'}
         </Button>
@@ -255,3 +255,4 @@ function Frame({ children }: { children: ReactNode }) {
     </div>
   );
 }
+

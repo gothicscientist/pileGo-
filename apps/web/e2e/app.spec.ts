@@ -10,9 +10,10 @@ async function snap(page: import('@playwright/test').Page, name: string, project
 test('signed-out visitors see the sign-in floor', async ({ page }, info) => {
   await mockSupabase(page, { signedIn: false });
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: /Turn the pile on your chair/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Clear the pile\. Keep the cash\./ })).toBeVisible();
   await expect(page.getByLabel('Email')).toBeVisible();
-  await page.waitForTimeout(900);
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(1200);
   await snap(page, 'signin', info.project.name);
 });
 
@@ -60,12 +61,13 @@ test('the pile shows unsold pieces and the receipt', async ({ page }, info) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'The pile' })).toBeVisible();
   const pile = page.getByRole('region', { name: 'The pile' });
-  await expect(pile.getByRole('link', { name: /Levi's 501 straight leg jeans/ })).toBeVisible();
+  await expect(pile.getByRole('link', { name: /Raw selvedge straight jeans/ })).toBeVisible();
   await expect(page.getByText('Taken this month')).toBeVisible();
   // Sold more than a week ago: not on the pile, but the receipt says to ship it.
-  await expect(pile.getByRole('link', { name: /Stussy 8 ball hoodie/ })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'Ship Stussy 8 ball hoodie' })).toBeVisible();
-  await page.waitForTimeout(1200);
+  await expect(pile.getByRole('link', { name: /Smiley graphic hoodie/ })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Ship Smiley graphic hoodie' })).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(1400);
   await snap(page, 'pile', info.project.name);
 });
 
@@ -73,6 +75,8 @@ test('an empty account gets a way to start', async ({ page }, info) => {
   await mockSupabase(page, { empty: true });
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Start with one thing from the pile' })).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(1200);
   await snap(page, 'pile-empty', info.project.name);
 });
 
@@ -80,15 +84,15 @@ test('closet filters by status and search', async ({ page }, info) => {
   await mockSupabase(page);
   await page.goto('/closet');
   await expect(page.getByRole('heading', { name: 'Closet' })).toBeVisible();
-  await expect(page.getByText("Arc'teryx Beta shell jacket")).toBeVisible();
+  await expect(page.getByText('Colour block anorak')).toBeVisible();
   await page.waitForTimeout(500);
   await snap(page, 'closet', info.project.name);
-  await page.getByPlaceholder('Search brand, title, SKU, colour').fill('carhartt');
-  await expect(page.getByText("Arc'teryx Beta shell jacket")).toHaveCount(0);
-  await expect(page.getByText('Carhartt Detroit jacket, brown duck canvas')).toBeVisible();
+  await page.getByPlaceholder('Search brand, title, SKU, colour').fill('bomber');
+  await expect(page.getByText('Colour block anorak')).toHaveCount(0);
+  await expect(page.getByText('Rust bomber jacket')).toBeVisible();
   await page.getByPlaceholder('Search brand, title, SKU, colour').fill('');
   await page.getByRole('tab', { name: /Sold/ }).first().click();
-  await expect(page.getByText('Dr. Martens 1460 boots')).toBeVisible();
+  await expect(page.getByText('Cord collar denim jacket')).toBeVisible();
   await page.goto('/closet?view=table');
   await expect(page.getByRole('table')).toBeVisible();
   await snap(page, 'closet-table', info.project.name);
@@ -97,7 +101,7 @@ test('closet filters by status and search', async ({ page }, info) => {
 test('item page shows listings, price and cross-list sheet', async ({ page }, info) => {
   await mockSupabase(page);
   await page.goto('/item/a1');
-  await expect(page.getByRole('heading', { name: "Levi's 501 straight leg jeans" })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Raw selvedge straight jeans' })).toBeVisible();
   await page.waitForTimeout(500);
   await snap(page, 'item', info.project.name);
   await page.getByRole('tab', { name: 'Listings' }).click();
@@ -457,3 +461,4 @@ test('a closed phone code says so', async ({ page }, info) => {
   await expect(page.getByRole('heading', { name: 'This code no longer works' })).toBeVisible();
   await expect(page.getByText('This code was closed on your computer')).toBeVisible();
 });
+

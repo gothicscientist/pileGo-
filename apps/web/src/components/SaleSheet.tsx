@@ -63,7 +63,7 @@ export function SaleSheet({ item, open, onClose }: { item: Item; open: boolean; 
             {live.map(l => (
               <label
                 key={l.id}
-                className={cx('flex cursor-pointer items-center gap-3 rounded-lg border-2 p-2.5', where === l.id ? 'border-ink' : 'border-line')}
+                className={cx('flex cursor-pointer items-center gap-3 rounded-xl border-2 p-2.5', where === l.id ? 'border-ink' : 'border-line')}
               >
                 <input type="radio" name="where" className="accent-[var(--ink)]" checked={where === l.id} onChange={() => setWhere(l.id)} />
                 <Sticker id={l.marketplace} size="sm" />
@@ -71,7 +71,7 @@ export function SaleSheet({ item, open, onClose }: { item: Item; open: boolean; 
               </label>
             ))}
             <label
-              className={cx('flex cursor-pointer items-center gap-3 rounded-lg border-2 p-2.5', where === 'elsewhere' ? 'border-ink' : 'border-line')}
+              className={cx('flex cursor-pointer items-center gap-3 rounded-xl border-2 p-2.5', where === 'elsewhere' ? 'border-ink' : 'border-line')}
             >
               <input type="radio" name="where" className="accent-[var(--ink)]" checked={where === 'elsewhere'} onChange={() => setWhere('elsewhere')} />
               <span className="text-sm font-medium">Somewhere else: in person, a market, a message</span>
@@ -81,7 +81,7 @@ export function SaleSheet({ item, open, onClose }: { item: Item; open: boolean; 
         <TextField label={`Sold for (${item.currency})`} inputMode="decimal" value={price} onChange={e => setPrice(e.target.value)} className="max-w-48" />
         {others.length > 0 && (
           <p className="text-sm text-ink-2">
-            pileGo will end it on {others.map(l => MARKETPLACES[l.marketplace].name).join(', ')}. Listing-kit and Facebook listings are flagged for
+            pileGo! will end it on {others.map(l => MARKETPLACES[l.marketplace].name).join(', ')}. Listing-kit and Facebook listings are flagged for
             you to remove by hand.
           </p>
         )}
@@ -89,3 +89,4 @@ export function SaleSheet({ item, open, onClose }: { item: Item; open: boolean; 
     </Sheet>
   );
 }
+

@@ -1,11 +1,11 @@
-# pileGo
+# pileGo!
 
 A free, open-source closet for people who resell clothes. Photograph a piece,
 let the AI fill in the listing, and send it to eBay, Vinted, Depop, Poshmark,
 Mercari, Grailed and Facebook Marketplace from one place. When it sells
-somewhere, pileGo takes it down everywhere else.
+somewhere, pileGo! takes it down everywhere else.
 
-![The pile: unsold pieces scattered on a blue floor, with a receipt of what is listed and what to do next](docs/screenshots/pile.webp)
+![The pile: unsold everyday pieces scattered on a paper floor with kraft price tags, with a receipt of what is listed and what to do next](docs/screenshots/pile.webp)
 
 ## What it does
 
@@ -35,6 +35,7 @@ somewhere, pileGo takes it down everywhere else.
 |---|---|
 | ![An item page with photos, details and the listings on each marketplace](docs/screenshots/item.webp) | ![The cross-list sheet with a per-marketplace preview](docs/screenshots/crosslist.webp) |
 | ![Out there: listings grouped by what they need from you](docs/screenshots/out.webp) | ![Insights: profit receipt and sales charts](docs/screenshots/insights.webp) |
+| ![The pile in dark mode](docs/screenshots/pile-dark.webp) | ![The sign-in page in dark mode, with a hoodie, a graphic tee, flannel, selvedge, cargo shorts and Onitsuka Tiger trainers on a green mat](docs/screenshots/signin-dark.webp) |
 
 ## How pileGo reaches each marketplace
 
@@ -109,3 +110,4 @@ How the pieces fit together is in [docs/architecture.md](docs/architecture.md).
 AGPL-3.0-or-later. If you run a modified pileGo for other people, share your
 changes. The Vinted engine is adapted from [Bumpline](CREDITS.md#bumpline);
 see [CREDITS.md](CREDITS.md).
+

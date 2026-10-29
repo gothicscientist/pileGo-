@@ -10,6 +10,8 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${PORT}`,
     trace: 'retain-on-failure',
+    // PW_DARK=1 runs everything in dark mode, for the dark screenshots.
+    colorScheme: process.env.PW_DARK ? 'dark' : 'light',
     // Lets the e2e run inside environments that ship their own Chromium.
     launchOptions: process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {},
   },
@@ -24,3 +26,4 @@ export default defineConfig({
     env: { VITE_SUPABASE_URL: 'http://supabase.test', VITE_SUPABASE_ANON_KEY: 'test-anon-key' },
   },
 });
+

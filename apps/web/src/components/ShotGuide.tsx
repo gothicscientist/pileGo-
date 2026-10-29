@@ -32,12 +32,12 @@ export function CoverPreview({
   // On a phone the slots already show each photo; the big preview earns its space only for the scan and the cutout.
   const phoneToo = scanning || Boolean(cut && cut.state !== 'idle');
   return (
-    <div className={cx('floor relative aspect-[4/5] max-h-[60vh] overflow-hidden rounded-2xl', !phoneToo && 'hidden lg:block')}>
+    <div className={cx('grain relative aspect-[4/5] max-h-[60vh] overflow-hidden rounded-[22px] bg-paper-2 lift', !phoneToo && 'hidden lg:block')}>
       {cut?.preview ? (
         <motion.img
           src={cut.preview}
           alt="Cutout of the cover photo"
-          className="absolute inset-0 m-auto max-h-[86%] max-w-[86%] object-contain cutout-shadow"
+          className="absolute inset-0 m-auto max-h-[84%] max-w-[84%] object-contain cutout-shadow"
           initial={{ scale: 0.8, rotate: -8, opacity: 0 }}
           animate={{ scale: 1, rotate: -3, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 180, damping: 14 }}
@@ -45,27 +45,27 @@ export function CoverPreview({
       ) : (
         <img src={cover.local} alt="Cover photo" className="absolute inset-0 size-full object-cover" />
       )}
-      <span className="absolute top-2 left-2 rounded bg-ink px-1.5 py-0.5 text-[0.65rem] font-bold text-paper">
+      <span className="absolute top-3 left-3 z-[1] rounded-full bg-paper/90 px-2.5 py-1 text-[0.7rem] font-semibold text-ink backdrop-blur">
         {cover.role === 'front' ? 'Cover' : 'Cover until you add a front photo'}
       </span>
       {scanning && !reduce && (
         <div className="pointer-events-none absolute inset-0" aria-hidden>
           <div
-            className="absolute inset-x-0 h-1/4 bg-gradient-to-b from-transparent via-tag/35 to-tag/70"
+            className="absolute inset-x-0 h-1/4 bg-gradient-to-b from-transparent via-accent/35 to-accent/70"
             style={{ animation: 'sweep 1.6s cubic-bezier(.6,.1,.4,.9) infinite alternate' }}
           />
         </div>
       )}
       {cut?.state === 'working' && (
-        <div className="absolute inset-x-3 bottom-3 rounded-lg bg-ink/80 px-3 py-2 text-xs text-paper">
+        <div className="absolute inset-x-3 bottom-3 rounded-xl bg-ink/80 px-3 py-2 text-xs text-paper backdrop-blur">
           Cutting out
           <div className="mt-1 h-1 overflow-hidden rounded bg-white/20">
-            <div className="h-full bg-tag transition-all" style={{ width: `${Math.round(cut.progress * 100)}%` }} />
+            <div className="h-full bg-accent transition-all" style={{ width: `${Math.round(cut.progress * 100)}%` }} />
           </div>
         </div>
       )}
       {cut?.state === 'error' && (
-        <p className="absolute inset-x-3 bottom-3 rounded-lg bg-ink/80 px-3 py-2 text-xs text-paper">
+        <p className="absolute inset-x-3 bottom-3 rounded-xl bg-ink/80 px-3 py-2 text-xs text-paper backdrop-blur">
           The cutout did not work in this browser. The normal photo will be used.
         </p>
       )}
@@ -91,6 +91,7 @@ export function ShotGuide({
   onRole: (key: string, role: PhotoRole) => void;
   onDrop: (e: DragEvent) => void;
 }) {
+  const reduce = useReducedMotion();
   const extras = shots.filter(s => s.role === 'extra');
   const done = KEY_SHOTS.filter(k => shots.some(s => s.role === k.role)).length;
   return (
@@ -103,18 +104,28 @@ export function ShotGuide({
       onDrop={onDrop}
     >
       <div className="flex items-baseline justify-between gap-2">
-        <h2 id="key-photos" className="font-display text-lg font-bold">
+        <h2 id="key-photos" className="font-display text-lg">
           Three key photos
         </h2>
-        <span className={cx('text-sm font-semibold tabular', done === 3 ? 'text-tag' : 'text-muted')} data-testid="shot-count">
+        <motion.span
+          key={done}
+          initial={reduce ? false : { scale: 1.35, rotate: -6 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: 'spring', stiffness: 420, damping: 14 }}
+          className={cx(
+            'rounded-full px-2.5 py-0.5 text-sm font-semibold tabular',
+            done === 3 ? 'bg-olive/25 text-[var(--olive-deep)] dark:text-olive' : 'bg-paper-2 text-muted',
+          )}
+          data-testid="shot-count"
+        >
           {done} of 3
-        </span>
+        </motion.span>
       </div>
       <ol className="grid grid-cols-3 gap-2 sm:gap-3">
         {KEY_SHOTS.map((k, i) => {
           const shot = shots.find(s => s.role === k.role);
           return (
-            <li key={k.role} className="min-w-0">
+            <li key={k.role} className="min-w-0" style={{ rotate: `${[-1.2, 0.8, -0.6][i]}deg` }}>
               {shot ? (
                 <ShotTile shot={shot} locked={locked} onRemove={onRemove} onRole={onRole} badge={`${i + 1}. ${k.label}`} />
               ) : (
@@ -122,15 +133,15 @@ export function ShotGuide({
                   type="button"
                   disabled={locked || full}
                   onClick={() => onPick(k.role)}
-                  className="flex aspect-[4/5] w-full flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-line bg-paper-2/60 p-2 text-center transition-colors hover:border-ink-2 disabled:opacity-50"
+                  className="group flex aspect-[4/5] w-full flex-col items-center justify-center gap-1 rounded-[18px] border-2 border-dashed border-line bg-card/60 p-2 text-center transition duration-300 ease-[var(--ease-spring)] hover:-translate-y-1 hover:border-accent hover:bg-card active:scale-95 disabled:opacity-50"
                   aria-label={`Add the ${k.label.toLowerCase()} photo. ${k.tip}.`}
                 >
                   <ShotIllustration role={k.role} />
-                  <span className="font-display text-sm leading-tight font-bold">
+                  <span className="font-display text-sm leading-tight">
                     {i + 1}. {k.label}
                   </span>
                   <span className="hidden text-[0.7rem] leading-tight text-muted sm:block">{k.tip}</span>
-                  <span className="mt-0.5 inline-flex items-center gap-0.5 text-[0.7rem] font-semibold text-tag">
+                  <span className="mt-0.5 inline-flex items-center gap-0.5 text-[0.7rem] font-semibold text-accent">
                     <Plus className="size-3" aria-hidden /> Add
                   </span>
                 </button>
@@ -155,7 +166,7 @@ export function ShotGuide({
             <button
               type="button"
               onClick={() => onPick('extra')}
-              className="flex aspect-square w-full flex-col items-center justify-center gap-0.5 rounded-lg border-2 border-dashed border-line text-[0.7rem] font-semibold text-muted hover:border-ink-2"
+              className="flex aspect-square w-full flex-col items-center justify-center gap-0.5 rounded-2xl border-2 border-dashed border-line text-[0.7rem] font-semibold text-muted transition duration-300 ease-[var(--ease-spring)] hover:-translate-y-0.5 hover:border-accent hover:text-accent active:scale-95"
               aria-label="Add an extra photo"
             >
               <Plus className="size-4" aria-hidden />
@@ -184,7 +195,12 @@ function ShotTile({
   square?: boolean;
 }) {
   return (
-    <div className={cx('relative overflow-hidden bg-paper-2', square ? 'aspect-square rounded-lg' : 'aspect-[4/5] rounded-xl')}>
+    <motion.div
+      initial={{ opacity: 0, scale: 0.86, rotate: -5, y: -10 }}
+      animate={{ opacity: 1, scale: 1, rotate: 0, y: 0 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 18 }}
+      className={cx('relative overflow-hidden bg-paper-2 lift', square ? 'aspect-square rounded-2xl' : 'aspect-[4/5] rounded-[18px]')}
+    >
       <img
         src={shot.local}
         alt={`${ROLE_NAME[shot.role]} photo`}
@@ -197,8 +213,8 @@ function ShotTile({
         </span>
       )}
       {badge && (
-        <span className="absolute top-1 left-1 inline-flex items-center gap-0.5 rounded bg-ink px-1 text-[0.6rem] font-bold text-paper">
-          {shot.state === 'done' && <Check className="size-3 text-tag" aria-hidden />}
+        <span className="absolute top-1.5 left-1.5 inline-flex items-center gap-0.5 rounded-full bg-paper/90 px-1.5 py-px text-[0.62rem] font-semibold text-ink backdrop-blur">
+          {shot.state === 'done' && <Check className="size-3 text-[var(--olive-deep)]" strokeWidth={3} aria-hidden />}
           {badge}
         </span>
       )}
@@ -208,7 +224,7 @@ function ShotTile({
             aria-label="What this photo shows"
             value={shot.role}
             onChange={e => onRole(shot.key, e.target.value as PhotoRole)}
-            className="min-w-0 max-w-[4.75rem] rounded bg-white/90 px-0.5 py-0.5 text-[0.65rem] font-semibold text-ink"
+            className="min-w-0 max-w-[4.75rem] rounded-full bg-white/90 px-1 py-0.5 text-[0.65rem] font-semibold text-[#2d3033]"
           >
             {(['front', 'back', 'label', 'extra'] as const).map(r => (
               <option key={r} value={r}>
@@ -216,19 +232,19 @@ function ShotTile({
               </option>
             ))}
           </select>
-          <button type="button" aria-label="Remove photo" className="rounded bg-white/90 p-1 text-danger" onClick={() => onRemove(shot.key)}>
+          <button type="button" aria-label="Remove photo" className="rounded-full bg-white/90 p-1 text-danger transition active:scale-90" onClick={() => onRemove(shot.key)}>
             <Trash2 className="size-3.5" aria-hidden />
           </button>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
 
 /** Tiny line drawings of each shot, so the slots read at a glance. */
 export function ShotIllustration({ role }: { role: KeyRole }) {
   const props = {
-    className: 'size-10 text-ink-2',
+    className: 'size-10 text-ink-2 transition-transform duration-500 ease-[var(--ease-spring)] group-hover:-rotate-6 group-hover:scale-110 group-hover:text-accent',
     viewBox: '0 0 48 48',
     fill: 'none',
     stroke: 'currentColor',
@@ -260,3 +276,4 @@ export function ShotIllustration({ role }: { role: KeyRole }) {
     </svg>
   );
 }
+

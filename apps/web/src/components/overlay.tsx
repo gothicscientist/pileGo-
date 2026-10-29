@@ -36,12 +36,17 @@ export function Sheet({
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
   const opener = useRef<Element | null>(null);
+  // Callers pass a fresh onClose on every render. Read it from a ref so a
+  // re-render while the sheet is open does not rerun the focus setup below
+  // and pull focus out of the field the seller is typing in.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
     opener.current = document.activeElement;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') closeRef.current();
       if (e.key === 'Tab' && panel.current) {
         const focusable = panel.current.querySelectorAll<HTMLElement>(
           'button:not([disabled]), [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])',
@@ -67,14 +72,14 @@ export function Sheet({
       document.body.style.overflow = prev;
       (opener.current as HTMLElement | null)?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   return createPortal(
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6">
           <motion.div
-            className="absolute inset-0 bg-[#0d0e22]/55"
+            className="absolute inset-0 bg-[#1d1f21]/45 backdrop-blur-[3px]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -87,16 +92,17 @@ export function Sheet({
             aria-labelledby={titleId}
             tabIndex={-1}
             className={cx(
-              'relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-paper outline-none lift-lg sm:rounded-2xl',
+              'relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[26px] bg-paper outline-none lift-lg sm:rounded-[26px]',
               wide ? 'sm:max-w-4xl' : 'sm:max-w-lg',
             )}
-            initial={{ y: 40, opacity: 0, rotate: -0.6 }}
-            animate={{ y: 0, opacity: 1, rotate: 0 }}
-            exit={{ y: 30, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+            initial={{ y: 60, opacity: 0, rotate: -0.8, scale: 0.98 }}
+            animate={{ y: 0, opacity: 1, rotate: 0, scale: 1 }}
+            exit={{ y: 40, opacity: 0, scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 32 }}
           >
+            <span className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-line sm:hidden" aria-hidden />
             <header className="flex items-center justify-between gap-4 border-b border-line px-5 py-3">
-              <h2 id={titleId} className="font-display text-xl font-bold">
+              <h2 id={titleId} className="font-display text-xl">
                 {title}
               </h2>
               <IconButton label="Close" onClick={onClose}>
@@ -139,19 +145,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div
         aria-live="polite"
-        className="pointer-events-none fixed inset-x-0 bottom-20 z-[60] flex flex-col items-center gap-2 px-4 md:bottom-6"
+        className="pointer-events-none fixed inset-x-0 bottom-24 z-[60] flex flex-col items-center gap-2 px-4 md:bottom-6"
       >
         <AnimatePresence>
           {toasts.map(t => (
             <motion.div
               key={t.id}
               layout
-              initial={{ y: 24, opacity: 0, scaleY: 0.6 }}
-              animate={{ y: 0, opacity: 1, scaleY: 1 }}
-              exit={{ opacity: 0, y: 10 }}
+              initial={{ y: 24, opacity: 0, scale: 0.9, rotate: -1.5 }}
+              animate={{ y: 0, opacity: 1, scale: 1, rotate: 0 }}
+              exit={{ opacity: 0, y: 10, scale: 0.96 }}
+              transition={{ type: 'spring', stiffness: 460, damping: 30 }}
               style={{ originY: 1 }}
               className={cx(
-                'pointer-events-auto flex max-w-md items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium lift-lg',
+                'pointer-events-auto flex max-w-md items-center gap-3 rounded-[22px] py-2.5 pl-5 text-sm font-medium lift-lg',
+                t.action ? 'pr-2.5' : 'pr-5',
                 t.tone === 'error' ? 'bg-danger text-white' : 'bg-ink text-paper',
               )}
               role={t.tone === 'error' ? 'alert' : 'status'}
@@ -160,7 +168,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               {t.action && (
                 <button
                   type="button"
-                  className="rounded-md bg-white/15 px-2 py-1 font-semibold hover:bg-white/25"
+                  className="rounded-full bg-white/15 px-3 py-1 font-semibold transition hover:bg-white/25 active:scale-95"
                   onClick={() => {
                     t.action!.run();
                     setToasts(list => list.filter(x => x.id !== t.id));
@@ -180,3 +188,4 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 export function useToast() {
   return useContext(ToastContext);
 }
+

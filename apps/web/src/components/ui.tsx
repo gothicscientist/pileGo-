@@ -9,6 +9,7 @@ import {
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from 'react';
+import { CUTOUTS, type CutoutId } from '~/lib/art';
 import { cx } from '~/lib/format';
 
 type Variant = 'tag' | 'ink' | 'line' | 'ghost' | 'danger';
@@ -51,7 +52,7 @@ export function IconButton({
       aria-label={label}
       title={label}
       className={cx(
-        'inline-flex size-10 items-center justify-center rounded-full text-ink-2 transition hover:bg-paper-2 hover:text-ink',
+        'inline-flex size-10 items-center justify-center rounded-full text-ink-2 transition duration-300 ease-[var(--ease-spring)] hover:bg-paper-2 hover:text-ink active:scale-90',
         className,
       )}
       {...rest}
@@ -160,13 +161,13 @@ export function ChipInput({
         {values.map(v => (
           <span
             key={v}
-            className="inline-flex items-center gap-1 rounded-md bg-paper-2 py-1 pr-1 pl-2 text-sm text-ink"
+            className="inline-flex items-center gap-1 rounded-full bg-paper-2 py-1 pr-1 pl-2.5 text-sm text-ink"
           >
             {v}
             <button
               type="button"
               aria-label={`Remove ${v}`}
-              className="rounded p-0.5 text-muted hover:bg-line hover:text-ink"
+              className="rounded-full p-0.5 text-muted hover:bg-line hover:text-ink"
               onClick={() => onChange(values.filter(x => x !== v))}
             >
               <X className="size-3.5" aria-hidden />
@@ -208,7 +209,7 @@ export function ChipInput({
             <button
               key={s}
               type="button"
-              className="rounded-md border border-dashed border-line px-2 py-0.5 text-xs text-ink-2 hover:border-ink-2"
+              className="rounded-full border border-dashed border-line px-2.5 py-0.5 text-xs text-ink-2 transition hover:border-ink-2 hover:text-ink active:scale-95"
               onClick={() => add(s)}
             >
               + {s}
@@ -248,8 +249,10 @@ export function ChoiceChips<T extends string>({
               aria-pressed={on}
               onClick={() => onChange(on ? null : o.value)}
               className={cx(
-                'rounded-lg px-3 py-2 text-sm font-medium transition',
-                on ? 'bg-ink text-paper' : 'bg-card text-ink shadow-[inset_0_0_0_1.5px_var(--line)] hover:shadow-[inset_0_0_0_1.5px_var(--ink-2)]',
+                'rounded-full px-3.5 py-2 text-sm font-medium transition duration-300 ease-[var(--ease-spring)] active:scale-95',
+                on
+                  ? 'bg-ink text-paper shadow-[0_6px_14px_-10px_rgb(0_0_0/0.6)]'
+                  : 'bg-card text-ink shadow-[inset_0_0_0_1.5px_var(--line)] hover:-translate-y-px hover:shadow-[inset_0_0_0_1.5px_var(--ink-2)]',
               )}
             >
               {o.label}
@@ -279,27 +282,83 @@ export function Paper({
   as?: 'section' | 'div' | 'aside' | 'article';
 }) {
   return (
-    <Tag className={cx('relative rounded-xl bg-card lift', torn && 'receipt-edge rounded-b-none pb-6', className)}>
+    <Tag className={cx('relative rounded-[20px] bg-card lift', torn && 'receipt-edge rounded-b-none pb-6', className)}>
       {children}
     </Tag>
   );
 }
 
-export function SectionTitle({ children, action, className }: { children: ReactNode; action?: ReactNode; className?: string }) {
+/** The top of a page: one big, loud headline and whatever goes beside it. */
+export function PageHeader({
+  title,
+  note,
+  children,
+  className,
+}: {
+  title: ReactNode;
+  note?: ReactNode;
+  children?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <header className={cx('flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5', className)}>
+      <div className="min-w-0">
+        <h1 className="font-display text-[clamp(2.8rem,6.5vw,5rem)] leading-[0.9]">{title}</h1>
+        {note && <p className="mt-2 text-ink-2">{note}</p>}
+      </div>
+      {children}
+    </header>
+  );
+}
+
+export function SectionTitle({
+  children,
+  action,
+  className,
+}: {
+  children: ReactNode;
+  action?: ReactNode;
+  className?: string;
+}) {
   return (
     <div className={cx('mb-3 flex items-end justify-between gap-3', className)}>
-      <h2 className="font-display text-2xl font-bold leading-none">{children}</h2>
+      <div>
+        <h2 className="font-display text-2xl leading-none">{children}</h2>
+      </div>
       {action}
     </div>
   );
 }
 
-export function Empty({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
+/** Nothing here yet: a dashed spot on the table with one garment waiting on it. */
+export function Empty({
+  title,
+  children,
+  action,
+  art = 'whiteTee',
+}: {
+  title: string;
+  children?: ReactNode;
+  action?: ReactNode;
+  art?: CutoutId | null;
+}) {
+  const c = art ? CUTOUTS[art] : null;
   return (
-    <div className="flex flex-col items-start gap-3 rounded-xl border-2 border-dashed border-line p-6">
-      <p className="font-display text-xl font-bold">{title}</p>
-      {children && <div className="max-w-prose text-ink-2">{children}</div>}
-      {action}
+    <div className="grain group relative flex items-center gap-6 overflow-hidden rounded-[20px] border-2 border-dashed border-line bg-paper p-6">
+      <div className="relative z-[1] flex min-w-0 flex-1 flex-col items-start gap-3">
+        <p className="font-display text-xl">{title}</p>
+        {children && <div className="max-w-prose text-ink-2">{children}</div>}
+        {action}
+      </div>
+      {c && (
+        <img
+          src={c.src}
+          alt=""
+          aria-hidden
+          className="cutout-shadow relative z-[1] hidden w-24 shrink-0 rotate-6 transition-transform duration-500 ease-[var(--ease-spring)] group-hover:-translate-y-1 group-hover:rotate-0 sm:block"
+          style={{ aspectRatio: String(c.ratio) }}
+        />
+      )}
     </div>
   );
 }
@@ -309,8 +368,9 @@ export function ErrorNote({ error, className }: { error: unknown; className?: st
   const message =
     typeof error === 'string' ? error : error instanceof Error ? error.message : ((error as { message?: string }).message ?? 'Something went wrong.');
   return (
-    <p role="alert" className={cx('rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger', className)}>
+    <p role="alert" className={cx('rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger', className)}>
       {message}
     </p>
   );
 }
+

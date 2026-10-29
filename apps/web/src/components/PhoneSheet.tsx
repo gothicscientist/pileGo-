@@ -64,7 +64,7 @@ export function PhoneSheet({
             initial={{ rotate: -4, y: 10, opacity: 0 }}
             animate={{ rotate: -1.5, y: 0, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 260, damping: 18 }}
-            className={cx('rounded-lg bg-white p-3 lift', state === 'expired' && 'opacity-30')}
+            className={cx('rounded-xl bg-white p-3 lift', state === 'expired' && 'opacity-30')}
           >
             {session && state !== 'opening' ? (
               <QrCode text={session.url} className="size-48" />
@@ -85,7 +85,7 @@ export function PhoneSheet({
             <p className="inline-flex w-fit items-center gap-1.5 rounded-full bg-paper-2 px-2.5 py-1 text-xs font-semibold" data-testid="phone-status">
               {session.opened ? (
                 <>
-                  <Check className="size-3.5 text-tag" aria-hidden /> Phone connected
+                  <Check className="size-3.5 text-accent" aria-hidden /> Phone connected
                 </>
               ) : (
                 <>
@@ -96,8 +96,8 @@ export function PhoneSheet({
           )}
 
           {local && (
-            <p className="rounded-lg bg-sticker/60 px-3 py-2 text-sm text-[#16172b]" role="note" data-testid="phone-local">
-              This tab is on <strong>{new URL(session!.url).host}</strong>, which only this computer can open. Open pileGo from its web
+            <p className="kraft rounded-xl px-3 py-2 text-sm" role="note" data-testid="phone-local">
+              This tab is on <strong>{new URL(session!.url).host}</strong>, which only this computer can open. Open pileGo! from its web
               address and make the code there.
             </p>
           )}
@@ -122,7 +122,7 @@ export function PhoneSheet({
               onClick={copy}
               className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-ink-2 underline decoration-line underline-offset-4 hover:text-ink"
             >
-              {copied ? <Check className="size-4 text-tag" aria-hidden /> : <Copy className="size-4" aria-hidden />}
+              {copied ? <Check className="size-4 text-accent" aria-hidden /> : <Copy className="size-4" aria-hidden />}
               {copied ? 'Link copied' : 'Copy the link instead'}
             </button>
           )}
@@ -135,7 +135,7 @@ export function PhoneSheet({
 function Step({ n, children }: { n: number; children: ReactNode }) {
   return (
     <li className="flex gap-2.5">
-      <span className="hand -mt-1 w-4 shrink-0 text-2xl leading-none text-floor">{n}</span>
+      <span className="hand -mt-1 w-4 shrink-0 text-2xl leading-none text-accent">{n}</span>
       <span>{children}</span>
     </li>
   );
@@ -156,7 +156,8 @@ export function QrCode({ text, className }: { text: string; className?: string }
   return (
     <svg viewBox={`0 0 ${size} ${size}`} className={className} role="img" aria-label="QR code for the phone camera" shapeRendering="crispEdges">
       <rect width={size} height={size} fill="#fff" />
-      <path d={d} fill="#16172b" />
+      <path d={d} fill="#2d3033" />
     </svg>
   );
 }
+

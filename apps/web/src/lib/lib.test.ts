@@ -16,7 +16,7 @@ const base: Item = {
 
 describe('format helpers', () => {
   it('picks readable text on sticker colours', () => {
-    expect(inkOn('#FFE14D')).toBe('#16172B');
+    expect(inkOn('#FFE14D')).toBe('#2d3033');
     expect(inkOn('#111111')).toBe('#FFFFFF');
   });
   it('counts whole days and pluralises', () => {
@@ -110,3 +110,4 @@ describe('phone capture links', () => {
     expect(unreachableFromPhone('https://pilego.app/phone/x')).toBe(false);
   });
 });
+

@@ -17,7 +17,7 @@ export function CopyButton({ text, label = 'Copy', className }: { text: string; 
     <button
       type="button"
       className={cx(
-        'inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-ink-2 hover:bg-paper-2 hover:text-ink',
+        'inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold text-ink-2 transition hover:bg-paper-2 hover:text-ink active:scale-95',
         className,
       )}
       onClick={async () => {
@@ -115,7 +115,7 @@ export function ListingKit({ item, listing, generated }: { item: Item; listing?:
         <CopyButton text={all} label="Copy everything" className="ml-auto" />
       </div>
 
-      <dl className="divide-y divide-dashed divide-line rounded-lg border border-line bg-card">
+      <dl className="divide-y divide-dashed divide-line rounded-xl border border-line bg-card">
         {generated.title && <KitRow label="Title" value={generated.title} />}
         <KitRow label="Description" value={generated.description} long />
         {generated.fields
@@ -127,7 +127,7 @@ export function ListingKit({ item, listing, generated }: { item: Item; listing?:
 
       {listing && listing.status !== 'listed' && listing.status !== 'sold' && (
         <form
-          className="flex flex-col gap-2 rounded-lg bg-paper-2 p-3"
+          className="flex flex-col gap-2 rounded-xl bg-paper-2 p-3"
           onSubmit={async e => {
             e.preventDefault();
             try {
@@ -142,7 +142,7 @@ export function ListingKit({ item, listing, generated }: { item: Item; listing?:
           }}
         >
           <label className="text-sm font-semibold" htmlFor={`kit-url-${listing.id}`}>
-            Listed it? Paste the link so pileGo can track it.
+            Listed it? Paste the link so pileGo! can track it.
           </label>
           <div className="flex gap-2">
             <Input
@@ -171,3 +171,4 @@ function KitRow({ label, value, long }: { label: string; value: string; long?: b
     </div>
   );
 }
+

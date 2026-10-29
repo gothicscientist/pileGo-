@@ -14,6 +14,7 @@ import {
   type MarketplaceId,
 } from '@pilego/core';
 import { AlertTriangle, Check, PlugZap } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { useUserId } from '~/lib/auth';
@@ -22,7 +23,7 @@ import { extensionSetupUrl } from '~/lib/extension-flow';
 import { cx, money } from '~/lib/format';
 import { useEbayActions, useEbayStatus, useProfile, useQueuePublish, type ListingOverride } from '~/lib/queries';
 import { errorMessage } from '~/lib/supabase';
-import { listingStatusLabel, Sticker, TierLabel } from './bits';
+import { listingStatusLabel, MarketIcon, Sticker, TierLabel } from './bits';
 import { ListingKit } from './ListingKit';
 import { Sheet, useToast } from './overlay';
 import { Button, ErrorNote, Field, Input, TextArea } from './ui';
@@ -183,13 +184,13 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
     return (
       <Sheet open={open} onClose={close} title="Paste these by hand" wide>
         <p className="mb-4 text-ink-2">
-          {sentKits.map(k => MARKETPLACES[k].name).join(' and ')} {sentKits.length === 1 ? 'has' : 'have'} no way for pileGo to post for you yet.
+          {sentKits.map(k => MARKETPLACES[k].name).join(' and ')} {sentKits.length === 1 ? 'has' : 'have'} no way for pileGo! to post for you yet.
           Here is everything to copy.
         </p>
         {sentKits.length > 1 && (
           <div className="mb-4 flex gap-2">
             {sentKits.map(k => (
-              <button key={k} type="button" onClick={() => setActive(k)} className={cx('rounded-md p-1', k === m && 'ring-2 ring-ink')}>
+              <button key={k} type="button" onClick={() => setActive(k)} className={cx('rounded-full p-1 transition active:scale-95', k === m && 'ring-2 ring-ink')}>
                 <Sticker id={k} tilt={false} />
               </button>
             ))}
@@ -235,15 +236,15 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
                     disabled={live}
                     onClick={() => toggle(m)}
                     className={cx(
-                      'flex w-full items-center gap-3 rounded-xl border-2 p-2.5 text-left transition',
-                      on ? 'border-ink bg-card' : 'border-transparent bg-paper-2 hover:border-line',
+                      'flex w-full items-center gap-3 rounded-2xl border-2 p-2.5 text-left transition duration-300 ease-[var(--ease-spring)] enabled:active:scale-[0.98]',
+                      on ? 'border-ink bg-card shadow-[0_8px_18px_-14px_rgb(0_0_0/0.5)]' : 'border-transparent bg-paper-2 hover:border-line',
                       live && 'cursor-default opacity-70',
                     )}
                   >
                     <span
                       className={cx(
-                        'flex size-5 shrink-0 items-center justify-center rounded border-2',
-                        on ? 'border-ink bg-ink text-paper' : 'border-line bg-card',
+                        'flex size-5 shrink-0 items-center justify-center rounded-md border-2 transition duration-300 ease-[var(--ease-spring)]',
+                        on ? 'scale-110 border-ink bg-ink text-paper' : 'border-line bg-card',
                       )}
                       aria-hidden
                     >
@@ -276,8 +277,8 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
         <div className="flex min-w-0 flex-col gap-4">
           {needsExtension.length > 0 && !ext.installed && (
             <Notice icon={<PlugZap className="size-5" aria-hidden />}>
-              {needsExtension.map(m => MARKETPLACES[m].name).join(', ')} {needsExtension.length === 1 ? 'needs' : 'need'} the pileGo browser
-              extension. They will wait in the queue until you open pileGo in a browser that has it.{' '}
+              {needsExtension.map(m => MARKETPLACES[m].name).join(', ')} {needsExtension.length === 1 ? 'needs' : 'need'} the pileGo! browser
+              extension. They will wait in the queue until you open pileGo! in a browser that has it.{' '}
               <Link to={extensionUrl} className="font-semibold underline" onClick={rememberDraft}>
                 Get the extension
               </Link>
@@ -293,7 +294,7 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
                   </button>
                 </>
               ) : (
-                'eBay is not set up on this copy of pileGo yet. The listing will wait until it is.'
+                'eBay is not set up on this copy of pileGo! yet. The listing will wait until it is.'
               )}
             </Notice>
           )}
@@ -308,11 +309,22 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
                   aria-selected={m === active}
                   onClick={() => setActive(m)}
                   className={cx(
-                    'shrink-0 rounded-lg px-3 py-1.5 text-sm font-semibold',
-                    m === active ? 'bg-ink text-paper' : 'text-ink-2 hover:bg-paper-2',
+                    'relative shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors active:scale-95',
+                    m === active ? 'text-paper' : 'text-ink-2 hover:bg-paper-2',
                   )}
                 >
-                  {MARKETPLACES[m].name}
+                  {m === active && (
+                    <motion.span
+                      layoutId="crosslist-preview"
+                      className="absolute inset-0 rounded-full bg-ink"
+                      transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                      aria-hidden
+                    />
+                  )}
+                  <span className="relative flex items-center gap-1.5">
+                    <MarketIcon id={m} />
+                    {MARKETPLACES[m].name}
+                  </span>
                 </button>
               ))}
             </div>
@@ -322,7 +334,7 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
             <div className="flex flex-col gap-4" role="tabpanel">
               <p className="text-sm text-ink-2">{MARKETPLACES[active].blurb}</p>
               {g.warnings.length > 0 && (
-                <ul className="flex flex-col gap-1 rounded-lg bg-sticker/50 px-3 py-2 text-sm text-[#16172b]">
+                <ul className="flex flex-col gap-1 kraft rounded-xl px-3 py-2 text-sm">
                   {g.warnings.map(w => (
                     <li key={w}>{w}</li>
                   ))}
@@ -378,9 +390,10 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
 
 function Notice({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-3 rounded-lg border-2 border-ink/80 bg-card px-3 py-2.5 text-sm">
+    <div className="flex items-start gap-3 rounded-xl border-2 border-ink/80 bg-card px-3 py-2.5 text-sm">
       <span className="mt-0.5 shrink-0">{icon}</span>
       <p>{children}</p>
     </div>
   );
 }
+
