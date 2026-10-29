@@ -491,7 +491,7 @@ function BulkCrossList({ items, open, onClose, onDone }: { items: Item[]; open: 
                     {on && <Check className="size-3.5" strokeWidth={3} aria-hidden />}
                   </span>
                   <Sticker id={m} size="sm" />
-                  <TierLabel tier={MARKETPLACES[m].capabilities.create} className="ml-auto" />
+                  <TierLabel tier={MARKETPLACES[m].capabilities.create} auto={MARKETPLACES[m].auto_post} className="ml-auto" />
                 </button>
               </li>
             );

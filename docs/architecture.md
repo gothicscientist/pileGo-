@@ -75,9 +75,12 @@ content script runs on, such as another `*.pages.dev` site, can only link
 after the seller approves it in the popup. Until then that origin learns only
 that the extension is installed.
 
-Every two minutes the worker claims Vinted jobs, if a Vinted tab is open. When
-the seller acts in the app or presses Run now, it can also open a Vinted tab in
-the background and open sell-form tabs for the assisted marketplaces.
+The worker claims waiting jobs when the app cross-lists, when the seller
+presses Run now, when the browser starts, and every two minutes. It opens a
+Vinted tab in the background and the sell-form tabs for the assisted
+marketplaces as it needs them, so a cross-list the app asked for while the
+extension was asleep or reloading still goes up. A poke that arrives during a
+run is picked up as soon as that run ends.
 
 - **Vinted** (`src/vinted`). The engine is adapted from Bumpline. It runs in
   the Vinted tab and sends requests through a small script in the page's own

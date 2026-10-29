@@ -266,10 +266,17 @@ function schedule() {
   ext.alarms.create('sales', { periodInMinutes: 30, delayInMinutes: 1 });
 }
 
-ext.runtime.onInstalled.addListener(schedule);
-ext.runtime.onStartup.addListener(schedule);
+// Listings go up by themselves: the timer picks up anything still waiting,
+// such as a cross-list the app asked for while the extension was reloading.
+function startup() {
+  schedule();
+  void run(true);
+}
+
+ext.runtime.onInstalled.addListener(startup);
+ext.runtime.onStartup.addListener(startup);
 ext.alarms.onAlarm.addListener(alarm => {
-  if (alarm.name === 'jobs') void run(false);
+  if (alarm.name === 'jobs') void run(true);
   if (alarm.name === 'sales') void sync(false);
 });
 

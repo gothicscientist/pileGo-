@@ -129,7 +129,7 @@ function Marketplaces({ profile }: { profile: FullProfile }) {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <Sticker id={m} size="sm" />
-                    <TierLabel tier={info.capabilities.create} />
+                    <TierLabel tier={info.capabilities.create} auto={info.auto_post} />
                     <button type="button" className="ml-auto text-xs text-muted underline" onClick={() => setEditing(e => (e === m ? null : m))}>
                       Fees {rule.percent}%{rule.fixed ? ` + ${rule.fixed}` : ''}
                       {over ? ' (yours)' : ''}
