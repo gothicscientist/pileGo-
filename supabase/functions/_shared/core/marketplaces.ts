@@ -40,6 +40,12 @@ export interface MarketplaceInfo {
   hosts: string[];
   /** An assisted marketplace where the extension also presses post. */
   auto_post?: boolean;
+  /**
+   * A one-time step on the seller's own account that the site wants before
+   * the first listing and only the seller can do. The extension stops there
+   * and says so if it is missing.
+   */
+  first_listing?: string;
 }
 
 export const MARKETPLACES: Record<MarketplaceId, MarketplaceInfo> = {
@@ -140,8 +146,10 @@ export const MARKETPLACES: Record<MarketplaceId, MarketplaceInfo> = {
   },
   mercari: {
     id: 'mercari',
+    auto_post: true,
+    first_listing: 'Add a payment card on Mercari (Account › Payment methods).',
     name: 'Mercari',
-    blurb: 'The extension fills Mercari’s sell form in your tab; you check it and list.',
+    blurb: 'The extension fills every field of Mercari’s sell form in your logged-in tab and lists it.',
     regions: ['US'],
     capabilities: {
       create: 'assist',
@@ -161,8 +169,10 @@ export const MARKETPLACES: Record<MarketplaceId, MarketplaceInfo> = {
   },
   grailed: {
     id: 'grailed',
+    auto_post: true,
+    first_listing: 'Verify your phone number on Grailed, and set up payouts so sales can pay you.',
     name: 'Grailed',
-    blurb: 'The extension fills Grailed’s sell form in your tab; you check it and publish.',
+    blurb: 'The extension fills every field of Grailed’s sell form in your logged-in tab and publishes it.',
     regions: ['US', 'UK', 'EU', 'CA', 'AU'],
     capabilities: {
       create: 'assist',

@@ -56,8 +56,8 @@ how much it can do, and the app labels every marketplace with one of these:
 | Vinted | One click | One click | One click | One click (wardrobe) | One click |
 | Depop | Auto-post | Assisted | | Public listing page | |
 | Poshmark | Auto-post | Assisted | | Public listing page | |
-| Mercari | Assisted | Assisted | | Public listing page | |
-| Grailed | Assisted | Assisted | | Public listing page | |
+| Mercari | Auto-post | Assisted | | Public listing page | |
+| Grailed | Auto-post | Assisted | | Public listing page | |
 
 The Vinted engine keeps a human pace. It pauses between steps, caps how many
 listings it creates per hour and per day, and stops for a while if Vinted rate

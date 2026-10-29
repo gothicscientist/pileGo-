@@ -1,4 +1,4 @@
-// What to pick in Depop's and Poshmark's dropdowns for a pileGo item. Pure
+// What to pick in the sell forms' dropdowns for a pileGo item. Pure
 // functions, so the guessing can be tested without the sites. Option names
 // were read off the live sell forms (October 2026); the drivers match them
 // loosely, so a renamed option degrades to an empty field, not a wrong one.
@@ -14,7 +14,7 @@ function conditionOf(item: Item): Condition {
   return isCondition(item.condition) ? item.condition : 'good';
 }
 
-export function conditionWords(market: 'depop' | 'poshmark', item: Item): string[] {
+export function conditionWords(market: 'depop' | 'poshmark' | 'mercari' | 'grailed', item: Item): string[] {
   return CONDITION_WORDS[market]?.[conditionOf(item)] ?? [];
 }
 
@@ -376,4 +376,370 @@ export function poshmarkTags(item: Item): string[] {
   for (const m of item.materials) add(m);
   if (!out.length) add(item.category === 'activewear' ? 'Athleisure' : 'Casual');
   return out;
+}
+
+/**
+ * Ways a size option on a list may be labelled, for matching against
+ * sizeWants: "M (38-40)" is also "M", "US M / EU 48-50 / 2" is also "M".
+ */
+export function sizeLabels(label: string): string[] {
+  const out = [label.trim()];
+  const first = label.split('/')[0]!.trim();
+  for (const s of [label, first]) {
+    const bare = s.replace(/\s*\(.*\)\s*$/, '').trim();
+    out.push(bare, bare.replace(/^US\s+/i, '').replace(/\s+in\.?$/i, '').trim());
+  }
+  return [...new Set(out.filter(Boolean))];
+}
+
+/** The option for a size, best match first; options earlier in the list win ties. */
+export function pickSize<T>(options: T[], label: (o: T) => string, size: string | null | undefined): T | null {
+  const wants = sizeWants(size).map(w => w.toLowerCase().replace(/\s+/g, ' '));
+  if (!wants.length) return null;
+  const keyed = options.map(o => ({ o, names: sizeLabels(label(o)).map(n => n.toLowerCase().replace(/\s+/g, ' ')) }));
+  for (const want of wants) {
+    const hit = keyed.find(k => k.names.includes(want));
+    if (hit) return hit.o;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Mercari
+// ---------------------------------------------------------------------------
+
+/**
+ * Where an item goes in Mercari's category tree: the department row, then
+ * the category, then the subcategory, each with fallbacks best first. An
+ * empty subcategory list picks Mercari's "All <category>" row. Names were
+ * read off the live picker (October 2026).
+ */
+export interface MercariChoice {
+  department: 'Women' | 'Men' | 'Kids';
+  category: string[];
+  subcategory: string[];
+}
+
+export function mercariCategory(item: Item): MercariChoice {
+  const s = item.subcategory ?? '';
+  const c = item.category ?? '';
+
+  if (item.department === 'kids') {
+    const girly = ['dresses', 'skirts'].includes(c) || ['skirts', 'mini-dresses', 'midi-dresses', 'maxi-dresses', 'heels'].includes(s);
+    const g = girly ? 'Girls' : 'Boys';
+    const cat =
+      c === 'outerwear' ? 'coats & jackets'
+      : c === 'bottoms' ? 'bottoms'
+      : c === 'dresses' ? (girly ? 'dresses' : 'other')
+      : c === 'shoes' ? 'shoes'
+      : c === 'bags' || c === 'accessories' ? 'accessories'
+      : c === 'tops' || c === 'knitwear' || c === 'activewear' ? 'tops & t-shirts'
+      : 'other';
+    return { department: 'Kids', category: [`${g} ${cat}`], subcategory: [`${g} (4+)`] };
+  }
+
+  const pick = (category: string[], subcategory: string[] = []) => ({ category, subcategory });
+
+  if (item.department === 'women') {
+    const choice = ((): Omit<MercariChoice, 'department'> => {
+      switch (c) {
+        case 'tops':
+          return pick(['Tops & blouses'], {
+            't-shirts': ['T-shirts'],
+            shirts: ['Button down shirt'],
+            blouses: ['Blouse'],
+            'tank-tops': ['Tank Tops', 'Camisoles'],
+            polos: ['Polo shirt'],
+            'crop-tops': ['Knit top', 'T-shirts'],
+          }[s] ?? ['Other']);
+        case 'knitwear':
+          if (s === 'hoodies') return pick(['Sweaters'], ['Hooded']);
+          if (s === 'sweatshirts') return pick(['Athletic apparel'], ['Athletic Sweatshirts']);
+          if (s === 'cardigans') return pick(['Sweaters'], ['Cardigan']);
+          return pick(['Sweaters'], ['Crewneck', 'Other']);
+        case 'outerwear':
+          if (s === 'blazers') return pick(['Suits & blazers'], ['Blazer']);
+          return pick(['Coats & jackets'], {
+            'denim-jackets': ['Jean jacket'],
+            'leather-jackets': ['Motorcycle', 'Other'],
+            coats: ['Wool', 'Trench', 'Peacoat'],
+            puffers: ['Puffer'],
+            gilets: ['Vest'],
+            jackets: ['Windbreaker', 'Other'],
+          }[s] ?? ['Other']);
+        case 'dresses':
+          return pick(['Dresses'], {
+            'mini-dresses': ['Above knee, mini'],
+            'midi-dresses': ['Midi'],
+            'maxi-dresses': ['Maxi'],
+            jumpsuits: ['Jumpsuits & Rompers'],
+          }[s] ?? ['Other']);
+        case 'bottoms':
+          if (s === 'jeans') return pick(['Jeans'], ['Other']);
+          if (s === 'shorts') return pick(['Shorts'], ['Other']);
+          if (s === 'skirts') return pick(['Skirts'], ['Other']);
+          if (s === 'leggings') return pick(['Athletic apparel'], ['Athletic Leggings']);
+          if (s === 'joggers') return pick(['Athletic apparel'], ['Athletic Sweat Pants', 'Track Pants']);
+          return pick(['Pants'], ['Casual pants', 'Other']);
+        case 'activewear':
+          return pick(['Athletic apparel'], {
+            'sports-tops': ['Athletic T-Shirts'],
+            'sports-bottoms': ['Athletic Leggings', 'Athletic Pants'],
+            tracksuits: ['Tracksuits'],
+            jerseys: ['Jerseys'],
+          }[s] ?? ['Other']);
+        case 'shoes':
+          return pick(['Shoes'], {
+            sneakers: ['Fashion sneakers'],
+            boots: ['Boots'],
+            heels: ['Heels'],
+            flats: ['Flats', 'Loafers'],
+            sandals: ['Sandals'],
+          }[s] ?? ['Other']);
+        case 'bags':
+          return pick(["Women's handbags"], {
+            handbags: ['Shoulder Bags', 'Satchel'],
+            backpacks: ['Backpacks'],
+            totes: ['Tote Bags'],
+            crossbody: ['Crossbody Bags'],
+          }[s] ?? ['Other']);
+        case 'accessories':
+          if (s === 'jewellery') return pick(['Jewelry'], ['Necklaces']);
+          return pick(["Women's accessories"], {
+            hats: ['Hats'],
+            scarves: ['Scarves'],
+            belts: ['Belts'],
+            sunglasses: ['Sunglasses'],
+            watches: ['Watches'],
+          }[s] ?? ['Other']);
+        default:
+          return pick(['Other']);
+      }
+    })();
+    return { department: 'Women', ...choice };
+  }
+
+  const choice = ((): Omit<MercariChoice, 'department'> => {
+    switch (c) {
+      case 'tops':
+        return pick(['Tops'], {
+          't-shirts': ['T-shirts'],
+          shirts: ['Button-front'],
+          blouses: ['Button-front'],
+          'tank-tops': ['Tank'],
+          polos: ['Polos'],
+          'crop-tops': ['T-shirts'],
+        }[s] ?? ['Other']);
+      case 'knitwear':
+        if (s === 'hoodies') return pick(['Sweats & hoodies'], ['Hoodie']);
+        if (s === 'sweatshirts') return pick(['Sweats & hoodies'], ['Sweatshirt, pullover']);
+        if (s === 'cardigans') return pick(['Sweaters'], ['Cardigan']);
+        return pick(['Sweaters'], ['Crewneck', 'Other']);
+      case 'outerwear':
+        if (s === 'blazers') return pick(['Blazers & sport coats'], ['Other']);
+        return pick(['Coats & jackets'], {
+          'denim-jackets': ['Jean jacket'],
+          'leather-jackets': ['Motorcycle', 'Other'],
+          coats: ['Wool', 'Trench', 'Peacoat'],
+          puffers: ['Puffer'],
+          gilets: ['Vest'],
+          jackets: ['Flight/bomber', 'Windbreaker', 'Other'],
+        }[s] ?? ['Other']);
+      case 'bottoms':
+        if (s === 'jeans') return pick(['Jeans'], ['Other']);
+        if (s === 'shorts') return pick(['Shorts'], ['Casual shorts', 'Other']);
+        if (s === 'joggers') return pick(['Sweats & hoodies'], ['Sweat Pants']);
+        return pick(['Pants'], ['Casual pants', 'Other']);
+      case 'activewear':
+        return pick(['Athletic apparel'], {
+          'sports-tops': ['Athletic T-Shirts'],
+          'sports-bottoms': ['Athletic Sweat Pants', 'Pants'],
+          tracksuits: ['Tracksuits'],
+          jerseys: ['Jerseys'],
+        }[s] ?? ['Other']);
+      case 'shoes':
+        return pick(['Shoes'], {
+          sneakers: ['Fashion sneakers'],
+          boots: ['Boots'],
+          flats: ['Loafers', 'Slip-Ons'],
+          sandals: ['Sandals'],
+        }[s] ?? []);
+      case 'bags':
+        return pick(["Men's accessories"], { backpacks: ['Backpacks'] }[s] ?? ['Bags']);
+      case 'accessories':
+        if (s === 'jewellery') return pick(['Jewelry'], ['Necklaces']);
+        return pick(["Men's accessories"], {
+          hats: ['Hats'],
+          scarves: ['Scarves'],
+          belts: ['Belts'],
+          sunglasses: ['Sunglasses'],
+          watches: ['Watches'],
+        }[s] ?? ['Other']);
+      case 'dresses':
+      default:
+        return pick(['Other']);
+    }
+  })();
+  return { department: 'Men', ...choice };
+}
+
+// ---------------------------------------------------------------------------
+// Grailed
+// ---------------------------------------------------------------------------
+
+export interface GrailedChoice {
+  department: 'Menswear' | 'Womenswear';
+  category: string[];
+  subcategory: string[];
+}
+
+/** Grailed's department, category and subcategory, read off the live form (October 2026). */
+export function grailedCategory(item: Item): GrailedChoice {
+  const s = item.subcategory ?? '';
+  const c = item.category ?? '';
+  const pick = (category: string[], subcategory: string[]) => ({ category, subcategory });
+
+  if (item.department === 'women') {
+    const choice = ((): Omit<GrailedChoice, 'department'> => {
+      switch (c) {
+        case 'tops':
+          return pick(['Tops'], {
+            't-shirts': ['Short Sleeve T-Shirts'],
+            shirts: ['Button Ups'],
+            blouses: ['Blouses'],
+            'tank-tops': ['Tank Tops'],
+            polos: ['Polos'],
+            'crop-tops': ['Crop Tops'],
+          }[s] ?? ['Short Sleeve T-Shirts']);
+        case 'knitwear':
+          return pick(['Tops'], { hoodies: ['Hoodies'], sweatshirts: ['Sweatshirts'] }[s] ?? ['Sweaters']);
+        case 'outerwear':
+          return pick(['Outerwear'], {
+            blazers: ['Blazers'],
+            'denim-jackets': ['Denim Jackets'],
+            'leather-jackets': ['Leather Jackets'],
+            coats: ['Coats'],
+            puffers: ['Down Jackets'],
+            gilets: ['Vests'],
+            jackets: ['Jackets', 'Bombers'],
+          }[s] ?? ['Jackets']);
+        case 'dresses':
+          if (s === 'jumpsuits') return pick(['Bottoms'], ['Jumpsuits']);
+          return pick(['Dresses'], { 'mini-dresses': ['Mini Dresses'], 'midi-dresses': ['Midi Dresses'], 'maxi-dresses': ['Maxi Dresses'] }[s] ?? ['Midi Dresses']);
+        case 'bottoms':
+          return pick(['Bottoms'], {
+            jeans: ['Jeans'],
+            shorts: ['Shorts'],
+            skirts: ['Mini Skirts', 'Midi Skirts'],
+            joggers: ['Joggers', 'Sweatpants'],
+            leggings: ['Leggings'],
+          }[s] ?? ['Pants']);
+        case 'activewear':
+          if (s === 'sports-bottoms') return pick(['Bottoms'], ['Leggings', 'Sweatpants']);
+          if (s === 'tracksuits') return pick(['Bottoms'], ['Sweatpants']);
+          return pick(['Tops'], ['Short Sleeve T-Shirts']);
+        case 'shoes':
+          return pick(['Footwear'], { sneakers: ['Low-Top Sneakers'], boots: ['Boots'], heels: ['Heels'], flats: ['Flats'], sandals: ['Sandals'] }[s] ?? ['Flats']);
+        case 'bags':
+          return pick(['Bags & Luggage'], { handbags: ['Shoulder Bags', 'Handle Bags'], backpacks: ['Backpacks'], totes: ['Tote Bags'], crossbody: ['Crossbody Bags'] }[s] ?? ['Other']);
+        case 'accessories':
+          if (s === 'jewellery') return pick(['Jewelry'], ['Necklaces', 'Other']);
+          return pick(['Accessories'], { hats: ['Hats'], scarves: ['Scarves'], belts: ['Belts'], sunglasses: ['Sunglasses'], watches: ['Watches'] }[s] ?? ['Miscellaneous']);
+        default:
+          return pick(['Tops'], ['Short Sleeve T-Shirts']);
+      }
+    })();
+    return { department: 'Womenswear', ...choice };
+  }
+
+  const choice = ((): Omit<GrailedChoice, 'department'> => {
+    switch (c) {
+      case 'tops':
+        return pick(['Tops'], {
+          't-shirts': ['Short Sleeve T-Shirts', 'Long Sleeve T-Shirts'],
+          shirts: ['Shirts (Button Ups)'],
+          blouses: ['Shirts (Button Ups)'],
+          'tank-tops': ['Tank Tops & Sleeveless'],
+          polos: ['Polos'],
+          'crop-tops': ['Short Sleeve T-Shirts'],
+        }[s] ?? ['Short Sleeve T-Shirts']);
+      case 'knitwear':
+        return pick(['Tops'], s === 'hoodies' || s === 'sweatshirts' ? ['Sweatshirts & Hoodies'] : ['Sweaters & Knitwear']);
+      case 'outerwear':
+        if (s === 'blazers') return pick(['Tailoring'], ['Blazers']);
+        return pick(['Outerwear'], {
+          'denim-jackets': ['Denim Jackets'],
+          'leather-jackets': ['Leather Jackets'],
+          coats: ['Heavy Coats'],
+          puffers: ['Parkas', 'Heavy Coats'],
+          gilets: ['Vests'],
+          jackets: ['Light Jackets', 'Bombers'],
+        }[s] ?? ['Light Jackets']);
+      case 'bottoms':
+        return pick(['Bottoms'], { jeans: ['Denim'], shorts: ['Shorts'], joggers: ['Sweatpants & Joggers'], leggings: ['Leggings'] }[s] ?? ['Casual Pants']);
+      case 'activewear':
+        if (s === 'sports-bottoms' || s === 'tracksuits') return pick(['Bottoms'], ['Sweatpants & Joggers']);
+        if (s === 'jerseys') return pick(['Tops'], ['Jerseys']);
+        return pick(['Tops'], ['Short Sleeve T-Shirts']);
+      case 'shoes':
+        return pick(['Footwear'], { sneakers: ['Low-Top Sneakers', 'Hi-Top Sneakers'], boots: ['Boots'], flats: ['Casual Leather Shoes'], sandals: ['Sandals'] }[s] ?? ['Casual Leather Shoes']);
+      case 'bags':
+        return pick(['Accessories'], ['Bags & Luggage']);
+      case 'accessories':
+        return pick(['Accessories'], {
+          hats: ['Hats'],
+          scarves: ['Gloves & Scarves'],
+          belts: ['Belts'],
+          jewellery: ['Jewelry & Watches'],
+          watches: ['Jewelry & Watches'],
+          sunglasses: ['Sunglasses'],
+        }[s] ?? ['Miscellaneous']);
+      case 'dresses':
+        return pick(['Tops'], ['Short Sleeve T-Shirts']);
+      default:
+        return pick(['Tops'], ['Short Sleeve T-Shirts']);
+    }
+  })();
+  return { department: 'Menswear', ...choice };
+}
+
+const GRAILED_COLOURS: Record<string, string> = {
+  black: 'Black', charcoal: 'Gray',
+  white: 'White', ivory: 'Beige', cream: 'Beige',
+  grey: 'Gray', gray: 'Gray',
+  brown: 'Brown', chocolate: 'Brown', tan: 'Brown', camel: 'Brown',
+  beige: 'Beige', khaki: 'Beige',
+  yellow: 'Yellow', mustard: 'Yellow',
+  red: 'Red', burgundy: 'Red', maroon: 'Red', wine: 'Red',
+  orange: 'Orange',
+  pink: 'Pink',
+  purple: 'Purple', lilac: 'Purple',
+  blue: 'Blue', navy: 'Blue', denim: 'Blue',
+  green: 'Green', olive: 'Green',
+  multi: 'Multi', multicolour: 'Multi', multicolor: 'Multi',
+  silver: 'Silver',
+  gold: 'Gold',
+};
+
+/** Grailed takes one colour; several distinct ones make Multi. */
+export function grailedColour(item: Item): string | null {
+  const all = mapColours(item.colors, GRAILED_COLOURS, 3);
+  if (!all.length) return null;
+  return all.length > 2 ? 'Multi' : all[0]!;
+}
+
+const GRAILED_STYLES = ['Luxury', 'Vintage', 'Avant-Garde', 'Streetwear', 'Workwear', 'Gorpcore', 'Sportswear', 'Basics', 'Western'];
+
+/** Grailed's one style, from the item's tags and era; null leaves it unset. */
+export function grailedStyle(item: Item): string | null {
+  const synonyms: Record<string, string> = {
+    avantgarde: 'Avant-Garde', designer: 'Luxury', utility: 'Workwear', outdoor: 'Gorpcore', athletic: 'Sportswear',
+    athleisure: 'Sportswear', sporty: 'Sportswear', minimal: 'Basics', minimalist: 'Basics', skate: 'Streetwear', skater: 'Streetwear',
+  };
+  for (const tag of item.style_tags) {
+    const t = lower(tag).replace(/[^a-z]/g, '');
+    const hit = GRAILED_STYLES.find(s => s.toLowerCase().replace(/[^a-z]/g, '') === t) ?? synonyms[t];
+    if (hit) return hit;
+  }
+  return isVintage(item) ? 'Vintage' : null;
 }
