@@ -3,11 +3,11 @@
 
 import { generateListing, MARKETPLACES, type Item, type Job, type Listing, type MarketplaceId, type Profile } from '@pilego/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { between, errorText, ext, sleep, toBase64 } from '../shared/browser.ts';
+import { between, errorText, ext, sleep, toBase64, within } from '../shared/browser.ts';
 import type { AssistReport, FillResult, ListingWork, PhotoBytes, VintedOutcome, VintedRequest } from '../shared/messages.ts';
 import { blockMessage, capWait, noteWrite, readBlock } from '../shared/pace.ts';
-import { postedListing, SITES } from '../assist/sites.ts';
-import { activate, openTabs, readyTab, sendToTab, vintedSiteFor, waitForLoad } from './tabs.ts';
+import { leftForm, postedListing } from '../assist/sites.ts';
+import { activate, navigate, openTabs, readyTab, sendToTab, vintedSiteFor, waitForLoad } from './tabs.ts';
 
 export const ASSIST_MARKETS: MarketplaceId[] = ['depop', 'poshmark', 'mercari', 'grailed', 'facebook'];
 
@@ -198,6 +198,9 @@ export async function closeOpenedTabs() {
   state.openedTabs.clear();
 }
 
+/** The longest one Vinted request may take, photo uploads and all. */
+const VINTED_TIMEOUT = 5 * 60_000;
+
 async function runVinted(sb: SupabaseClient, job: Job, interactive: boolean) {
   const block = await readBlock('vinted');
   if (block) {
@@ -259,8 +262,10 @@ async function runVinted(sb: SupabaseClient, job: Job, interactive: boolean) {
   }
 
   if (writes) await setListing(sb, listing.id, { status: 'publishing', error: null });
-  const out = await sendToTab<VintedOutcome>(tabId, msg, 25_000).catch(
-    err => ({ status: 'failed', message: errorText(err), retry_in: 300 }) as VintedOutcome,
+  const out = await within(
+    sendToTab<VintedOutcome>(tabId, msg, 25_000).catch(err => ({ status: 'failed', message: errorText(err), retry_in: 300 }) as VintedOutcome),
+    VINTED_TIMEOUT,
+    { status: 'failed', message: 'The Vinted tab stopped answering.', retry_in: 300 },
   );
   const payload = (listing.payload ?? {}) as Record<string, unknown>;
 
@@ -321,17 +326,50 @@ interface Waiting {
   listing_id: string;
   marketplace: MarketplaceId;
   kind: 'post' | 'remove';
+  /** When pileGo opened the tab, for settling ones a lost answer left behind. */
+  started_at?: number;
+  /** The listing's title, for finding it on a closet page after posting. */
+  title?: string;
+  /** pileGo pressed the site's own post button. */
+  pressed?: boolean;
   /** The tab could not post by itself and handed over to the seller. */
   stuck?: boolean;
 }
+
+/** The longest a sell form may take, photos and all, before pileGo stops waiting for the tab to answer. */
+const FILL_TIMEOUT = 10 * 60_000;
+
+/** Fresh forms pileGo tries when the site's server fails, before it waits and tries again later. */
+const SERVER_TRIES = 3;
 
 async function waitingList(): Promise<Record<string, Waiting>> {
   return ((await ext.storage.local.get('assist.waiting'))['assist.waiting'] as Record<string, Waiting> | undefined) ?? {};
 }
 
-async function setWaiting(list: Record<string, Waiting>) {
-  await ext.storage.local.set({ 'assist.waiting': list });
+let waitingLock: Promise<unknown> = Promise.resolve();
+
+/**
+ * Read, change and save the waiting list, one change at a time, so a tab's
+ * report and its address change never both claim the same job.
+ */
+function editWaiting<T>(change: (list: Record<string, Waiting>) => T): Promise<T> {
+  const next = waitingLock.then(async () => {
+    const list = await waitingList();
+    const out = change(list);
+    await ext.storage.local.set({ 'assist.waiting': list });
+    return out;
+  });
+  waitingLock = next.catch(() => {});
+  return next;
 }
+
+/** Take a job off the waiting list; only the first caller gets it. */
+const takeWaiting = (jobId: string) =>
+  editWaiting(list => {
+    const w = list[jobId];
+    delete list[jobId];
+    return w ?? null;
+  });
 
 async function runAssist(sb: SupabaseClient, job: Job, first: boolean) {
   const info = MARKETPLACES[job.marketplace];
@@ -371,6 +409,7 @@ async function runAssist(sb: SupabaseClient, job: Job, first: boolean) {
   // a form pileGo fills by itself is filled in front.
   const tab = await ext.tabs.create({ url, active: first || auto });
   if (tab.id == null) return finish(sb, job, 'pending', 'Could not open a tab.', null, 300);
+  const tabId = tab.id;
   const message = auto
     ? `pileGo is listing this on ${info.name} in the tab it opened.`
     : posting
@@ -384,33 +423,71 @@ async function runAssist(sb: SupabaseClient, job: Job, first: boolean) {
     auto ? { status: 'publishing', error: null } : posting ? { status: 'needs_action', error: message } : { status: 'delisting', error: message },
   );
   await finish(sb, job, 'needs_user', message, { tab: true });
-  const list = await waitingList();
-  list[job.id] = { job, tab_id: tab.id, listing_id: listing.id, marketplace: job.marketplace, kind: posting ? 'post' : 'remove' };
-  await setWaiting(list);
+  await editWaiting(list => {
+    list[job.id] = {
+      job,
+      tab_id: tabId,
+      listing_id: listing.id,
+      marketplace: job.marketplace,
+      kind: posting ? 'post' : 'remove',
+      started_at: Date.now(),
+      title: work.listing.title || work.listing.description.split('\n')[0],
+    };
+  });
 
-  await waitForLoad(tab.id);
-  if (posting) await backToForm(tab.id, url);
-  // Wait for the content script with pings, then send the job once. Resending
-  // it after posting has moved the tab on would start a second fill there.
-  const ready = await sendToTab(tab.id, { type: 'assist:ping' }, 30_000).then(
-    () => true,
-    err => (console.warn('[pileGo] assist tab did not answer', errorText(err)), false),
-  );
+  const ready = await openForm(tabId, url, posting);
   if (!auto) {
-    if (ready) void ext.tabs.sendMessage(tab.id, posting ? { type: 'assist:fill', work } : { type: 'assist:remove', work, reason }).catch(() => {});
+    if (ready) void ext.tabs.sendMessage(tabId, posting ? { type: 'assist:fill', work } : { type: 'assist:remove', work, reason }).catch(() => {});
     return;
   }
 
-  await activate(tab.id).catch(() => {});
+  await activate(tabId).catch(() => {});
   state.lastMessage = `Listing on ${info.name}…`;
-  const reply = ready
-    ? ((await ext.tabs.sendMessage(tab.id, { type: 'assist:fill', work }).catch(err => {
-        // Posting navigates away, which closes the channel before the tab answers.
-        console.debug('[pileGo] assist tab closed the channel', errorText(err));
-        return null;
-      })) as FillResult | null)
-    : null;
-  await settleAuto(sb, job.id, tab.id, reply);
+  // A page that never brings up the content script (the site is down, or a
+  // browser error page) is worth a fresh load too.
+  const unloaded: FillResult = { ok: false, filled: [], missing: [], photos: 0, posted: false, retry: true, error: `The ${info.name} page did not load.` };
+  let reply = ready ? await fillTab(tabId, work) : unloaded;
+  for (let attempt = 2; reply?.retry && attempt <= SERVER_TRIES; attempt += 1) {
+    // The site's server failed, not the form: wait a little, then fill a fresh one.
+    const still = await editWaiting(list => {
+      const w = list[job.id];
+      if (w) w.pressed = false;
+      return Boolean(w);
+    });
+    if (!still) return;
+    pressedJobs.delete(job.id);
+    state.lastMessage = `${info.name}’s server had a problem. Trying again (${attempt} of ${SERVER_TRIES})…`;
+    await sleep(10_000 * (attempt - 1));
+    await navigate(tabId, url);
+    reply = (await openForm(tabId, url, true)) ? await fillTab(tabId, work) : unloaded;
+  }
+  if (reply?.retry) return retryLater(sb, job.id, tabId, reply.error ?? `${info.name}’s server had a problem.`);
+  await settleAuto(sb, job.id, tabId, reply);
+}
+
+/** Wait for a freshly opened tab and its content script. */
+async function openForm(tabId: number, url: string, posting: boolean): Promise<boolean> {
+  await waitForLoad(tabId);
+  if (posting) await backToForm(tabId, url);
+  // Wait for the content script with pings, then send the job once. Resending
+  // it after posting has moved the tab on would start a second fill there.
+  return sendToTab(tabId, { type: 'assist:ping' }, 30_000).then(
+    () => true,
+    err => (console.warn('[pileGo] assist tab did not answer', errorText(err)), false),
+  );
+}
+
+/** Hand the job to the tab and wait for it to fill and post, but not for ever. */
+function fillTab(tabId: number, work: ListingWork): Promise<FillResult | null> {
+  const sent = (ext.tabs.sendMessage(tabId, { type: 'assist:fill', work }) as Promise<FillResult | undefined>).then(
+    r => r ?? null,
+    err => {
+      // Posting navigates away, which closes the channel before the tab answers.
+      console.debug('[pileGo] assist tab closed the channel', errorText(err));
+      return null;
+    },
+  );
+  return within(sent, FILL_TIMEOUT, null);
 }
 
 /**
@@ -429,14 +506,46 @@ async function backToForm(tabId: number, url: string) {
   }
 }
 
+/** The site's server kept failing: close the tab and queue the job again, so it goes up later by itself. */
+async function retryLater(sb: SupabaseClient, jobId: string, tabId: number, error: string) {
+  const w = await takeWaiting(jobId);
+  if (!w) return;
+  await ext.tabs.remove(tabId).catch(() => {});
+  const name = MARKETPLACES[w.marketplace].name;
+  if (w.job.attempts < 4) {
+    const message = `${error} pileGo will try ${name} again in 10 minutes.`;
+    state.lastMessage = message;
+    await setListing(sb, w.listing_id, { status: 'queued', error: message });
+    return finish(sb, w.job, 'pending', message, null, 600);
+  }
+  const message = `${error} pileGo tried ${name} ${w.job.attempts} times. Press Retry to try again.`;
+  state.lastMessage = message;
+  await setListing(sb, w.listing_id, { status: 'needs_action', error: message });
+  return finish(sb, w.job, 'needs_user', message);
+}
+
 /** Jobs already marked posted, so a report and a URL change do not both count. */
 const settled = new Set<string>();
 
-/** Steps the auto-post tabs last reported, by job: "Posting on Depop…" means the button was pressed. */
-const lastStep = new Map<string, string>();
+/** Jobs whose tab has pressed the post button, so the flag is saved once. */
+const pressedJobs = new Set<string>();
 
-export function noteProgress(jobId: string, step: string) {
-  lastStep.set(jobId, step);
+/** A step from an auto-post tab. "Posting on Depop…" means the post button was pressed. */
+export async function noteProgress(jobId: string, step: string) {
+  // A tab still ticking after its job settled must not put "Listing on…" back up.
+  if (settled.has(jobId)) return;
+  if (step) state.lastMessage = step;
+  if (!/^(posting|listing) on/i.test(step) || pressedJobs.has(jobId)) return;
+  pressedJobs.add(jobId);
+  await editWaiting(list => {
+    if (list[jobId]) list[jobId].pressed = true;
+  });
+}
+
+/** What a tab's content script says is wrong with its page, such as a 500 error page. */
+async function tabError(tabId: number): Promise<string | null> {
+  const ping = (ext.tabs.sendMessage(tabId, { type: 'assist:ping' }) as Promise<{ error?: string | null } | undefined>).catch(() => undefined);
+  return (await within(ping, 3000, undefined))?.error ?? null;
 }
 
 /**
@@ -444,27 +553,36 @@ export function noteProgress(jobId: string, step: string) {
  * the job. If neither has, the tab's address decides.
  */
 async function settleAuto(sb: SupabaseClient, jobId: string, tabId: number, reply: FillResult | null) {
-  const pressed = reply?.posted || /^(posting|listing) on/i.test(lastStep.get(jobId) ?? '');
-  const end = Date.now() + (pressed ? 30_000 : 5_000);
+  const before = (await waitingList())[jobId];
+  const end = Date.now() + (reply?.posted || before?.pressed ? 30_000 : 5_000);
+  let w = before;
   while (Date.now() < end) {
-    const w = (await waitingList())[jobId];
+    w = (await waitingList())[jobId];
     if (!w || w.stuck) break;
     await sleep(1000);
   }
-  lastStep.delete(jobId);
-  const list = await waitingList();
-  const w = list[jobId];
+  pressedJobs.delete(jobId);
   if (!w || w.stuck) return;
   const tab = await ext.tabs.get(tabId).catch(() => null);
   const url = tab?.url ?? null;
-  const site = SITES[w.marketplace];
-  delete list[jobId];
-  await setWaiting(list);
-  if (pressed && url && site && !site.sellPage.test(url)) return settlePosted(sb, w, url);
+  // The site took the post when the tab said so, or when it moved on from the form to a page that is not an error.
+  const moved = Boolean(w.pressed && url && leftForm(w.marketplace, url) && !(await tabError(tabId)));
+  if (reply?.posted || moved) {
+    const mine = await takeWaiting(jobId);
+    if (mine) await settlePosted(sb, mine, url);
+    return;
+  }
   const name = MARKETPLACES[w.marketplace].name;
   const message = reply?.error
     ? `${reply.error} Finish it in the ${name} tab.`
     : `pileGo could not finish the ${name} form. Finish it in the tab it opened, or press Retry.`;
+  // Still waiting: if the seller posts it by hand, the new address settles the job.
+  const still = await editWaiting(list => {
+    if (list[jobId]) list[jobId].stuck = true;
+    return Boolean(list[jobId]);
+  });
+  if (!still) return;
+  state.lastMessage = message;
   await setListing(sb, w.listing_id, { status: 'needs_action', error: message });
   await finish(sb, w.job, 'needs_user', message);
 }
@@ -472,7 +590,15 @@ async function settleAuto(sb: SupabaseClient, jobId: string, tabId: number, repl
 async function settlePosted(sb: SupabaseClient, w: Waiting, url: string | null) {
   if (settled.has(w.job.id)) return;
   settled.add(w.job.id);
-  const found = url ? postedListing(w.marketplace, url) : null;
+  pressedJobs.delete(w.job.id);
+  let found = url ? postedListing(w.marketplace, url) : null;
+  if (!found && w.title) {
+    // Landed on the closet or the feed: the new listing is usually on it, once the page is up.
+    await waitForLoad(w.tab_id, 15_000);
+    const ask = sendToTab<{ url?: string | null }>(w.tab_id, { type: 'assist:find', marketplace: w.marketplace, title: w.title }, 8000).catch(() => undefined);
+    const link = (await within(ask, 20_000, undefined))?.url;
+    found = link ? postedListing(w.marketplace, link) : null;
+  }
   const { data: listing } = await sb.from('listings').select('*').eq('id', w.listing_id).maybeSingle();
   const li = listing as Listing | null;
   if (li) {
@@ -485,25 +611,28 @@ async function settlePosted(sb: SupabaseClient, w: Waiting, url: string | null) 
       error: found ? null : 'Paste the listing link on the item page so pileGo can check it for sales.',
     });
   }
+  state.lastMessage = `Listed on ${MARKETPLACES[w.marketplace].name}.`;
   await finish(sb, w.job, 'done', null, { url: found?.url ?? null });
 }
 
 /** A report from an assist tab: posted, removed, or the seller stopped. */
 export async function onAssistReport(sb: SupabaseClient, report: AssistReport, tabUrl: string | null) {
-  const list = await waitingList();
-  const w = list[report.job_id];
-  if (!w) return;
   if (report.type === 'assist:stuck') {
     if (settled.has(report.job_id)) return;
     // Still waiting: the seller finishes the form, and posting it settles the job.
-    w.stuck = true;
-    await setWaiting(list);
+    const w = await editWaiting(list => {
+      const w = list[report.job_id];
+      if (w) w.stuck = true;
+      return w ?? null;
+    });
+    if (!w) return;
+    state.lastMessage = report.message;
     await setListing(sb, w.listing_id, { status: 'needs_action', error: report.message });
     await finish(sb, w.job, 'needs_user', report.message);
     return;
   }
-  delete list[report.job_id];
-  await setWaiting(list);
+  const w = await takeWaiting(report.job_id);
+  if (!w) return;
   const name = MARKETPLACES[w.marketplace].name;
   if (report.type === 'assist:posted') await settlePosted(sb, w, report.url ?? tabUrl);
   else if (report.type === 'assist:removed') {
@@ -517,29 +646,73 @@ export async function onAssistReport(sb: SupabaseClient, report: AssistReport, t
   }
 }
 
-/** The seller published and the site moved on to the new listing: that is as good as pressing "I've posted it". */
+/**
+ * The site moved on from the form: to the new listing, or (once pileGo has
+ * pressed post) to the closet or feed. That is as good as "I've posted it".
+ */
 export async function onTabUrl(sb: SupabaseClient, tabId: number, url: string) {
-  const list = await waitingList();
-  for (const [id, w] of Object.entries(list)) {
-    if (w.tab_id !== tabId || w.kind !== 'post') continue;
-    if (!postedListing(w.marketplace, url)) continue;
-    delete list[id];
-    await setWaiting(list);
-    await settlePosted(sb, w, url);
+  const hits = await editWaiting(list => {
+    const out: Waiting[] = [];
+    for (const [id, w] of Object.entries(list)) {
+      if (w.tab_id !== tabId || w.kind !== 'post') continue;
+      if (!postedListing(w.marketplace, url) && !(w.pressed && leftForm(w.marketplace, url))) continue;
+      delete list[id];
+      out.push(w);
+    }
+    return out;
+  });
+  for (const w of hits) await settlePosted(sb, w, url);
+}
+
+/** A tab pileGo was working in closed: say so on the listing instead of leaving it on "Listing…". */
+export async function onTabClosed(sb: SupabaseClient | null, tabId: number) {
+  forgetTab(tabId);
+  const gone = await editWaiting(list => {
+    const out: Waiting[] = [];
+    for (const [id, w] of Object.entries(list)) {
+      if (w.tab_id !== tabId) continue;
+      delete list[id];
+      out.push(w);
+    }
+    return out;
+  });
+  if (!sb) return;
+  for (const w of gone) {
+    pressedJobs.delete(w.job.id);
+    // A stuck form already told the seller what to do.
+    if (w.stuck || settled.has(w.job.id)) continue;
+    const name = MARKETPLACES[w.marketplace].name;
+    const message =
+      w.kind === 'remove'
+        ? `The ${name} tab closed before the listing came down. Take it down on ${name} by hand, or press Retry.`
+        : w.pressed
+          ? `pileGo pressed ${name}’s post button, then the tab closed before ${name} showed the new listing. If it is on ${name}, paste its link on the item page; if not, press Retry.`
+          : `The ${name} tab closed before the listing went up. Press Retry to open it again.`;
+    await setListing(sb, w.listing_id, { status: 'needs_action', error: message }).catch(() => {});
+    await finish(sb, w.job, 'needs_user', message);
   }
 }
 
-export async function onTabClosed(tabId: number) {
-  forgetTab(tabId);
-  const list = await waitingList();
-  let changed = false;
-  for (const [id, w] of Object.entries(list)) {
-    if (w.tab_id === tabId) {
-      delete list[id];
-      changed = true;
+/**
+ * Settle what a lost answer or a restarted worker left behind: a closed tab,
+ * or an auto-post tab nobody has heard from since the fill should have ended.
+ */
+async function sweepWaiting(sb: SupabaseClient) {
+  for (const [id, w] of Object.entries(await waitingList())) {
+    if (state.running.has(id)) continue;
+    const tab = await ext.tabs.get(w.tab_id).catch(() => null);
+    if (!tab) {
+      await onTabClosed(sb, w.tab_id);
+      continue;
     }
+    const age = Date.now() - (w.started_at ?? 0);
+    if (w.stuck) {
+      // The seller has had a day to finish it by hand; the listing already says so.
+      if (age > 24 * 3600_000) await takeWaiting(id);
+      continue;
+    }
+    if (w.kind === 'post' && AUTO_POST.includes(w.marketplace) && age > FILL_TIMEOUT + 60_000) await settleAuto(sb, id, w.tab_id, null);
   }
-  if (changed) await setWaiting(list);
 }
 
 // ---------------------------------------------------------------------------
@@ -570,9 +743,13 @@ export async function runQueue(sb: SupabaseClient, interactive: boolean): Promis
     if (interactive) markets.push(...ASSIST_MARKETS);
     if (!markets.length) return 0;
 
+    await sweepWaiting(sb).catch(err => console.warn('[pileGo] could not check waiting tabs', errorText(err)));
+
     const { data, error } = await sb.rpc('claim_jobs', { p_runner: 'extension', p_marketplaces: markets, p_limit: 6 });
     if (error) throw new Error(error.message);
-    const jobs = (data ?? []) as Job[];
+    // Vinted first: it takes seconds in a background tab, while each sell form
+    // takes minutes in front, and it should not wait behind them.
+    const jobs = ((data ?? []) as Job[]).sort((a, b) => Number(b.marketplace === 'vinted') - Number(a.marketplace === 'vinted'));
     let firstAssist = true;
     for (const job of jobs) {
       state.running.add(job.id);

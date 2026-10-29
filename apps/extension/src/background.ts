@@ -218,8 +218,7 @@ ext.runtime.onMessage.addListener((raw: unknown, sender, reply) => {
   }
   if (msg.type === 'assist:progress') {
     // Also keeps this worker awake while a form fills.
-    noteProgress(String(msg.job_id), String(msg.step));
-    state.lastMessage = String(msg.step);
+    void noteProgress(String(msg.job_id), String(msg.step));
     return false;
   }
   if (msg.type.startsWith('assist:') && sender.tab) {
@@ -254,7 +253,10 @@ ext.tabs.onUpdated.addListener((tabId, info) => {
 ext.tabs.onRemoved.addListener(tabId => {
   appTabs.delete(tabId);
   forgetTab(tabId);
-  void onTabClosed(tabId);
+  void authed()
+    .catch(() => null)
+    .then(s => onTabClosed(s?.sb ?? null, tabId))
+    .then(broadcast);
 });
 
 // ---------------------------------------------------------------------------

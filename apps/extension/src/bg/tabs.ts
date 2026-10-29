@@ -52,6 +52,25 @@ export function waitForLoad(tabId: number, ms = 30_000): Promise<void> {
   });
 }
 
+/** Load a URL in a tab and wait for the new page, not the one it replaces. */
+export async function navigate(tabId: number, url: string): Promise<void> {
+  const started = new Promise<void>(resolve => {
+    const timer = setTimeout(done, 5000);
+    function done() {
+      clearTimeout(timer);
+      ext.tabs.onUpdated.removeListener(listen);
+      resolve();
+    }
+    function listen(id: number, info: { status?: string }) {
+      if (id === tabId && info.status === 'loading') done();
+    }
+    ext.tabs.onUpdated.addListener(listen);
+  });
+  await ext.tabs.update(tabId, { url }).catch(() => {});
+  await started;
+  await waitForLoad(tabId);
+}
+
 /** Send to a tab's content script, waiting for it to come up if the page is still loading. */
 export async function sendToTab<T>(tabId: number, msg: unknown, readyMs = 20_000): Promise<T> {
   const end = Date.now() + readyMs;

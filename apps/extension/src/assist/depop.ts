@@ -19,7 +19,7 @@ import {
   depopStyles,
   sizeWants,
 } from './choices.ts';
-import { giveFiles, norm, pickOption, press, pressKey, setValue, shown, text, typeText, waitFor } from './dom.ts';
+import { giveFiles, isServerError, norm, pageError, pickOption, press, pressKey, newServerAlert, serverAlertEls, serverAlerts, setValue, shown, text, typeText, waitFor } from './dom.ts';
 import { Tally, type Driver, type DriverContext } from './driver.ts';
 
 const MAX_PHOTOS = 8;
@@ -208,7 +208,12 @@ export const fillDepop: Driver = async (work: ListingWork, files: File[], ctx: D
   const { item, listing } = work;
 
   ctx.step('Waiting for Depop’s form…');
-  const ready = await waitFor(() => byId('group-input') && byId('description'), 30_000);
+  const ready = await waitFor(() => (byId('group-input') && byId('description')) || pageError(), 30_000);
+  const broken = pageError();
+  if (broken) {
+    tally.retry = true;
+    return tally.result(false, `Depop’s server had a problem (${broken}).`);
+  }
   if (!ready) return tally.result(false, 'Depop’s sell form did not load. Are you logged in to Depop?');
 
   ctx.check();
@@ -271,6 +276,12 @@ export const fillDepop: Driver = async (work: ListingWork, files: File[], ctx: D
   if (byId('variants-input') && item.size) needed.push('size');
   const blocking = needed.filter(n => tally.missing.includes(n));
   if (blocking.length) {
+    // A photo upload Depop's server refused is worth a fresh form, not the seller's time.
+    const said = serverAlerts()[0];
+    if (said) {
+      tally.retry = true;
+      return tally.result(false, `Depop’s server had a problem (${said}).`);
+    }
     const sizes = seen.get('variants');
     const hint =
       blocking.includes('size') && item.size
@@ -280,18 +291,39 @@ export const fillDepop: Driver = async (work: ListingWork, files: File[], ctx: D
   }
 
   ctx.check();
-  const post = [...document.querySelectorAll<HTMLButtonElement>('button[type="submit"]')].find(b => text(b) === 'Post' && shown(b));
+  let post = [...document.querySelectorAll<HTMLButtonElement>('button[type="submit"]')].find(b => text(b) === 'Post' && shown(b));
   if (!post) return tally.result(false, 'Could not find Depop’s Post button.');
   if (!(await ctx.beforePost())) return tally.result(false);
   ctx.step('Posting on Depop…');
-  press(post);
-
-  const outcome = await waitFor(
-    () => (!/\/products\/create/.test(location.pathname) ? 'posted' : errors().length ? 'refused' : null),
-    45_000,
-    500,
-  );
-  if (outcome === 'posted') return tally.result(true);
+  // Depop's server now and then answers Post with a 500; the form stays filled, so press it again.
+  for (let attempt = 1; ; attempt += 1) {
+    const before = new Set<Element>(serverAlertEls());
+    press(post);
+    let said: string | null = null;
+    const outcome = await waitFor(
+      () => {
+        if (!/\/products\/create/.test(location.pathname)) return 'posted';
+        said = newServerAlert(before) ?? pageError();
+        if (said) return 'server';
+        // A 500 toast left from the last try is not Depop refusing the form.
+        return errors().some(e => !isServerError(e)) ? 'refused' : null;
+      },
+      45_000,
+      500,
+    );
+    if (outcome === 'posted') return tally.result(true);
+    if (outcome !== 'server') break;
+    const again = [...document.querySelectorAll<HTMLButtonElement>('button[type="submit"]')].find(b => text(b) === 'Post' && shown(b));
+    if (attempt >= 3 || !again) {
+      tally.retry = true;
+      return tally.result(false, `Depop’s server had a problem (${said}).`);
+    }
+    ctx.step(`Depop’s server had a problem. Trying again in ${5 * attempt} seconds…`);
+    await sleep(5000 * attempt);
+    ctx.check();
+    ctx.step('Posting on Depop…');
+    post = again;
+  }
   const why = errors();
   return tally.result(false, why.length ? `Depop wants: ${why.slice(0, 4).join('; ')}.` : 'Depop did not confirm the listing.');
 };

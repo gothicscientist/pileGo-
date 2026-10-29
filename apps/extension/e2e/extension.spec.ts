@@ -214,6 +214,98 @@ test('fills every field on Poshmark, through the photo and price pop-ups, and li
   expect(page.url()).toBe('https://poshmark.com/listing/GAP-Jacket-65a1b2c3');
 });
 
+test.describe('after pressing post', () => {
+  const POSH_LISTED = `history.pushState({}, '', '/listing/GAP-Jacket-65a1b2c3');`;
+  const poshItem = (base: ReturnType<typeof work>) => ({
+    ...base.item,
+    brand: 'GAP',
+    department: 'men',
+    subcategory: 'jackets',
+    colors: ['brown'],
+    condition: 'good',
+    style_tags: ['workwear'],
+    era: '90s',
+    materials: ['cotton'],
+  });
+
+  test('Poshmark landing on the closet counts as listed, and the new listing is found there', async ({ context, worker }) => {
+    const closet =
+      `history.pushState({}, '', '/closet/seller'); document.body.innerHTML = '<main><a href="/listing/Old-Coat-111aaa">Old coat</a>` +
+      `<a href="/listing/GAP-brown-jacket-65a1b2c3"><img alt="GAP brown jacket"></a></main>';`;
+    expect(POSHMARK_FORM).toContain(POSH_LISTED);
+    await context.route('https://poshmark.com/**', route => route.fulfill({ contentType: 'text/html', body: POSHMARK_FORM.replace(POSH_LISTED, closet) }));
+    const page = await context.newPage();
+    await page.goto('https://poshmark.com/create-listing');
+    const id = await tabId(worker, 'https://poshmark.com/*');
+    const base = work();
+    const out = await worker.evaluate(({ id, work }) => chrome.tabs.sendMessage(id, { type: 'assist:fill', work }), {
+      id,
+      work: work({ marketplace: 'poshmark', item: poshItem(base), listing: { ...base.listing, marketplace: 'poshmark', title: 'GAP brown jacket' } }),
+    });
+    expect(out).toMatchObject({ ok: true, posted: true });
+    expect(page.url()).toBe('https://poshmark.com/closet/seller');
+    const found = await worker.evaluate(({ id }) => chrome.tabs.sendMessage(id, { type: 'assist:find', marketplace: 'poshmark', title: 'GAP brown jacket' }), { id });
+    expect(found).toEqual({ url: 'https://poshmark.com/listing/GAP-brown-jacket-65a1b2c3' });
+    await expect(page.locator('pilego-panel')).toHaveCount(0);
+  });
+
+  test('Poshmark saying the listing is live counts as listed, even on the editor’s address', async ({ context, worker }) => {
+    const live = `document.getElementById('share').innerHTML = '<div class="modal" style="display:block">Your listing is live! <button>Share</button></div>';`;
+    await context.route('https://poshmark.com/**', route => route.fulfill({ contentType: 'text/html', body: POSHMARK_FORM.replace(POSH_LISTED, live) }));
+    const page = await context.newPage();
+    await page.goto('https://poshmark.com/create-listing');
+    const id = await tabId(worker, 'https://poshmark.com/*');
+    const base = work();
+    const out = await worker.evaluate(({ id, work }) => chrome.tabs.sendMessage(id, { type: 'assist:fill', work }), {
+      id,
+      work: work({ marketplace: 'poshmark', item: poshItem(base), listing: { ...base.listing, marketplace: 'poshmark', title: 'GAP brown jacket' } }),
+    });
+    expect(out).toMatchObject({ ok: true, posted: true });
+    expect(page.url()).toBe('https://poshmark.com/create-listing');
+  });
+
+  test('Depop answering Post with a 500 gets pressed again, and the listing goes up', async ({ context, worker }) => {
+    const gate = `if (e.submitter && e.submitter.textContent !== 'Post') return;`;
+    const flaky =
+      gate +
+      ` window.posts = (window.posts || 0) + 1; if (window.posts === 1) { const t = document.createElement('div'); t.setAttribute('role', 'alert');` +
+      ` t.textContent = 'Request failed with status code 500'; document.querySelector('main').append(t); return; }`;
+    expect(DEPOP_FORM).toContain(gate);
+    await context.route('https://www.depop.com/**', route => route.fulfill({ contentType: 'text/html', body: DEPOP_FORM.replace(gate, flaky) }));
+    const page = await context.newPage();
+    await page.goto('https://www.depop.com/products/create/');
+    const id = await tabId(worker, 'https://www.depop.com/*');
+    const base = work();
+    const item = { ...base.item, brand: 'GAP', department: 'unisex', subcategory: 'jackets', colors: ['brown'], condition: 'excellent', style_tags: ['workwear'], era: null };
+    const out = await worker.evaluate(({ id, work }) => chrome.tabs.sendMessage(id, { type: 'assist:fill', work }), {
+      id,
+      work: work({ marketplace: 'depop', item, listing: { ...base.listing, marketplace: 'depop', title: '', description: 'GAP brown jacket' } }),
+    });
+    expect(out).toMatchObject({ ok: true, posted: true });
+    expect(await page.evaluate(() => (window as unknown as { posts: number }).posts)).toBe(2);
+    expect(page.url()).toBe('https://www.depop.com/products/seller-gap-jacket-1234/');
+  });
+
+  test('a Depop 500 page asks for a fresh form instead of handing over to the seller', async ({ context, worker }) => {
+    await context.route('https://www.depop.com/**', route =>
+      route.fulfill({ status: 500, contentType: 'text/html', body: '<html><head><title>Internal Server Error</title></head><body><h1>500</h1></body></html>' }),
+    );
+    const page = await context.newPage();
+    await page.goto('https://www.depop.com/products/create/');
+    const id = await tabId(worker, 'https://www.depop.com/*');
+    const base = work();
+    const started = Date.now();
+    const out = await worker.evaluate(({ id, work }) => chrome.tabs.sendMessage(id, { type: 'assist:fill', work }), {
+      id,
+      work: work({ marketplace: 'depop', listing: { ...base.listing, marketplace: 'depop' } }),
+    });
+    expect(out).toMatchObject({ ok: false, posted: false, retry: true });
+    expect((out as { error: string }).error).toMatch(/500/);
+    expect(Date.now() - started).toBeLessThan(10_000);
+    await expect(page.locator('pilego-panel')).toHaveCount(1);
+  });
+});
+
 test.describe('linking', () => {
   async function appPage(context: import('@playwright/test').BrowserContext, origin: string) {
     await context.route(`${origin}/**`, route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body>pileGo</body></html>' }));

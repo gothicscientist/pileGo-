@@ -81,6 +81,42 @@ export function pickOption<T>(options: T[], label: (o: T) => string, wants: stri
   return null;
 }
 
+const SERVER_WORDS =
+  /\b(?:status|error|code|http)[\s:]*(?:code\s*)?50[0-4]\b|\b50[0-4]\s*[-–:|]?\s*(?:error|internal|bad gateway|service|server)|server error|service unavailable|bad gateway|gateway time-?out|something went wrong|try again later/i;
+
+/** A message that blames the site's server rather than the form, so trying again can work. */
+export const isServerError = (message: string) => SERVER_WORDS.test(message);
+
+/**
+ * The page itself came back as a server error: the HTTP status of the
+ * document, or an error page's title or heading.
+ */
+export function pageError(doc: Document = document): string | null {
+  const nav = doc.defaultView?.performance?.getEntriesByType?.('navigation')[0] as (PerformanceEntry & { responseStatus?: number }) | undefined;
+  if (nav?.responseStatus && nav.responseStatus >= 500) return `HTTP ${nav.responseStatus}`;
+  for (const el of [doc.querySelector('title'), ...doc.querySelectorAll('h1, h2')]) {
+    const t = text(el);
+    if (t && t.length < 80 && SERVER_WORDS.test(t)) return t;
+  }
+  return null;
+}
+
+/** Short alerts or toasts on screen that blame the server. */
+export function serverAlertEls(doc: Document = document): HTMLElement[] {
+  return [...doc.querySelectorAll<HTMLElement>('[role="alert"], [role="status"], [class*="toast" i], [class*="snackbar" i], [class*="error" i]')].filter(el => {
+    const t = text(el);
+    return t && t.length < 160 && shown(el) && SERVER_WORDS.test(t);
+  });
+}
+
+export const serverAlerts = (doc: Document = document) => [...new Set(serverAlertEls(doc).map(text))];
+
+/** A server alert that was not on screen before pressing a button: the toast from the last try may linger. */
+export function newServerAlert(before: Set<Element>, doc: Document = document): string | null {
+  const fresh = serverAlertEls(doc).find(el => !before.has(el));
+  return fresh ? text(fresh) : null;
+}
+
 /** Hand files to an upload input, as if the seller had picked them. */
 export function giveFiles(input: HTMLInputElement, files: File[]): void {
   const win = input.ownerDocument.defaultView ?? window;

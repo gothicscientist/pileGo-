@@ -25,6 +25,23 @@ export function send<T = unknown>(msg: unknown): Promise<T | undefined> {
 
 export const sleep = (ms: number) => new Promise<void>(done => setTimeout(done, ms));
 
+/** A promise that gives up after `ms`, so one tab that never answers cannot hold up the queue. */
+export function within<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise(resolve => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+    work.then(
+      value => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(fallback);
+      },
+    );
+  });
+}
+
 /** A random whole number of milliseconds between low and high. */
 export const between = (low: number, high: number) => low + Math.floor(Math.random() * (high - low + 1));
 
