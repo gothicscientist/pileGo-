@@ -389,6 +389,7 @@ async function runAssist(sb: SupabaseClient, job: Job, first: boolean) {
   await setWaiting(list);
 
   await waitForLoad(tab.id);
+  if (posting) await backToForm(tab.id, url);
   if (!auto) {
     await sendToTab(tab.id, posting ? { type: 'assist:fill', work } : { type: 'assist:remove', work, reason }, 30_000).catch(err =>
       console.warn('[pileGo] assist tab did not answer', errorText(err)),
@@ -404,6 +405,22 @@ async function runAssist(sb: SupabaseClient, job: Job, first: boolean) {
     return null;
   });
   await settleAuto(sb, job.id, tab.id, reply);
+}
+
+/**
+ * Marketplaces sometimes bounce the sell page somewhere else on first load
+ * (Poshmark to the seller's closet), so go back to the form once.
+ */
+async function backToForm(tabId: number, url: string) {
+  const want = new URL(url).pathname.replace(/\/+$/, '');
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const now = await ext.tabs.get(tabId).catch(() => null);
+    if (!now?.url) return;
+    if (new URL(now.url).pathname.replace(/\/+$/, '').startsWith(want)) return;
+    await ext.tabs.update(tabId, { url }).catch(() => {});
+    await sleep(500);
+    await waitForLoad(tabId);
+  }
 }
 
 /** Jobs already marked posted, so a report and a URL change do not both count. */

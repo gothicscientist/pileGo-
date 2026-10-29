@@ -103,15 +103,14 @@ async function choose(name: string, wants: string[][], max = wants.length): Prom
     await sleep(350);
   }
   closeMenu(name);
-  await sleep(150);
-  // A single select shows its value in the input; check it took.
-  if (!chips(name).length && picked.length === 1 && norm(input.value) !== norm(picked[0])) {
+  // A single select shows its value in the input once React catches up; check it took.
+  const took = () => norm(input.value) === norm(picked[0]);
+  if (!chips(name).length && picked.length === 1 && !(await waitFor(took, 2000))) {
     const opts = await openMenu(name);
     const hit = opts.find(o => norm(label(o)) === norm(picked[0]));
     if (hit) press(hit);
-    await sleep(350);
     closeMenu(name);
-    return norm(input.value) === norm(picked[0]) ? picked : [];
+    return (await waitFor(took, 2000)) ? picked : [];
   }
   return picked;
 }
@@ -262,7 +261,10 @@ export const fillDepop: Driver = async (work: ListingWork, files: File[], ctx: D
     await sleep(700);
   }
   tally.ok('worldwide shipping', document.querySelector<HTMLInputElement>('input[name="isInternationalShippingEnabled"]')?.checked);
-  tally.ok('package size', await choose('shippingMethods', [depopPackage(item)]));
+  // Depop suggests a package size from the category's typical weight and warns
+  // when it is overridden, so its own suggestion stays.
+  const suggested = (byId('shippingMethods-input') as HTMLInputElement | null)?.value.trim();
+  tally.ok('package size', suggested || (await choose('shippingMethods', [depopPackage(item)])));
 
   // Without these Depop refuses the listing; stop and say what is missing.
   const needed = ['photos', 'description', 'category', 'condition', 'price'];

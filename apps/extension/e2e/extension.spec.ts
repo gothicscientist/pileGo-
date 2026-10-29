@@ -160,7 +160,7 @@ test('fills every field on Depop, removes its colour guess and posts', async ({ 
       source: ['Preloved'],
       age: ['Modern'],
       style: ['Utility'],
-      shippingMethods: 'Extra large',
+      shippingMethods: 'Large',
       variants: 'M',
     },
     price: '32',
