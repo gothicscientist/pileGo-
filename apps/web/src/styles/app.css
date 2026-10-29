@@ -293,6 +293,12 @@ body {
   .field::placeholder {
     color: var(--muted);
   }
+  /* A value the AI estimated and the seller has not checked yet. */
+  .field.field-estimate {
+    border-style: dashed;
+    border-color: color-mix(in srgb, var(--tag) 60%, var(--line));
+    background: color-mix(in srgb, var(--sticker) 16%, var(--card));
+  }
   textarea.field {
     min-height: 7rem;
     line-height: 1.5;

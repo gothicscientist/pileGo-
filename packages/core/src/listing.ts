@@ -1,5 +1,6 @@
 import { CONDITION_LABEL } from './conditions.ts';
 import { MARKETPLACES } from './marketplaces.ts';
+import { MEASUREMENT_KEYS, MEASUREMENT_LABEL } from './measurements.ts';
 import { priceOn, type PriceStrategy } from './pricing.ts';
 import { categoryPath, findSubcategory } from './taxonomy.ts';
 import { clampParagraphs, clampWords, stripWords, titleCase, toHashtag, uniqueBy } from './text.ts';
@@ -33,23 +34,16 @@ export interface GenerateOptions {
   fee_overrides?: Profile['fee_overrides'];
 }
 
-const MEASURE_LABEL: Record<Exclude<keyof Measurements, 'unit'>, string> = {
-  pit_to_pit: 'Pit to pit',
-  length: 'Length',
-  shoulder: 'Shoulder',
-  sleeve: 'Sleeve',
-  waist: 'Waist',
-  hips: 'Hips',
-  inseam: 'Inseam',
-  rise: 'Rise',
-};
-
+/** One line per measurement. Values still estimated by the AI are marked approximate. */
 export function measurementLines(m: Measurements | null | undefined): string[] {
   if (!m) return [];
   const lines: string[] = [];
-  for (const key of Object.keys(MEASURE_LABEL) as Array<keyof typeof MEASURE_LABEL>) {
+  for (const key of MEASUREMENT_KEYS) {
     const value = m[key];
-    if (value != null && value > 0) lines.push(`${MEASURE_LABEL[key]}: ${trimNumber(value)} ${m.unit}`);
+    if (value != null && value > 0) {
+      const approx = m.estimated?.includes(key) ? 'approx. ' : '';
+      lines.push(`${MEASUREMENT_LABEL[key]}: ${approx}${trimNumber(value)} ${m.unit}`);
+    }
   }
   return lines;
 }

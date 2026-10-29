@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mockSupabase } from './fixtures';
+import { mockSupabase, SUPABASE } from './fixtures';
 
 const shots = process.env.SCREENSHOTS;
 
@@ -109,5 +109,66 @@ test('scan page offers camera and file pickers', async ({ page }, info) => {
   await page.goto('/scan');
   await expect(page.getByRole('heading', { name: 'Scan an item' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Scan with AI' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: /Add the front photo/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Add the back photo/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Add the label photo/ })).toBeVisible();
+  await expect(page.getByTestId('shot-count')).toHaveText('0 of 3');
   await snap(page, 'scan', info.project.name);
+});
+
+test('scan sends photo roles and marks measurement estimates', async ({ page }, info) => {
+  await mockSupabase(page);
+  await page.addInitScript(() => window.localStorage.setItem('pilego-cutouts', 'off'));
+  let sent: { roles?: string[]; unit?: string; photos?: string[] } | null = null;
+  await page.route(`${SUPABASE}/functions/v1/scan-item`, async route => {
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' } });
+    sent = route.request().postDataJSON();
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: { 'access-control-allow-origin': '*' },
+      body: JSON.stringify({
+        title: 'Hanes plain white crewneck tee', brand: 'Hanes', department: 'men', category: 'tops', subcategory: null, size: 'M',
+        size_system: 'letter', colors: ['white'], materials: ['100% cotton'], condition: 'good', flaws: null, era: null,
+        style_tags: ['basics'], description: 'A plain white tee.', keywords: [], price: { low: 4, high: 10, suggested: 6, currency: 'USD' },
+        measurements_to_take: ['pit_to_pit', 'length'], confidence: 0.9, notes: null,
+        estimated_measurements: { unit: 'in', basis: 'Size M on a standard US chart', pit_to_pit: 20, length: 28, shoulder: 18, sleeve: 8 },
+      }),
+    });
+  });
+  await page.goto('/scan');
+  await expect(page.getByTestId('shot-count')).toHaveText('0 of 3');
+  const jpeg = await page.screenshot({ type: 'jpeg', clip: { x: 0, y: 0, width: 160, height: 200 } });
+
+  for (const [slot, name] of [['front', 'front.jpg'], ['label', 'label.jpg']] as const) {
+    const chooser = page.waitForEvent('filechooser');
+    await page.getByRole('button', { name: new RegExp(`Add the ${slot} photo`) }).click();
+    await (await chooser).setFiles({ name, mimeType: 'image/jpeg', buffer: jpeg });
+  }
+  await expect(page.getByTestId('shot-count')).toHaveText('2 of 3');
+  await expect(page.getByTestId('missing-shots')).toContainText('No back photo yet');
+  await expect(page.getByRole('button', { name: 'Scan with AI' })).toBeEnabled();
+  await snap(page, 'scan-photos', info.project.name);
+
+  await page.getByRole('button', { name: 'Scan with AI' }).click();
+  await expect(page.getByRole('heading', { name: 'Check it over' })).toBeVisible();
+  expect(sent!.roles).toEqual(['front', 'label']);
+  expect(sent!.unit).toBe('in');
+  expect(sent!.photos).toHaveLength(2);
+
+  await expect(page.getByTestId('estimate-note')).toContainText('size M on a standard US chart');
+  const pit = page.getByLabel(/Pit to pit/);
+  await expect(pit).toHaveValue('20');
+  await expect(pit).toHaveClass(/field-estimate/);
+  await expect(page.getByText('AI est.')).toHaveCount(4);
+  await snap(page, 'scan-review', info.project.name);
+
+  // Measuring one by hand makes it the seller's own.
+  await pit.fill('21');
+  await expect(pit).not.toHaveClass(/field-estimate/);
+  await expect(page.getByText('AI est.')).toHaveCount(3);
+  await page.getByRole('button', { name: 'Clear the estimates' }).click();
+  await expect(page.getByLabel(/Length/)).toHaveValue('');
+  await expect(pit).toHaveValue('21');
+  await expect(page.getByTestId('estimate-note')).toHaveCount(0);
 });
