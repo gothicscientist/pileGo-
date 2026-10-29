@@ -62,7 +62,7 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
   const userId = useUserId();
   const location = useLocation();
   const draftKey = `pilego-crosslist:${userId}:${item.id}`;
-  const { data: profile } = useProfile();
+  const { data: profile, isPending: profilePending } = useProfile();
   const ext = useExtension();
   const ebay = useEbayStatus();
   const ebayActions = useEbayActions();
@@ -85,7 +85,7 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
   const [sentKits, setSentKits] = useState<MarketplaceId[]>([]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || profilePending) return;
     const draft = readDraft(draftKey);
     const start = (draft?.selected ?? mine).filter(m => MARKETPLACE_IDS.includes(m) && !isLive(m));
     setSelected(start);
@@ -95,7 +95,7 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
     setError(null);
     setSentKits([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, item.id, userId]);
+  }, [open, item.id, userId, profilePending]);
 
   const close = () => {
     clearDraft(draftKey);

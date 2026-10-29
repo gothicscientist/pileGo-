@@ -172,10 +172,15 @@ function session() {
 export interface MockOptions {
   signedIn?: boolean;
   empty?: boolean;
+  marketplaces?: string[];
+  legacyMarketplace?: string;
 }
 
 export async function mockSupabase(page: Page, opts: MockOptions = {}) {
   const items = opts.empty ? [] : buildItems();
+  if (opts.legacyMarketplace && items[0]?.listings[0]) {
+    items[0].listings.push({ ...items[0].listings[0], id: 'legacy-listing', marketplace: opts.legacyMarketplace });
+  }
   const seeds = new Map(SEEDS.map(s => [s.id, s]));
   if (opts.signedIn !== false) {
     await page.addInitScript(
@@ -197,7 +202,10 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
     if (req.method() === 'OPTIONS') {
       return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
     }
-    if (path.startsWith('/rest/v1/profiles')) return json(route, single ? PROFILE : [PROFILE]);
+    if (path.startsWith('/rest/v1/profiles')) {
+      const profile = { ...PROFILE, marketplaces: opts.marketplaces ?? PROFILE.marketplaces };
+      return json(route, single ? profile : [profile]);
+    }
     if (path.startsWith('/rest/v1/items')) {
       const id = url.searchParams.get('id')?.replace('eq.', '');
       if (id) {
@@ -259,3 +267,4 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
     return json(route, {});
   });
 }
+

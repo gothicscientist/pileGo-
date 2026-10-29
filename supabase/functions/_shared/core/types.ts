@@ -9,10 +9,7 @@ export type MarketplaceId =
   | 'depop'
   | 'poshmark'
   | 'mercari'
-  | 'grailed'
-  | 'facebook'
-  | 'etsy'
-  | 'vestiaire';
+  | 'grailed';
 
 /**
  * How pileGo reaches a marketplace.

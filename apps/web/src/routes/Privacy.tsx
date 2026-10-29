@@ -34,7 +34,7 @@ export function Privacy() {
           items are taken down elsewhere. You can disconnect in Settings, which deletes the token.
         </p>
         <p>
-          For Vinted, Depop, Poshmark, Mercari, Grailed and Facebook Marketplace, the optional browser extension works inside
+          For Vinted, Depop, Poshmark, Mercari and Grailed, the optional browser extension works inside
           tabs where you are already logged in. Your marketplace passwords and cookies never leave your browser and are never
           sent to pileGo! When you check an item’s price, the extension also opens eBay’s public search for similar sold items
           in your browser and hands their titles, prices and links back to pileGo! for the price check.

@@ -77,7 +77,6 @@ describe('pages', () => {
     expect(postedListing('poshmark', 'https://poshmark.com/listing/Levis-Jacket-65a1b2?x=1')?.id).toBe('Levis-Jacket-65a1b2');
     expect(postedListing('mercari', 'https://www.mercari.com/us/item/m12345678/')?.id).toBe('m12345678');
     expect(postedListing('grailed', 'https://www.grailed.com/listings/5551234-levis')?.id).toBe('5551234');
-    expect(postedListing('facebook', 'https://www.facebook.com/marketplace/you/selling')?.url).toBe('https://www.facebook.com/marketplace/you/selling');
   });
 });
 

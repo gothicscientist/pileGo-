@@ -1,4 +1,4 @@
-// Runs on the sell pages of Depop, Poshmark, Mercari, Grailed and Facebook.
+// Runs on the sell pages of Depop, Poshmark, Mercari and Grailed.
 // On Depop and Poshmark it fills every field and presses the site's own post
 // button, with a few seconds to press Stop first. Elsewhere it fills what it
 // can find and shows a panel with the rest to copy; the seller posts.

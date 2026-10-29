@@ -90,7 +90,7 @@ functions to requests from your app.
 
 ## 5. The browser extension
 
-Vinted, Depop, Poshmark, Mercari, Grailed and Facebook have no public API for
+Vinted, Depop, Poshmark, Mercari and Grailed have no public API for
 sellers, so the extension does that work from your own logged-in tabs. It also
 reads eBay's public sold listings in your browser, for price suggestions.
 

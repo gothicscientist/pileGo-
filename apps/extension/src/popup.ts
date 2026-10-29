@@ -19,7 +19,6 @@ const NAMES: Record<string, string> = {
   poshmark: 'Poshmark',
   mercari: 'Mercari',
   grailed: 'Grailed',
-  facebook: 'Facebook',
 };
 
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}, ...kids: Array<Node | string | null>) {

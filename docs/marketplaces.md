@@ -139,20 +139,6 @@ These also apply to Depop and Poshmark:
   that asks you to delete it or mark it sold. Then you press Done.
 - **Relisting and import:** not supported on these sites yet.
 
-## Facebook Marketplace: Assisted
-
-The extension fills the create-item form in the same way. Facebook has no
-public listing pages that pileGo could check reliably, so sales and taking
-listings down are by hand. pileGo flags the listing when the item sells
-elsewhere.
-
-## Etsy and Vestiaire Collective: Listing kit
-
-pileGo gives you text ready to copy, with photos to download or share, and a
-link to the sell page. You press "Mark listed" once it is up. Etsy only allows
-vintage items that are 20 years or older. Vestiaire wants designer pieces and
-reviews them first.
-
 ## Adding a marketplace
 
 1. Add it to `packages/core/src/marketplaces.ts` with its limits, fees and

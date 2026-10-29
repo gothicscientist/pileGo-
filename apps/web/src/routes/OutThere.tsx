@@ -214,7 +214,7 @@ export function OutThere() {
                       </Link>
                       <p className="text-sm text-muted">
                         {money(item.sold_price, item.currency)}
-                        {item.sold_marketplace ? ` on ${MARKETPLACES[item.sold_marketplace].name}` : ''}
+                        {item.sold_marketplace ? ` on ${MARKETPLACES[item.sold_marketplace]?.name ?? item.sold_marketplace}` : ''}
                         {item.location ? `, find it at ${item.location}` : ''}
                       </p>
                     </div>
@@ -231,3 +231,4 @@ export function OutThere() {
     </div>
   );
 }
+

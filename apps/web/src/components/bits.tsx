@@ -6,23 +6,15 @@ import { ClipboardCopy, Hand, ImageOff, MousePointerClick, Shirt, Zap } from 'lu
 import type { CSSProperties, ReactNode } from 'react';
 import depopIcon from '~/assets/marketplaces/depop.png';
 import ebayIcon from '~/assets/marketplaces/ebay.png';
-import etsyIcon from '~/assets/marketplaces/etsy.png';
-import facebookIcon from '~/assets/marketplaces/facebook.png';
 import grailedIcon from '~/assets/marketplaces/grailed.png';
 import mercariIcon from '~/assets/marketplaces/mercari.png';
 import poshmarkIcon from '~/assets/marketplaces/poshmark.png';
-import vestiaireIcon from '~/assets/marketplaces/vestiaire.png';
 import vintedIcon from '~/assets/marketplaces/vinted.png';
 import { cx, seeded } from '~/lib/format';
 import { usePhotoUrls } from '~/lib/queries';
 
-const SHORT_NAME: Partial<Record<MarketplaceId, string>> = {
-  facebook: 'Facebook',
-  vestiaire: 'Vestiaire',
-};
-
-export function marketName(id: MarketplaceId, short = false): string {
-  return (short && SHORT_NAME[id]) || MARKETPLACES[id].name;
+export function marketName(id: MarketplaceId, _short = false): string {
+  return MARKETPLACES[id].name;
 }
 
 const ICON: Record<MarketplaceId, string> = {
@@ -32,9 +24,6 @@ const ICON: Record<MarketplaceId, string> = {
   poshmark: poshmarkIcon,
   mercari: mercariIcon,
   grailed: grailedIcon,
-  facebook: facebookIcon,
-  etsy: etsyIcon,
-  vestiaire: vestiaireIcon,
 };
 
 /** The marketplace's own app icon, as a small coin. */
@@ -245,3 +234,4 @@ export function HangTag({
     </span>
   );
 }
+
