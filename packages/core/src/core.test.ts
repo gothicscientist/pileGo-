@@ -4,13 +4,30 @@ import {
   buildTitle,
   clampParagraphs,
   clampWords,
+  cleanComps,
+  compQuery,
   computeAnalytics,
+  looksLikeLot,
+  positionForPrice,
+  priceAtPosition,
+  priceLadder,
+  sanitizeSoldComps,
+  sizesInTitle,
+  trimOutliers,
   feeFor,
   feeRule,
   generateListing,
+  clearEstimates,
+  isEstimated,
   makeSku,
   matchCategory,
+  measurementLines,
+  measurementsFromEstimate,
+  normalizeEstimate,
   normalizeScan,
+  photoCaption,
+  scanUserPrompt,
+  setMeasurement,
   priceForTakeHome,
   priceOn,
   suggestPrice,
@@ -115,7 +132,107 @@ describe('suggestPrice', () => {
     expect(s.low).toBeLessThanOrEqual(s.suggested);
     expect(s.high).toBeGreaterThanOrEqual(s.suggested);
     expect(s.comps_used).toBe(3);
-    expect(s.reasons.length).toBe(3);
+    // Sold, asking, AI, and the euro comparable that was left out.
+    expect(s.reasons.length).toBe(4);
+    expect(s.sources).toEqual({ sold: 2, asking: 1, own: 0, ai: true, dropped: 1 });
+  });
+  it('discounts an AI-only estimate', () => {
+    const s = suggestPrice({ currency: 'USD', condition: 'good', ai: { low: 40, high: 60, suggested: 50 } })!;
+    expect(s.suggested).toBe(40);
+    expect(s.low).toBe(32);
+    expect(s.high).toBe(48);
+    expect(s.confidence).toBe('low');
+    expect(s.quick!).toBeLessThan(s.low);
+  });
+  it('lets sold prices outweigh a high AI guess', () => {
+    const sold = [22, 24, 25, 26, 28, 30].map((price, i) => ({ source: 'ebay' as const, title: `hoodie ${i}`, price, currency: 'USD', sold: true }));
+    const s = suggestPrice({ currency: 'USD', condition: 'good', ai: { low: 40, high: 70, suggested: 55 }, comps: sold })!;
+    expect(s.suggested).toBeGreaterThan(24);
+    expect(s.suggested).toBeLessThan(31);
+    expect(s.confidence).toBe('high');
+    expect(s.sold_prices).toEqual([22, 24, 25, 26, 28, 30]);
+  });
+});
+
+describe('comparables', () => {
+  it('builds a search without the size and with the distinctive words', () => {
+    const q = compQuery(baseItem({ title: "Levi's faded denim trucker jacket size M", size: 'M', subcategory: 'denim-jackets', category: 'outerwear' }));
+    expect(q).toContain("Levi's");
+    expect(q).toContain('trucker');
+    expect(q).not.toMatch(/\bM\b/);
+    expect(q).not.toMatch(/size/i);
+    expect(compQuery(baseItem({ category: 'outerwear', subcategory: 'denim-jackets' }), { broad: true })).toBe("Levi's Denim jackets");
+  });
+  it('trims outliers', () => {
+    expect(trimOutliers([20, 22, 24, 25, 26, 28, 300])).toEqual([20, 22, 24, 25, 26, 28]);
+    expect(trimOutliers([2, 40, 42, 44, 45])).toEqual([40, 42, 44, 45]);
+    expect(trimOutliers([10, 500])).toEqual([10, 500]);
+  });
+  it('spots bundles and sizes in titles', () => {
+    expect(looksLikeLot('Lot of 5 vintage tees')).toBe(true);
+    expect(looksLikeLot('Bundle 3 hoodies')).toBe(true);
+    expect(looksLikeLot('Patagonia Better Sweater fleece')).toBe(false);
+    expect(sizesInTitle('Patagonia Better Sweater Mens Size L')).toEqual(['l']);
+    expect(sizesInTitle('Nike tee XL black')).toEqual(['xl']);
+    expect(sizesInTitle('Small batch denim from Japan')).toEqual([]);
+  });
+  it('checks sold prices sent from the browser', () => {
+    const out = sanitizeSoldComps([
+      { title: 'Fleece', price: 40, currency: 'usd', url: 'https://www.ebay.com/itm/1', sold: false },
+      { title: 'Fleece', price: '41.5', currency: 'USD', url: 'https://evil.example/itm/1' },
+      { title: '', price: 40, currency: 'USD' },
+      { title: 'Fleece', price: -1, currency: 'USD' },
+      { title: 'Fleece', price: 20000, currency: 'USD' },
+      { title: 'Fleece', price: 40, currency: 'DOLLARS' },
+      null,
+    ]);
+    expect(out).toEqual([
+      { source: 'ebay', title: 'Fleece', price: 40, currency: 'USD', url: 'https://www.ebay.com/itm/1', sold: true },
+      { source: 'ebay', title: 'Fleece', price: 41.5, currency: 'USD', url: null, sold: true },
+    ]);
+    expect(sanitizeSoldComps('nope')).toEqual([]);
+    expect(sanitizeSoldComps(Array.from({ length: 100 }, () => ({ title: 'x', price: 1, currency: 'USD' }))).length).toBe(60);
+  });
+  it('keeps comparables in the same size, currency and one piece', () => {
+    const c = (title: string, price: number, currency = 'USD') => ({ source: 'ebay' as const, title, price, currency, sold: true });
+    const out = cleanComps(
+      [c('Fleece Size M', 40), c('Fleece M navy', 42), c('Fleece size L', 60), c('Fleece', 44), c('Lot of 3 fleeces', 90), c('Fleece M', 41, 'GBP')],
+      { currency: 'USD', size: 'Medium' },
+    );
+    expect(out.sold).toEqual([40, 42, 44]);
+    expect(out.dropped).toBe(3);
+  });
+});
+
+describe('pricing slider', () => {
+  const sold = [18, 20, 22, 24, 25, 26, 28, 30, 34, 38].map((price, i) => ({ source: 'ebay' as const, title: `t${i}`, price, currency: 'USD', sold: true }));
+  const s = suggestPrice({ currency: 'USD', condition: 'good', comps: sold })!;
+  const rule = feeRule('depop', 'US');
+
+  it('runs from sell fast to maximize profit', () => {
+    const ladder = priceLadder(s, 7, [{ id: 'depop', rule }]);
+    expect(ladder[0]!.price).toBe(s.quick);
+    expect(ladder[3]!.price).toBe(s.suggested);
+    expect(ladder[6]!.price).toBe(s.max);
+    for (let i = 1; i < ladder.length; i++) {
+      expect(ladder[i]!.price).toBeGreaterThanOrEqual(ladder[i - 1]!.price);
+      expect(ladder[i]!.percentile).toBeGreaterThanOrEqual(ladder[i - 1]!.percentile);
+      expect(ladder[i]!.take_home[0]!.keep).toBeGreaterThanOrEqual(ladder[i - 1]!.take_home[0]!.keep);
+    }
+    expect(ladder[0]!.speed).toBe('fast');
+    expect(['slow', 'stretch']).toContain(ladder[6]!.speed);
+    expect(ladder[0]!.rough).toBe(false);
+  });
+  it('round-trips a price to a position', () => {
+    expect(priceAtPosition(s, positionForPrice(s, s.suggested))).toBe(s.suggested);
+    expect(positionForPrice(s, 0)).toBe(0);
+    expect(positionForPrice(s, 10_000)).toBe(1);
+  });
+  it('calls time estimates rough without sold prices, and handles old suggestions', () => {
+    const old = { suggested: 48, low: 38, high: 60, currency: 'USD', confidence: 'medium' as const, reasons: [], comps_used: 11, computed_at: '' };
+    const ladder = priceLadder(old, 3);
+    expect(ladder.map(p => p.price)).toEqual([38, 48, 60]);
+    expect(ladder.every(p => p.rough)).toBe(true);
   });
   it('drops the price for stale listings', () => {
     const fresh = suggestPrice({ currency: 'USD', condition: 'good', ai: { low: 80, high: 120, suggested: 100 } })!;
@@ -227,5 +344,57 @@ describe('sku', () => {
     const sku = makeSku('outerwear', () => (n++ % 10) / 10);
     expect(sku).toMatch(/^OUT-[2-9A-Z]{5}$/);
     expect(sku).not.toMatch(/[01OIL]/.source.replace('O', '0'));
+  });
+});
+
+describe('measurement estimates', () => {
+  it('keeps plausible estimates, rounds them and drops absurd ones', () => {
+    const scan = normalizeScan(
+      {
+        title: 'Grey crewneck sweatshirt',
+        category: 'tops',
+        estimated_measurements: { pit_to_pit: '22.3', length: 27, sleeve: 400, waist: -3, shoulder: 'wide', basis: 'Size L on a US chart' },
+      },
+      'USD',
+      'in',
+    );
+    expect(scan.estimated_measurements).toEqual({ unit: 'in', basis: 'Size L on a US chart', pit_to_pit: 22.5, length: 27 });
+  });
+  it('checks ranges in the unit asked for', () => {
+    expect(normalizeEstimate({ pit_to_pit: 22 }, 'in')?.pit_to_pit).toBe(22);
+    // 12 cm is no garment's pit to pit; 12 in is a small child's.
+    expect(normalizeEstimate({ pit_to_pit: 12 }, 'cm')).toBeNull();
+    expect(normalizeEstimate({ pit_to_pit: 12 }, 'in')?.pit_to_pit).toBe(12);
+    expect(normalizeEstimate({ pit_to_pit: 56 }, 'cm')?.pit_to_pit).toBe(56);
+    expect(normalizeEstimate({ inseam: 90 }, 'in')).toBeNull();
+    expect(normalizeEstimate(null, 'in')).toBeNull();
+  });
+  it('never estimates shoes, bags or accessories', () => {
+    const scan = normalizeScan({ title: 'Nike trainers', category: 'shoes', estimated_measurements: { length: 30 } }, 'USD', 'cm');
+    expect(scan.estimated_measurements).toBeNull();
+  });
+  it('marks estimated values until the seller changes them', () => {
+    const m = measurementsFromEstimate({ unit: 'in', basis: null, pit_to_pit: 21, length: 28, sleeve: null })!;
+    expect(m).toEqual({ unit: 'in', pit_to_pit: 21, length: 28, estimated: ['pit_to_pit', 'length'] });
+    expect(isEstimated(m, 'length')).toBe(true);
+    const measured = setMeasurement(m, 'length', 29);
+    expect(measured.estimated).toEqual(['pit_to_pit']);
+    expect(measured.length).toBe(29);
+    expect(setMeasurement(measured, 'pit_to_pit', 21).estimated).toBeUndefined();
+    expect(clearEstimates(m)).toEqual({ unit: 'in' });
+    expect(measurementsFromEstimate(null)).toBeNull();
+  });
+  it('labels estimated measurements approximate in listings', () => {
+    expect(measurementLines({ unit: 'in', pit_to_pit: 22, length: 26.5, estimated: ['length'] })).toEqual([
+      'Pit to pit: 22 in',
+      'Length: approx. 26.5 in',
+    ]);
+    const listing = generateListing(baseItem({ measurements: { unit: 'cm', pit_to_pit: 56, estimated: ['pit_to_pit'] } }), 'ebay');
+    expect(listing.description).toContain('Pit to pit: approx. 56 cm');
+  });
+  it('captions photos by role for the model', () => {
+    expect(photoCaption('label', 2)).toMatch(/^Photo 3: the clothing label/);
+    expect(photoCaption(null, 0)).toBe('Photo 1.');
+    expect(scanUserPrompt('GBP', null, 'cm')).toContain('Measurements in centimetres');
   });
 });

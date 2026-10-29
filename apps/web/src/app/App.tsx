@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate, RouterProvider } from 'react-router';
 import { Spinner } from '~/components/ui';
 import { useAuth } from '~/lib/auth';
 import { isConfigured } from '~/lib/supabase';
+import { ExtensionPage } from '~/routes/ExtensionPage';
 import { Pile } from '~/routes/Pile';
 import { Privacy } from '~/routes/Privacy';
 import { SetupNeeded } from '~/routes/SetupNeeded';
@@ -37,6 +38,7 @@ const page = (node: ReactNode) => <Suspense fallback={<Loading />}>{node}</Suspe
 
 const router = createBrowserRouter([
   { path: '/privacy', element: <Privacy /> },
+  { path: '/extension', element: <ExtensionPage /> },
   { path: '/signin', element: <Navigate to="/" replace /> },
   {
     element: (

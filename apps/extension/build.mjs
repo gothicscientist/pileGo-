@@ -2,25 +2,29 @@
 // (MV3 event page) from one source tree.
 //
 //   node build.mjs           dist/chrome and dist/firefox
-//   node build.mjs --zip     also pilego-extension-chrome.zip and -firefox.zip
-//   node build.mjs --watch   rebuild Chrome on change
+//   node build.mjs                  dist/chrome and dist/firefox
+//   node build.mjs --zip            also pilego-extension-chrome.zip and -firefox.zip
+//   node build.mjs --zip-to=<dir>   zips written to <dir> instead of dist (the web
+//                                   app's build uses this to serve them at /downloads)
+//   node build.mjs --watch          rebuild Chrome on change
 //
-// PILEGO_APP_ORIGINS (comma separated) lists the pileGo web app origins the
-// extension trusts without asking, for example https://pilego.pages.dev.
-// Other *.pages.dev origins can still link, after the seller approves them in
-// the popup.
+// The extension trusts https://pilego.app (and localhost for development)
+// without asking. PILEGO_APP_ORIGINS (comma separated) adds the origins of a
+// self-hosted copy, for example https://pilego.pages.dev. Other *.pages.dev
+// origins can still link, after the seller approves them in the popup.
 
-import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as esbuild from 'esbuild';
+import { zipSync } from 'fflate';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 const args = new Set(process.argv.slice(2));
+const zipTo = process.argv.find(a => a.startsWith('--zip-to='))?.slice('--zip-to='.length);
 
-const DEFAULT_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173'];
+const DEFAULT_ORIGINS = ['https://pilego.app', 'https://www.pilego.app', 'http://localhost:5173', 'http://127.0.0.1:5173'];
 const trusted = (process.env.PILEGO_APP_ORIGINS ?? '')
   .split(',')
   .map(s => s.trim().replace(/\/+$/, ''))
@@ -47,6 +51,10 @@ const assistMatches = [
 
 const appMatches = [...appOrigins.map(o => `${o}/*`), 'https://*.pages.dev/*'];
 
+// eBay's public sold-listings search, read for price comparisons.
+export const EBAY_SEARCH_DOMAINS = ['www.ebay.com', 'www.ebay.co.uk', 'www.ebay.de', 'www.ebay.com.au', 'www.ebay.ca'];
+const ebayMatches = EBAY_SEARCH_DOMAINS.map(d => `https://${d}/*`);
+
 function manifest(browser) {
   const m = {
     manifest_version: 3,
@@ -57,7 +65,7 @@ function manifest(browser) {
     icons: { 16: 'icons/16.png', 32: 'icons/32.png', 48: 'icons/48.png', 128: 'icons/128.png' },
     action: { default_title: 'pileGo', default_popup: 'popup.html', default_icon: { 16: 'icons/16.png', 32: 'icons/32.png' } },
     permissions: ['storage', 'alarms', 'webRequest'],
-    host_permissions: [...vintedMatches, ...assistMatches, 'https://*.vinted.net/*', 'https://*.supabase.co/*', ...appMatches],
+    host_permissions: [...vintedMatches, ...assistMatches, 'https://*.vinted.net/*', 'https://*.supabase.co/*', ...ebayMatches, ...appMatches],
     content_scripts: [
       { matches: appMatches, js: ['app.js'], run_at: 'document_start' },
       { matches: vintedMatches, js: ['vinted.js'], run_at: 'document_idle' },
@@ -88,6 +96,7 @@ async function build(browser) {
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
   await esbuild.build({
+    absWorkingDir: root,
     entryPoints: entries,
     outdir: out,
     bundle: true,
@@ -107,15 +116,28 @@ async function build(browser) {
   return out;
 }
 
+function filesIn(dir, base = dir, out = {}) {
+  for (const name of readdirSync(dir).sort()) {
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) filesIn(path, base, out);
+    else out[relative(base, path).split('\\').join('/')] = readFileSync(path);
+  }
+  return out;
+}
+
+/** Zip with plain JavaScript, so building needs no `zip` binary on the host. */
 function zip(dir, name) {
-  const file = join(root, 'dist', name);
-  rmSync(file, { force: true });
-  execFileSync('zip', ['-qr', file, '.'], { cwd: dir });
+  const outDir = zipTo ? resolve(process.cwd(), zipTo) : join(root, 'dist');
+  mkdirSync(outDir, { recursive: true });
+  const file = join(outDir, name);
+  // A fixed date keeps the zip identical between builds of the same source.
+  writeFileSync(file, zipSync(filesIn(dir), { level: 9, mtime: new Date('2026-01-01T00:00:00Z') }));
   return file;
 }
 
 if (args.has('--watch')) {
   const ctx = await esbuild.context({
+    absWorkingDir: root,
     entryPoints: entries,
     outdir: join(root, 'dist', 'chrome'),
     bundle: true,
@@ -130,7 +152,7 @@ if (args.has('--watch')) {
   for (const browser of ['chrome', 'firefox']) {
     const out = await build(browser);
     if (!existsSync(join(out, 'icons', '128.png'))) throw new Error('static/icons is missing; run pnpm icons first.');
-    if (args.has('--zip')) console.log('Wrote', zip(out, `pilego-extension-${browser}.zip`));
+    if (args.has('--zip') || zipTo) console.log('Wrote', zip(out, `pilego-extension-${browser}.zip`));
     else console.log('Built', out);
   }
   console.log('Trusted app origins:', appOrigins.join(', '));

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
@@ -18,7 +19,14 @@ function dropUnusedOrtWasm(): Plugin {
   };
 }
 
+// The extension's zips are built next to the app and served from /downloads;
+// the install page compares this version with the one that is installed.
+const extensionVersion = (
+  JSON.parse(readFileSync(new URL('../extension/package.json', import.meta.url), 'utf8')) as { version: string }
+).version;
+
 export default defineConfig({
+  define: { __EXTENSION_VERSION__: JSON.stringify(extensionVersion) },
   resolve: {
     alias: { '~': fileURLToPath(new URL('./src', import.meta.url)) },
   },
@@ -45,6 +53,8 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: '/index.html',
+        // The extension zips are files, not app pages.
+        navigateFallbackDenylist: [/^\/downloads\//],
         globPatterns: ['**/*.{js,css,html,svg,woff2,png}'],
         globIgnores: ['**/ort*.js', '**/ort*.mjs'],
         // The background-removal model is large; it is cached by the library itself.

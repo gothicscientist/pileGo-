@@ -6,6 +6,7 @@ import type { AssistReport, ExtStatus } from './shared/messages.ts';
 import { readBlock } from './shared/pace.ts';
 import { authed, config, dropPendingLink, holdLink, isTrusted, pendingLink, redeem, unlink, type LinkRequest } from './bg/session.ts';
 import { ASSIST_MARKETS, forgetTab, noteVintedTab, onAssistReport, onTabClosed, onTabUrl, runQueue, state, waitingCount } from './bg/jobs.ts';
+import { soldComps } from './bg/comps.ts';
 import { importVinted, syncSales } from './bg/sync.ts';
 import { openTabs, VINTED_TABS } from './bg/tabs.ts';
 
@@ -117,6 +118,13 @@ type Msg = { type: string; [key: string]: unknown };
 async function onApp(msg: Msg, origin: string, tabId: number | undefined) {
   if (tabId != null) appTabs.set(tabId, origin);
   const trusted = await isTrusted(origin);
+  if (msg.type === 'app:sold-comps') {
+    // Reading eBay's public search needs no account, but only apps the seller
+    // trusts may make the browser do it.
+    if (!trusted) return { comps: null, error: 'Approve this copy of pileGo in the extension first.' };
+    const { query, region } = (msg.payload ?? {}) as { query?: string; region?: string };
+    return soldComps(String(query ?? ''), region);
+  }
   switch (msg.type) {
     case 'app:link': {
       const req = msg.payload as LinkRequest;

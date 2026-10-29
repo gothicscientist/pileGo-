@@ -1,7 +1,8 @@
 import { assertEquals, assertThrows } from 'jsr:@std/assert@1';
-import { parseJsonLoose, toGeminiSchema } from './ai.ts';
+import { parseJsonLoose, rankFlashModels, toGeminiSchema, withBenchedLast } from './ai.ts';
 import { buildAspects, matchValue, type Aspect } from './ebay-listing.ts';
 import { decodeXml, xmlValues } from './ebay.ts';
+import { isServiceCall } from './supabase.ts';
 import type { Item } from './core/types.ts';
 
 const item = {
@@ -49,6 +50,16 @@ Deno.test('Gemini schema types are upper-cased', () => {
   assertEquals(s.properties.a.items.enum, ['x']);
 });
 
+Deno.test('Gemini models: newest stable Flash first, no aliases or variants', () => {
+  const names = [
+    'models/gemini-2.5-flash', 'models/gemini-flash-latest', 'models/gemini-3-flash-preview', 'models/gemini-3.5-flash',
+    'models/gemini-3.5-flash-lite', 'models/gemini-3.8-flash', 'models/gemini-3.8-flash-tts', 'models/gemini-3.1-flash-image',
+    'models/gemini-omni-1.1-flash', 'models/gemini-3.10-flash',
+  ];
+  assertEquals(rankFlashModels(names), ['gemini-3.10-flash', 'gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-2.5-flash']);
+  assertEquals(withBenchedLast(['a', 'b', 'c', 'd'], m => m === 'a' || m === 'c'), ['b', 'd', 'a', 'c']);
+});
+
 Deno.test('parseJsonLoose reads fenced and padded JSON', () => {
   assertEquals(parseJsonLoose('```json\n{"a":1}\n```'), { a: 1 });
   assertEquals(parseJsonLoose('Sure! {"a":2} hope that helps'), { a: 2 });
@@ -60,4 +71,24 @@ Deno.test('xml helpers', () => {
   assertEquals(xmlValues(xml, 'ItemID'), ['1', '2']);
   assertEquals(xmlValues(xml, 'Title'), ['A & B']);
   assertEquals(decodeXml('<![CDATA[x<y]]>'), 'x<y');
+});
+
+Deno.test('isServiceCall accepts the service role key and any secret key', () => {
+  const saved = ['SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SECRET_KEYS'].map(n => [n, Deno.env.get(n)] as const);
+  const call = (authorization?: string) =>
+    isServiceCall(new Request('http://x', { headers: authorization ? { Authorization: authorization } : {} }));
+  try {
+    Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'legacy-jwt');
+    Deno.env.set('SUPABASE_SECRET_KEYS', '{"default":"sb_secret_a","cron":"sb_secret_b"}');
+    assertEquals(call('Bearer legacy-jwt'), true);
+    assertEquals(call('Bearer sb_secret_a'), true);
+    assertEquals(call('Bearer sb_secret_b'), true);
+    assertEquals(call('Bearer someone-elses-jwt'), false);
+    assertEquals(call('Bearer '), false);
+    assertEquals(call(), false);
+    Deno.env.set('SUPABASE_SECRET_KEYS', 'not json');
+    assertEquals(call('Bearer legacy-jwt'), true);
+  } finally {
+    for (const [n, v] of saved) v === undefined ? Deno.env.delete(n) : Deno.env.set(n, v);
+  }
 });

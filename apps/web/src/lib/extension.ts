@@ -7,6 +7,7 @@
 // sign-in token (extension-link) and hands it over. The extension redeems it
 // and from then on works with the browser closed to pileGo.
 
+import type { PriceComp } from '@pilego/core';
 import { useEffect, useState } from 'react';
 import { callFunction, SUPABASE_ANON_KEY, SUPABASE_URL } from './supabase';
 
@@ -94,6 +95,33 @@ export function askExtensionToSync(marketplaces?: string[]) {
 
 export function askExtensionToImport(marketplace: string) {
   post('import', { marketplace });
+}
+
+/**
+ * Ask the extension for recent eBay sold prices for `query`. It reads eBay's
+ * sold search in the seller's own browser, which eBay does not offer the
+ * server. Resolves null when the extension is not installed, cannot answer,
+ * or takes longer than `timeoutMs`.
+ */
+export function fetchSoldComps(query: string, region: string, timeoutMs = 20_000): Promise<PriceComp[] | null> {
+  if (typeof window === 'undefined' || !latest.installed || !query.trim()) return Promise.resolve(null);
+  const request_id = crypto.randomUUID();
+  return new Promise(resolve => {
+    const done = (comps: PriceComp[] | null) => {
+      window.removeEventListener('message', onMessage);
+      window.clearTimeout(timer);
+      resolve(comps);
+    };
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== window || event.origin !== window.location.origin) return;
+      const data = event.data as { source?: string; type?: string; request_id?: string; comps?: PriceComp[] | null };
+      if (!data || data.source !== EXT || data.type !== 'sold-comps' || data.request_id !== request_id) return;
+      done(Array.isArray(data.comps) ? data.comps : null);
+    };
+    const timer = window.setTimeout(() => done(null), timeoutMs);
+    window.addEventListener('message', onMessage);
+    post('sold-comps', { request_id, query, region });
+  });
 }
 
 export function useExtension(): ExtensionStatus {

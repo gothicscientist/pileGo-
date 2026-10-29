@@ -1,30 +1,23 @@
-// Scan: photos in, a drafted listing out. Photos upload as soon as they are
-// picked so the AI can read them; the garment is cut out for the pile while
-// the AI works.
+// Scan: photos in, a drafted listing out. The seller is asked for three key
+// shots (front, back, clothing label) plus any extras; each photo carries its
+// role to the AI. Photos upload as soon as they are picked so the AI can read
+// them; the garment is cut out for the pile while the AI works.
 
-import type { ScanResult } from '@pilego/core';
-import { Camera, ImagePlus, Scissors, Star, Trash2, Wand2 } from 'lucide-react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import type { PhotoRole, ScanResult } from '@pilego/core';
+import { Camera, ImagePlus, Scissors, Wand2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { emptyForm, formFromScan, ItemForm, type FormValue } from '~/components/ItemForm';
 import { useToast } from '~/components/overlay';
+import { CoverPreview, ShotGuide, type Shot } from '~/components/ShotGuide';
 import { Button, ErrorNote, Paper, TextField } from '~/components/ui';
 import { useUserId } from '~/lib/auth';
-import { cx } from '~/lib/format';
 import { imageFiles, takeHandedOffFiles } from '~/lib/handoff';
 import { newId, removePhotos } from '~/lib/photos';
-import { scanPhotos, stageCutout, stagePhoto, useCreateItem, useProfile, type StagedPhoto } from '~/lib/queries';
+import { scanPhotos, stageCutout, stagePhoto, useCreateItem, useProfile } from '~/lib/queries';
+import { assignRoles, listWords, missingShots, orderShots, withRole } from '~/lib/shots';
 import { errorMessage } from '~/lib/supabase';
-
-interface Shot {
-  key: string;
-  file: File;
-  local: string;
-  staged?: StagedPhoto;
-  state: 'uploading' | 'done' | 'error';
-  error?: string;
-}
 
 type Phase = 'pick' | 'scanning' | 'review';
 
@@ -56,13 +49,21 @@ export function Scan() {
   const [form, setForm] = useState<FormValue>(emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [cutouts, setCutouts] = useState(cutoutsOn);
-  const [cut, setCut] = useState<{ state: 'idle' | 'working' | 'done' | 'error'; progress: number; preview?: string; path?: string }>({
+  const [cut, setCut] = useState<{
+    state: 'idle' | 'working' | 'done' | 'error';
+    progress: number;
+    preview?: string;
+    path?: string;
+    coverKey?: string;
+  }>({
     state: 'idle',
     progress: 0,
   });
   const saved = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
+  const slotInput = useRef<HTMLInputElement>(null);
+  const pendingRole = useRef<PhotoRole | undefined>(undefined);
 
   // Photos dropped on the pile arrive here.
   useEffect(() => {
@@ -86,16 +87,23 @@ export function Scan() {
     [],
   );
 
-  function addFiles(files: File[]) {
-    const room = MAX_PHOTOS - shotsRef.current.length;
-    const next = files.slice(0, Math.max(0, room)).map<Shot>(file => ({
+  function addFiles(files: File[], firstRole?: PhotoRole) {
+    const current = shotsRef.current;
+    // A photo picked for a filled slot replaces the role, not the photo: the old one becomes an extra.
+    const base = firstRole && firstRole !== 'extra' ? current.map(s => (s.role === firstRole ? { ...s, role: 'extra' as const } : s)) : current;
+    const room = MAX_PHOTOS - current.length;
+    const picked = files.slice(0, Math.max(0, room));
+    const roles = assignRoles(base.map(s => s.role), picked.length, firstRole);
+    const next = picked.map<Shot>((file, i) => ({
       key: newId(),
       file,
       local: URL.createObjectURL(file),
+      role: roles[i]!,
       state: 'uploading',
     }));
     if (!next.length) return;
-    setShots(s => [...s, ...next]);
+    shotsRef.current = [...base, ...next];
+    setShots(shotsRef.current);
     for (const shot of next) {
       stagePhoto(uid, itemId, shot.file)
         .then(staged => setShots(s => s.map(x => (x.key === shot.key ? { ...x, staged, state: 'done' } : x))))
@@ -111,16 +119,19 @@ export function Scan() {
     }
   }
 
+  function pickFor(role: PhotoRole) {
+    pendingRole.current = role;
+    slotInput.current?.click();
+  }
+
   function removeShot(key: string) {
     const shot = shots.find(s => s.key === key);
     if (shot?.staged) void removePhotos([shot.staged.path]).catch(() => undefined);
     setShots(s => s.filter(x => x.key !== key));
-    if (shots[0]?.key === key) resetCutout();
   }
 
-  function makeCover(key: string) {
-    setShots(s => [...s.filter(x => x.key === key), ...s.filter(x => x.key !== key)]);
-    resetCutout();
+  function setRole(key: string, role: PhotoRole) {
+    setShots(s => withRole(s, key, role));
   }
 
   function resetCutout() {
@@ -128,16 +139,39 @@ export function Scan() {
     setCut({ state: 'idle', progress: 0 });
   }
 
-  const ready = shots.filter(s => s.state === 'done');
+  function onDrop(e: DragEvent) {
+    e.preventDefault();
+    if (phase === 'scanning') return;
+    addFiles(imageFiles(e.dataTransfer.files));
+  }
+
+  const ordered = orderShots(shots);
+  const cover = ordered[0];
+  const missing = missingShots(shots);
+
+  // The cutout belongs to the cover; a new front photo or a removed one starts it over.
+  useEffect(() => {
+    if (cut.state !== 'idle' && cut.coverKey !== cover?.key) resetCutout();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cover?.key]);
+
+  const ready = ordered.filter(s => s.state === 'done');
   const uploading = shots.some(s => s.state === 'uploading');
 
   function startCutout() {
-    const cover = shots[0];
     if (!cover?.staged || cut.state === 'working') return;
-    setCut({ state: 'working', progress: 0 });
-    stageCutout(uid, itemId, cover.staged.id, cover.file, p => setCut(c => ({ ...c, progress: p })))
-      .then(r => setCut({ state: 'done', progress: 1, preview: r.preview, path: r.cutout_path }))
-      .catch(() => setCut({ state: 'error', progress: 0 }));
+    const coverKey = cover.key;
+    setCut({ state: 'working', progress: 0, coverKey });
+    stageCutout(uid, itemId, cover.staged.id, cover.file, p => setCut(c => (c.coverKey === coverKey ? { ...c, progress: p } : c)))
+      .then(r =>
+        setCut(c => {
+          if (c.coverKey === coverKey) return { state: 'done', progress: 1, preview: r.preview, path: r.cutout_path, coverKey };
+          // The cover changed while this ran; drop the stale cutout.
+          void removePhotos([r.cutout_path]).catch(() => undefined);
+          return c;
+        }),
+      )
+      .catch(() => setCut(c => (c.coverKey === coverKey ? { state: 'error', progress: 0, coverKey } : c)));
   }
 
   async function runScan() {
@@ -148,7 +182,7 @@ export function Scan() {
       const result = await scanPhotos(
         ready.map(s => s.staged!.path),
         currency,
-        hint,
+        { hint, roles: ready.map(s => s.role), unit },
       );
       setScan(result);
       setForm(f => formFromScan(result, f));
@@ -166,7 +200,7 @@ export function Scan() {
 
   async function save(thenCrossList: boolean) {
     setError(null);
-    const photos = shots
+    const photos = ordered
       .filter(s => s.staged)
       .map((s, i) => ({ ...s.staged!, cutout_path: i === 0 && cut.path ? cut.path : null }));
     try {
@@ -206,7 +240,7 @@ export function Scan() {
           <p className="mt-2 max-w-xl text-ink-2">
             {phase === 'review'
               ? 'The AI filled this in from your photos. Fix anything it got wrong, then save.'
-              : 'Lay it flat in daylight. Front, back, the label and any flaw is plenty.'}
+              : 'Lay it flat in daylight and take three photos: the front, the back and the clothing label. Add close-ups of any flaws.'}
           </p>
         </div>
       </header>
@@ -214,12 +248,28 @@ export function Scan() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,26rem)_1fr]">
         {/* Photos */}
         <div className="flex flex-col gap-4">
-          <PhotoBoard
-            shots={shots}
+          {cover && <CoverPreview cover={cover} scanning={phase === 'scanning'} cut={cutouts ? cut : null} />}
+          <ShotGuide
+            shots={ordered}
+            locked={phase === 'scanning'}
+            full={shots.length >= MAX_PHOTOS}
+            onPick={pickFor}
             onRemove={removeShot}
-            onCover={makeCover}
-            scanning={phase === 'scanning'}
-            cut={cutouts ? cut : null}
+            onRole={setRole}
+            onDrop={onDrop}
+          />
+          <input
+            ref={slotInput}
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            data-testid="slot-input"
+            onChange={e => {
+              addFiles(imageFiles(e.target.files), pendingRole.current);
+              pendingRole.current = undefined;
+              e.target.value = '';
+            }}
           />
           {shots.length < MAX_PHOTOS && phase !== 'scanning' && (
             <div className="grid grid-cols-2 gap-3">
@@ -252,6 +302,9 @@ export function Scan() {
                   e.target.value = '';
                 }}
               />
+              <p className="col-span-2 -mt-1 text-xs text-muted">
+                Several at once fill the slots in order: front, back, label, then extras. Change what a photo shows from its menu.
+              </p>
             </div>
           )}
           <label className="flex items-start gap-3 rounded-lg p-2 text-sm text-ink-2">
@@ -292,6 +345,15 @@ export function Scan() {
                     onChange={e => setHint(e.target.value)}
                     placeholder="Label says M but fits like L. Bought new in 2021."
                   />
+                  {ready.length > 0 && missing.length > 0 && (
+                    <p className="rounded-lg bg-sticker/50 px-3 py-2 text-sm text-[#16172b]" role="note" data-testid="missing-shots">
+                      <strong>No {listWords(missing.map(k => k.label.toLowerCase()))} photo yet.</strong>{' '}
+                      {missing.some(k => k.role === 'label')
+                        ? 'The label tells the AI the brand, size and fabric, and the size lets it estimate measurements.'
+                        : `It helps the AI with ${listWords(missing.map(k => k.why))}.`}{' '}
+                      You can scan anyway.
+                    </p>
+                  )}
                   <ErrorNote error={error} />
                   <div className="flex flex-wrap items-center gap-3">
                     <Button
@@ -308,7 +370,7 @@ export function Scan() {
                       Fill it in myself
                     </Button>
                   </div>
-                  {!shots.length && <p className="text-sm text-muted">Add at least one photo to scan.</p>}
+                  {!shots.length && <p className="text-sm text-muted">Add at least one photo to scan. Front, back and label work best.</p>}
                 </Paper>
               </motion.div>
             )}
@@ -342,100 +404,15 @@ export function Scan() {
   );
 }
 
-function PhotoBoard({
-  shots,
-  onRemove,
-  onCover,
-  scanning,
-  cut,
-}: {
-  shots: Shot[];
-  onRemove: (key: string) => void;
-  onCover: (key: string) => void;
-  scanning: boolean;
-  cut: { state: string; progress: number; preview?: string } | null;
-}) {
-  const reduce = useReducedMotion();
-  const cover = shots[0];
-  if (!cover) {
-    return (
-      <div className="floor flex aspect-[4/5] flex-col items-center justify-center gap-3 rounded-2xl p-6 text-center">
-        <Camera className="size-10" aria-hidden />
-        <p className="font-display text-2xl font-bold">No photos yet</p>
-        <p className="text-sm text-floor-ink/80">Drop them here or use the buttons below.</p>
-      </div>
-    );
-  }
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="floor relative aspect-[4/5] overflow-hidden rounded-2xl">
-        {cut?.preview ? (
-          <motion.img
-            src={cut.preview}
-            alt="Cutout of the cover photo"
-            className="absolute inset-0 m-auto max-h-[86%] max-w-[86%] object-contain cutout-shadow"
-            initial={{ scale: 0.8, rotate: -8, opacity: 0 }}
-            animate={{ scale: 1, rotate: -3, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 180, damping: 14 }}
-          />
-        ) : (
-          <img src={cover.local} alt="Cover photo" className="absolute inset-0 size-full object-cover" />
-        )}
-        {scanning && !reduce && (
-          <div className="pointer-events-none absolute inset-0" aria-hidden>
-            <div
-              className="absolute inset-x-0 h-1/4 bg-gradient-to-b from-transparent via-tag/35 to-tag/70"
-              style={{ animation: 'sweep 1.6s cubic-bezier(.6,.1,.4,.9) infinite alternate' }}
-            />
-          </div>
-        )}
-        {cut?.state === 'working' && (
-          <div className="absolute inset-x-3 bottom-3 rounded-lg bg-ink/80 px-3 py-2 text-xs text-paper">
-            Cutting out
-            <div className="mt-1 h-1 overflow-hidden rounded bg-white/20">
-              <div className="h-full bg-tag transition-all" style={{ width: `${Math.round(cut.progress * 100)}%` }} />
-            </div>
-          </div>
-        )}
-        {cut?.state === 'error' && (
-          <p className="absolute inset-x-3 bottom-3 rounded-lg bg-ink/80 px-3 py-2 text-xs text-paper">
-            The cutout did not work in this browser. The normal photo will be used.
-          </p>
-        )}
-      </div>
-      <ul className="grid grid-cols-4 gap-2">
-        {shots.map((s, i) => (
-          <li key={s.key} className="group relative aspect-square overflow-hidden rounded-lg bg-paper-2">
-            <img src={s.local} alt={`Photo ${i + 1}`} className={cx('size-full object-cover', s.state === 'uploading' && 'opacity-50')} />
-            {s.state === 'uploading' && <span className="skeleton absolute inset-x-0 bottom-0 h-1" />}
-            {s.state === 'error' && (
-              <span className="absolute inset-0 flex items-center bg-danger/85 p-1 text-[0.65rem] leading-tight text-white" title={s.error}>
-                {s.error}
-              </span>
-            )}
-            {i === 0 && (
-              <span className="absolute top-1 left-1 rounded bg-ink px-1 text-[0.6rem] font-bold text-paper">Cover</span>
-            )}
-            {!scanning && (
-              <div className="absolute inset-x-0 bottom-0 flex justify-end gap-1 bg-gradient-to-t from-black/60 p-1 opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
-                {i > 0 && (
-                  <button type="button" aria-label="Make cover photo" className="rounded bg-white/90 p-1 text-ink" onClick={() => onCover(s.key)}>
-                    <Star className="size-3.5" aria-hidden />
-                  </button>
-                )}
-                <button type="button" aria-label="Remove photo" className="rounded bg-white/90 p-1 text-danger" onClick={() => onRemove(s.key)}>
-                  <Trash2 className="size-3.5" aria-hidden />
-                </button>
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-const NOTES = ['Reading the label', 'Working out the fabric', 'Looking for flaws', 'Naming the style', 'Writing the description', 'Guessing a fair price'];
+const NOTES = [
+  'Reading the label',
+  'Working out the fabric',
+  'Looking for flaws',
+  'Estimating measurements',
+  'Naming the style',
+  'Writing the description',
+  'Checking what it sells for',
+];
 
 function ScanningNotes() {
   const [n, setN] = useState(1);

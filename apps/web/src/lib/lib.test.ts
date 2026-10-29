@@ -1,8 +1,9 @@
-import type { Item, Job } from '@pilego/core';
+import type { Item, Job, PhotoRole, ScanResult } from '@pilego/core';
 import { describe, expect, it } from 'vitest';
-import { diffForm, emptyForm } from '~/components/ItemForm';
+import { diffForm, emptyForm, formFromScan } from '~/components/ItemForm';
 import { daysSince, inkOn, plural, seeded } from './format';
 import { nextUp } from './nextup';
+import { assignRoles, listWords, missingShots, orderShots, withRole } from './shots';
 
 const base: Item = {
   id: 'i1', user_id: 'u', sku: 'TOP-AAAAA', status: 'draft', title: 'Tee', brand: null, department: null, category: 'tops',
@@ -37,6 +38,45 @@ describe('item form', () => {
     const after = { ...before, title: 'New', colors: ['Red'] };
     expect(diffForm(before, after)).toEqual({ title: 'New', colors: ['Red'] });
     expect(diffForm(before, { ...before })).toEqual({});
+  });
+});
+
+describe('scan photos', () => {
+  const shot = (key: string, role: PhotoRole) => ({ key, role });
+  it('fills the key slots in order, then extras', () => {
+    expect(assignRoles([], 5)).toEqual(['front', 'back', 'label', 'extra', 'extra']);
+    expect(assignRoles(['back'], 2)).toEqual(['front', 'label']);
+    expect(assignRoles(['front'], 2, 'label')).toEqual(['label', 'back']);
+    expect(assignRoles(['front', 'back', 'label'], 1)).toEqual(['extra']);
+  });
+  it('puts the front first and swaps roles instead of doubling them', () => {
+    const shots = [shot('a', 'extra'), shot('b', 'label'), shot('c', 'front'), shot('d', 'extra')];
+    expect(orderShots(shots).map(s => s.key)).toEqual(['c', 'b', 'a', 'd']);
+    const swapped = withRole(shots, 'a', 'front');
+    expect(swapped.find(s => s.key === 'a')?.role).toBe('front');
+    expect(swapped.find(s => s.key === 'c')?.role).toBe('extra');
+    expect(withRole(shots, 'b', 'front').find(s => s.key === 'c')?.role).toBe('label');
+  });
+  it('names what is missing', () => {
+    expect(missingShots([{ role: 'front', state: 'done' }, { role: 'label', state: 'error' }]).map(k => k.role)).toEqual(['back', 'label']);
+    expect(listWords(['back', 'label'])).toBe('back or label');
+    expect(listWords(['front', 'back', 'label'])).toBe('front, back or label');
+  });
+});
+
+describe('scan to form', () => {
+  const scan = {
+    title: 'Grey sweatshirt', brand: null, department: null, category: 'tops', subcategory: null, size: 'L', size_system: 'letter',
+    colors: [], materials: [], condition: null, flaws: null, era: null, style_tags: [], description: '', keywords: [],
+    price: { low: 10, high: 20, suggested: 14, currency: 'USD' }, measurements_to_take: ['pit_to_pit', 'length'],
+    estimated_measurements: { unit: 'in', basis: 'Size L', pit_to_pit: 23, length: 28 }, confidence: 0.8, notes: null,
+  } satisfies ScanResult;
+  it('pre-fills estimated measurements, marked as estimates', () => {
+    expect(formFromScan(scan).measurements).toEqual({ unit: 'in', pit_to_pit: 23, length: 28, estimated: ['pit_to_pit', 'length'] });
+  });
+  it('keeps measurements the seller already typed', () => {
+    const base = { ...emptyForm(), measurements: { unit: 'in' as const, pit_to_pit: 21 } };
+    expect(formFromScan(scan, base).measurements).toEqual({ unit: 'in', pit_to_pit: 21 });
   });
 });
 

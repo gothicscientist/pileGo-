@@ -230,7 +230,7 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
             <Notice icon={<PlugZap className="size-5" aria-hidden />}>
               {needsExtension.map(m => MARKETPLACES[m].name).join(', ')} {needsExtension.length === 1 ? 'needs' : 'need'} the pileGo browser
               extension. They will wait in the queue until you open pileGo in a browser that has it.{' '}
-              <Link to="/settings#extension" className="font-semibold underline" onClick={onClose}>
+              <Link to="/extension" className="font-semibold underline" onClick={onClose}>
                 Get the extension
               </Link>
             </Notice>
