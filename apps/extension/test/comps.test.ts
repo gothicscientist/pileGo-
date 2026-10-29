@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { looksLikeChallenge, parsePrice, parseSoldListings, soldSearchUrl } from '../src/bg/comps.ts';
+import { depopSearchUrl, looksLikeChallenge, mercariSoldUrl, parsePrice, parseSoldListings, soldDate, soldSearchUrl } from '../src/bg/comps.ts';
 
 // Shaped after eBay's sold search (LH_Sold=1) as it has been served: the older
 // `s-item` list, and the `s-card` list that replaced it from 2025.
@@ -77,9 +77,11 @@ describe('reading eBay sold searches', () => {
         currency: 'USD',
         url: 'https://www.ebay.com/itm/256712345678',
         sold: true,
+        sold_at: '2026-10-12T00:00:00.000Z',
+        condition: 'good',
       },
-      { source: 'ebay', title: 'Gap Brown Arch Logo Full Zip Hoodie Sweatshirt L', price: 31, currency: 'USD', url: 'https://www.ebay.com/itm/256712345679', sold: true },
-      { source: 'ebay', title: 'Gap Vintage 90s Arch Hoodie Brown XL', price: 1024, currency: 'USD', url: 'https://www.ebay.com/itm/256712345682', sold: true },
+      { source: 'ebay', title: 'Gap Brown Arch Logo Full Zip Hoodie Sweatshirt L', price: 31, currency: 'USD', url: 'https://www.ebay.com/itm/256712345679', sold: true, sold_at: '2026-10-12T00:00:00.000Z', condition: 'good' },
+      { source: 'ebay', title: 'Gap Vintage 90s Arch Hoodie Brown XL', price: 1024, currency: 'USD', url: 'https://www.ebay.com/itm/256712345682', sold: true, sold_at: '2026-10-12T00:00:00.000Z', condition: 'good' },
     ]);
   });
 
@@ -98,6 +100,13 @@ describe('reading eBay sold searches', () => {
       ['Gap brown zip hoodie size L vintage', 22.5, 'GBP', 'https://www.ebay.co.uk/itm/396112233446'],
       ['Gap hoodie brown arch XS', 27.1, 'USD', 'https://www.ebay.co.uk/itm/396112233448'],
     ]);
+  });
+
+  it('reads the sale date in either order, and the condition', () => {
+    const [first] = parseSoldListings(CARDS, 'GBP');
+    expect(first).toMatchObject({ sold_at: '2026-10-12T00:00:00.000Z', condition: 'good' });
+    expect(soldDate('<span>Sold  Oct 3, 2026</span>')).toBe('2026-10-03T00:00:00.000Z');
+    expect(soldDate('<span>Verkauft  3. Okt 2026</span>')).toBeNull();
   });
 
   it('stops at the limit', () => {
@@ -144,4 +153,9 @@ it('builds the search for each region', () => {
   expect(soldSearchUrl('levi 501', 'AU')).toMatch(/^https:\/\/www\.ebay\.com\.au\//);
   expect(soldSearchUrl('levi 501', 'CA')).toMatch(/^https:\/\/www\.ebay\.ca\//);
   expect(soldSearchUrl('levi 501', 'XX')).toMatch(/^https:\/\/www\.ebay\.com\//);
+});
+
+it('builds the Mercari and Depop searches', () => {
+  expect(mercariSoldUrl('levi 501')).toBe('https://www.mercari.com/search/?keyword=levi+501&itemStatuses=2');
+  expect(depopSearchUrl('levi 501')).toBe('https://www.depop.com/search/?q=levi+501');
 });

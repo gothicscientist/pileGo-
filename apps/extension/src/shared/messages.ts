@@ -68,6 +68,7 @@ export type VintedOutcome =
 export type AssistRequest =
   | { type: 'assist:fill'; work: ListingWork }
   | { type: 'assist:remove'; work: ListingWork; reason: string }
+  | { type: 'assist:comps'; market: 'mercari' | 'depop' }
   | { type: 'assist:ping' };
 
 export type AssistReport =

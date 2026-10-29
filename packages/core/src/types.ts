@@ -216,6 +216,14 @@ export interface PriceComp {
   currency: string;
   url?: string | null;
   sold: boolean;
+  /** When it sold, for sold comparables that say. Recent sales count more. */
+  sold_at?: string | null;
+  /** When it was first listed, to tell how long it took to sell. */
+  listed_at?: string | null;
+  /** Its condition, when the marketplace says, to adjust its price to this item's condition. */
+  condition?: Condition | null;
+  /** Its size as the marketplace gives it. */
+  size?: string | null;
 }
 
 export interface PriceSuggestion {
@@ -237,6 +245,22 @@ export interface PriceSuggestion {
   asking_prices?: number[];
   /** How much of each kind of evidence went in. */
   sources?: PriceSources;
+  /**
+   * The three prices on the picker. Older rows lack them; priceTiers()
+   * derives them from quick, suggested and max.
+   */
+  tiers?: PriceTiers;
+  /** Median days similar pieces took to sell, when the comparables say. */
+  days_to_sell?: number | null;
+}
+
+export interface PriceTiers {
+  /** Priced to go: below most recent sales of similar pieces. */
+  likely: number;
+  /** About what similar pieces sell for. */
+  balanced: number;
+  /** The top of what buyers have paid; above it, few sell. */
+  less_likely: number;
 }
 
 export interface PriceSources {
@@ -244,6 +268,8 @@ export interface PriceSources {
   asking: number;
   own: number;
   ai: boolean;
+  /** Sold comparables by marketplace, such as { ebay: 20, poshmark: 31 }. */
+  sold_by?: Partial<Record<string, number>>;
   /** Comparables left out: bundles, other sizes, other currencies, outliers. */
   dropped: number;
 }

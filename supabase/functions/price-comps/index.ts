@@ -1,12 +1,15 @@
-// Price an item from comparable eBay listings, sold prices the extension read
-// in the seller's browser, the seller's own sales and the AI estimate. eBay's
-// sold-price API (Marketplace Insights) is restricted, so the server only sees
-// active listings; those are discounted in the blend.
+// Price an item from comparable sales: what the extension read in the seller's
+// browser (eBay, Poshmark and Mercari sales, live Depop listings), Poshmark
+// sales the server reads itself when the extension sent none, live eBay
+// listings, the seller's own sales and the AI estimate. eBay's sold-price API
+// (Marketplace Insights) is restricted, so the server only sees eBay's active
+// listings; those are discounted in the blend.
 //
 // POST { item_id, client_comps? } → { suggestion, comps, sources, error }
 
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.118.0';
-import { compQuery, sanitizeSoldComps, suggestPrice } from '../_shared/core/pricing.ts';
+import { parsePoshmarkSearch, poshmarkBlocked, poshmarkSearchUrl } from '../_shared/core/comps.ts';
+import { compQuery, sanitizeClientComps, suggestPrice } from '../_shared/core/pricing.ts';
 import type { Item, PriceComp } from '../_shared/core/types.ts';
 import { ebay, ebayConfigured, getAppToken, siteFor } from '../_shared/ebay.ts';
 import { HttpError, json, readJson, serve } from '../_shared/http.ts';
@@ -63,6 +66,19 @@ async function ebayComps(item: Item, region: string): Promise<{ comps: PriceComp
   return { comps, query };
 }
 
+/** Poshmark's sold search, for sellers without the extension. Poshmark may refuse servers; then there are none. */
+async function poshmarkSold(query: string, region: string): Promise<PriceComp[]> {
+  const url = poshmarkSearchUrl(query, region);
+  if (!url) return [];
+  const res = await fetch(url, {
+    headers: { Accept: 'text/html', 'Accept-Language': 'en-US,en;q=0.9', 'User-Agent': 'Mozilla/5.0 (compatible; pileGo price check)' },
+    signal: AbortSignal.timeout(10_000),
+  });
+  const html = await res.text();
+  if (!res.ok || poshmarkBlocked(html)) throw new Error(`Poshmark answered ${res.status}`);
+  return parsePoshmarkSearch(html, { host: new URL(url).host }).filter(c => c.sold);
+}
+
 async function ownSales(db: SupabaseClient, item: Item): Promise<number[]> {
   let q = db
     .from('items')
@@ -106,14 +122,22 @@ serve(async req => {
   }
   summary.asking = comps.length;
 
-  const sold = sanitizeSoldComps(client_comps);
-  summary.sold = sold.length;
+  const fromBrowser = sanitizeClientComps(client_comps);
   if (client_comps === undefined) {
-    summary.notes.push('Install the pileGo extension to include recent eBay sold prices.');
-  } else if (!sold.length) {
-    summary.notes.push('The extension found no recent eBay sales for this search.');
+    summary.notes.push('Install the pileGo extension to include recent sold prices from eBay and Mercari.');
+  } else if (!fromBrowser.some(c => c.sold)) {
+    summary.notes.push('The extension found no recent sales for this search.');
   }
-  comps = [...sold, ...comps];
+  if (!fromBrowser.some(c => c.source === 'poshmark')) {
+    try {
+      fromBrowser.push(...(await poshmarkSold(query, profile?.region ?? 'US')));
+    } catch (err) {
+      console.warn('Poshmark comps failed', err instanceof Error ? err.message : String(err));
+    }
+  }
+  summary.sold = fromBrowser.filter(c => c.sold).length;
+  comps = [...fromBrowser, ...comps];
+  summary.asking = comps.filter(c => !c.sold).length;
 
   const own = await ownSales(db, item);
   summary.own_sales = own.length;
@@ -128,6 +152,7 @@ serve(async req => {
     comps,
     own_sales: own,
     size: item.size,
+    item,
     days_listed: daysListed,
   });
   if (!suggestion) {
@@ -139,8 +164,8 @@ serve(async req => {
     });
   }
   await db.from('items').update({ price_suggestion: suggestion }).eq('id', item_id);
-  await db.from('price_comps').insert({ item_id, source: 'ebay', comps, query });
+  await db.from('price_comps').insert({ item_id, source: 'mixed', comps, query });
   // Sold first, then the cheapest asking prices: the most useful to see.
-  const shown = [...comps].sort((a, b) => Number(b.sold) - Number(a.sold) || a.price - b.price).slice(0, 30);
+  const shown = [...comps].sort((a, b) => Number(b.sold) - Number(a.sold) || a.price - b.price).slice(0, 60);
   return json(req, { suggestion, comps: shown, sources: summary, error: compsError });
 });

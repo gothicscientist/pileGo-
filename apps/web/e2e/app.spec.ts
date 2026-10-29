@@ -67,17 +67,25 @@ test('item page shows listings, price and cross-list sheet', async ({ page }, in
   await page.getByRole('tab', { name: 'Price' }).click();
   await expect(page.getByText('Suggested price')).toBeVisible();
   await expect(page.getByText('What you keep')).toBeVisible();
-  // The slider runs from selling fast to maximizing profit.
-  const slider = page.getByRole('slider', { name: /sell fast to maximize profit/ });
-  await expect(slider).toBeVisible();
+  // Three prices to pick from, read from similar sales, and a box for any price.
+  const picker = page.getByRole('radiogroup', { name: /Price: pick one/ });
+  await expect(picker.getByRole('radio', { name: /Likely to sell \$38/ })).toBeVisible();
+  await expect(picker.getByRole('radio', { name: /Balanced \$48/ })).toBeVisible();
+  await expect(picker.getByRole('radio', { name: /Less likely \$60/ })).toBeVisible();
+  await expect(page.getByText('In line with what similar pieces sell for.')).toBeVisible();
   await page.getByRole('button', { name: 'Check again' }).click();
   await expect(page.getByText('eBay is not connected on this server yet')).toBeVisible();
-  await slider.focus();
-  await page.keyboard.press('Home');
-  await expect(page.getByText('Likely sells within about a week')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Use $34' })).toBeVisible();
-  await page.keyboard.press('End');
-  await expect(page.getByRole('button', { name: 'Use $56' })).toBeVisible();
+  await expect(picker.getByRole('radio', { name: /Less likely \$52/ })).toBeVisible();
+  await expect(page.getByText(/6 on eBay, 4 on Poshmark/).first()).toBeVisible();
+  const box = page.getByLabel('Price in USD');
+  await box.fill('70');
+  await expect(page.getByText('Your price is high. Try pricing at or below $52 to help your item sell.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Use $70' })).toBeVisible();
+  await picker.getByRole('radio', { name: /Likely to sell/ }).click();
+  await expect(box).toHaveValue('38');
+  await expect(page.getByRole('button', { name: 'Use $38' })).toBeVisible();
+  await box.fill('');
+  await box.fill('62');
   await snap(page, 'item-price', info.project.name);
   await page.getByRole('button', { name: 'Cross-list' }).first().click();
   const dialog = page.getByRole('dialog', { name: 'Cross-list' });

@@ -1,12 +1,14 @@
-// Sold prices from eBay's public search, for the web app's pricing. eBay's
-// sold-items API is closed to most developers and its pages refuse servers,
-// but the seller's own browser can read the same search anyone can open:
-// ebay.com/sch/i.html?LH_Sold=1. A service worker has no DOMParser, so the
-// results are read with string matching that copes with both the older
-// `s-item` markup and the newer `s-card` one.
+// Comparable sales for the web app's pricing, read in the seller's own
+// browser because the marketplaces refuse servers or draw results in the page.
+// eBay's sold search (ebay.com/sch/i.html?LH_Sold=1) is read with string
+// matching, since a service worker has no DOMParser; it copes with both the
+// older `s-item` markup and the newer `s-card` one. Poshmark's search carries
+// its results as JSON. Mercari and Depop are read from a background tab.
 
-import type { PriceComp } from '@pilego/core';
+import { conditionFromText, parsePoshmarkSearch, poshmarkBlocked, poshmarkSearchUrl, type PriceComp } from '@pilego/core';
+import type { TabCompsMarket } from '../assist/comps.ts';
 import { ext, sleep } from '../shared/browser.ts';
+import { sendToTab, waitForLoad } from './tabs.ts';
 
 export type Region = 'US' | 'UK' | 'EU' | 'AU' | 'CA';
 
@@ -149,16 +151,39 @@ export function parseSoldListings(html: string, fallbackCurrency = 'USD', max = 
 
     const host = new URL(link[1]!.replace(/&amp;/g, '&')).host;
     seen.add(id);
-    out.push({
+    const comp: PriceComp = {
       source: 'ebay',
       title: title.slice(0, 200),
       price: price.price,
       currency: price.currency,
       url: `https://${host}/itm/${id}`,
       sold: true,
-    });
+    };
+    const soldAt = soldDate(chunk);
+    if (soldAt) comp.sold_at = soldAt;
+    const subtitle = after(chunk, /\bs-(?:item|card)__subtitle\b/, 300);
+    const condition = subtitle ? conditionFromText(textOf(upTo(subtitle.html, '</div>'))) : null;
+    if (condition) comp.condition = condition;
+    out.push(comp);
   }
   return out;
+}
+
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+/**
+ * The date in a result's "Sold  Oct 12, 2026" or "Sold  12 Oct 2026" line,
+ * as an ISO date. Other languages are left undated.
+ */
+export function soldDate(chunk: string): string | null {
+  const m =
+    /Sold\s+(?:([A-Z][a-z]{2})\w*\.?\s+(\d{1,2}),?\s+(\d{4})|(\d{1,2})\s+([A-Z][a-z]{2})\w*\.?\s+(\d{4}))/.exec(chunk);
+  if (!m) return null;
+  const month = MONTHS.indexOf((m[1] ?? m[5] ?? '').toLowerCase());
+  const day = Number(m[2] ?? m[4]);
+  const year = Number(m[3] ?? m[6]);
+  if (month < 0 || !day || day > 31 || year < 2000) return null;
+  return new Date(Date.UTC(year, month, day)).toISOString();
 }
 
 /** eBay's bot check, which shows instead of results now and then. */
@@ -177,48 +202,142 @@ export interface SoldCompsResult {
   comps: PriceComp[] | null;
   error?: string;
   url?: string;
+  /** What each marketplace gave: a count, or why it gave nothing. */
+  sources?: Record<string, number | string>;
 }
 
+type SourceResult = { comps: PriceComp[] | null; error?: string; url?: string };
+
+/** A search's comparables from the cache when they are under six hours old, else from `load`. */
+async function cachedSearch(key: string, load: () => Promise<SourceResult>): Promise<SourceResult> {
+  const cached = memory.get(key) ?? ((await ext.storage.local.get(key))[key] as { at: number; comps: PriceComp[] } | undefined);
+  if (cached && Date.now() - cached.at < CACHE_MS) return { comps: cached.comps };
+  const result = await load();
+  if (result.comps) {
+    const entry = { at: Date.now(), comps: result.comps };
+    memory.set(key, entry);
+    await ext.storage.local.set({ [key]: entry }).catch(() => {});
+    await pruneCache();
+  }
+  return result;
+}
+
+/** eBay's sold search, read in this browser because eBay refuses servers. */
+export async function ebaySold(q: string, region: unknown): Promise<SourceResult> {
+  const url = soldSearchUrl(q, region);
+  return cachedSearch(`comps:${url}`, async () => {
+    const wait = lastFetch + GAP_MS - Date.now();
+    if (wait > 0) await sleep(wait);
+    lastFetch = Date.now();
+
+    let html: string;
+    try {
+      const res = await fetch(url, { credentials: 'include', headers: { Accept: 'text/html' } });
+      html = await res.text();
+      if (!res.ok && !html.includes('s-item') && !html.includes('s-card')) {
+        return { comps: null, error: `eBay answered ${res.status}. Open ebay.com in a tab once, then try again.`, url };
+      }
+    } catch (err) {
+      return { comps: null, error: `Could not reach eBay: ${err instanceof Error ? err.message : String(err)}`, url };
+    }
+    if (looksLikeChallenge(html)) {
+      return { comps: null, error: 'eBay wants a quick check that you are human. Open ebay.com in a tab, then try again.', url };
+    }
+    return { comps: parseSoldListings(html, siteForRegion(region).currency), url };
+  });
+}
+
+/** Poshmark's sold search, which carries each sale's date, condition and size. */
+export async function poshmarkSold(q: string, region: unknown): Promise<SourceResult> {
+  const url = poshmarkSearchUrl(q, region);
+  if (!url) return { comps: null, error: 'Poshmark does not sell in this region.' };
+  return cachedSearch(`comps:${url}`, async () => {
+    try {
+      const res = await fetch(url, { credentials: 'include', headers: { Accept: 'text/html' } });
+      const html = await res.text();
+      if (!res.ok || poshmarkBlocked(html)) return { comps: null, error: `Poshmark answered ${res.status}. Open poshmark.com in a tab once, then try again.`, url };
+      return { comps: parsePoshmarkSearch(html, { host: new URL(url).host }), url };
+    } catch (err) {
+      return { comps: null, error: `Could not reach Poshmark: ${err instanceof Error ? err.message : String(err)}`, url };
+    }
+  });
+}
+
+export function mercariSoldUrl(q: string): string {
+  return `https://www.mercari.com/search/?${new URLSearchParams({ keyword: q, itemStatuses: '2' })}`;
+}
+
+export function depopSearchUrl(q: string): string {
+  return `https://www.depop.com/search/?${new URLSearchParams({ q })}`;
+}
+
+/**
+ * Mercari and Depop draw their results in the page, so the search opens in a
+ * tab the seller is not looking at, the assist script reads the cards, and
+ * the tab closes.
+ */
+async function tabSearch(market: TabCompsMarket, url: string): Promise<SourceResult> {
+  return cachedSearch(`comps:${url}`, async () => {
+    let tabId: number | undefined;
+    try {
+      // Opened blank, then sent to the search, so the tab exists before the
+      // page loads (and test browsers can serve the page).
+      const tab = await ext.tabs.create({ url: 'about:blank', active: false });
+      tabId = tab.id;
+      if (tabId == null) return { comps: null, error: 'Could not open a tab.', url };
+      await ext.tabs.update(tabId, { url });
+      await sleep(500);
+      await waitForLoad(tabId, 25_000);
+      const r = await sendToTab<{ comps?: PriceComp[] }>(tabId, { type: 'assist:comps', market }, 20_000);
+      return { comps: Array.isArray(r?.comps) ? r.comps : [], url };
+    } catch (err) {
+      return { comps: null, error: err instanceof Error ? err.message : String(err), url };
+    } finally {
+      if (tabId != null) await ext.tabs.remove(tabId).catch(() => {});
+    }
+  });
+}
+
+/**
+ * Comparables from every marketplace that shows them, read in the seller's
+ * own browser: sold prices from eBay, Poshmark and Mercari, and live asking
+ * prices from Depop, which hides its sales. Each search runs at once; one
+ * failing does not stop the others.
+ */
 export async function soldComps(query: string, region: unknown): Promise<SoldCompsResult> {
   const q = String(query ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
   if (q.length < 3) return { comps: null, error: 'The search was too short.' };
-  const url = soldSearchUrl(q, region);
-  const key = `comps:${url}`;
-
-  const cached = memory.get(key) ?? ((await ext.storage.local.get(key))[key] as { at: number; comps: PriceComp[] } | undefined);
-  if (cached && Date.now() - cached.at < CACHE_MS) return { comps: cached.comps, url };
-
-  const wait = lastFetch + GAP_MS - Date.now();
-  if (wait > 0) await sleep(wait);
-  lastFetch = Date.now();
-
-  let html: string;
-  try {
-    const res = await fetch(url, { credentials: 'include', headers: { Accept: 'text/html' } });
-    html = await res.text();
-    if (!res.ok && !html.includes('s-item') && !html.includes('s-card')) {
-      return { comps: null, error: `eBay answered ${res.status}. Open ebay.com in a tab once, then try again.`, url };
+  const us = (typeof region === 'string' ? region : 'US') === 'US';
+  const searches: Array<[string, Promise<SourceResult>]> = [
+    ['ebay', ebaySold(q, region)],
+    ['poshmark', poshmarkSold(q, region)],
+  ];
+  if (us) {
+    searches.push(['mercari', tabSearch('mercari', mercariSoldUrl(q))]);
+    searches.push(['depop', tabSearch('depop', depopSearchUrl(q))]);
+  }
+  const results = await Promise.all(searches.map(([, p]) => p));
+  const sources: Record<string, number | string> = {};
+  const comps: PriceComp[] = [];
+  results.forEach((r, i) => {
+    const name = searches[i]![0];
+    if (r.comps) {
+      sources[name] = r.comps.length;
+      comps.push(...r.comps);
+    } else {
+      sources[name] = r.error ?? 'No answer.';
     }
-  } catch (err) {
-    return { comps: null, error: `Could not reach eBay: ${err instanceof Error ? err.message : String(err)}`, url };
-  }
-  if (looksLikeChallenge(html)) {
-    return { comps: null, error: 'eBay wants a quick check that you are human. Open ebay.com in a tab, then try again.', url };
-  }
-
-  const comps = parseSoldListings(html, siteForRegion(region).currency);
-  const entry = { at: Date.now(), comps };
-  memory.set(key, entry);
-  await ext.storage.local.set({ [key]: entry }).catch(() => {});
-  await pruneCache();
-  return { comps, url };
+  });
+  const ebay = results[0]!;
+  if (!comps.length && results.every(r => !r.comps)) return { comps: null, error: ebay.error, url: ebay.url, sources };
+  return { comps, url: ebay.url, sources };
 }
 
-/** Keep at most 50 cached searches. */
+/** Keep at most 80 cached searches. */
 async function pruneCache() {
   const all = await ext.storage.local.get(null);
   const keys = Object.keys(all)
     .filter(k => k.startsWith('comps:'))
     .sort((a, b) => ((all[b] as { at: number }).at ?? 0) - ((all[a] as { at: number }).at ?? 0));
-  if (keys.length > 50) await ext.storage.local.remove(keys.slice(50));
+  if (keys.length > 80) await ext.storage.local.remove(keys.slice(80));
 }

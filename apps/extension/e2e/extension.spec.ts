@@ -244,8 +244,41 @@ test.describe('linking', () => {
     expect(status).toHaveProperty('tabs');
   });
 
-  test('reads sold prices from eBay for the app', async ({ context }) => {
+  test('reads sold prices from eBay, Poshmark and Mercari, and Depop listings, for the app', async ({ context }) => {
     const searches: string[] = [];
+    const state = {
+      $_search: {
+        gridData: {
+          data: [
+            {
+              id: 'p1',
+              title: 'Gap arch hoodie brown',
+              price_amount: { val: '24.0', currency_code: 'USD' },
+              condition: 'ug',
+              size: 'M',
+              first_published_at: '2026-10-01T10:00:00-07:00',
+              inventory: { status: 'sold_out', status_changed_at: '2026-10-04T10:00:00-07:00' },
+            },
+          ],
+        },
+      },
+    };
+    await context.route('https://poshmark.com/**', route =>
+      route.fulfill({ contentType: 'text/html', body: `<html><body><script>window.__INITIAL_STATE__=${JSON.stringify(state)};</script></body></html>` }),
+    );
+    await context.route('https://www.mercari.com/**', route =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: `<html><body><div data-testid="ItemContainer" data-productid="m123" data-is-on-sale="false" data-size="M">
+          <span>SOLD</span><p data-testid="ItemName">GAP arch logo hoodie</p><span>$19.00</span><span>$25.00</span></div></body></html>`,
+      }),
+    );
+    await context.route('https://www.depop.com/**', route =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: `<html><body><ul><li><a href="/products/seller-gap-arch-hoodie-ab12/" aria-label="Gap brown hoodie"></a><p>Gap</p><p>M</p><p>$30.00</p></li></ul></body></html>`,
+      }),
+    );
     await context.route('https://www.ebay.com/**', route => {
       searches.push(route.request().url());
       return route.fulfill({
@@ -269,7 +302,13 @@ test.describe('linking', () => {
     );
     expect(reply).toMatchObject({
       request_id: 'r1',
-      comps: [{ source: 'ebay', title: 'GAP Arch Logo Hoodie Brown M', price: 21.5, currency: 'USD', url: 'https://www.ebay.com/itm/396112233445', sold: true }],
+      comps: [
+        { source: 'ebay', title: 'GAP Arch Logo Hoodie Brown M', price: 21.5, currency: 'USD', url: 'https://www.ebay.com/itm/396112233445', sold: true },
+        { source: 'poshmark', price: 24, sold: true, condition: 'good', url: 'https://poshmark.com/listing/p1' },
+        { source: 'mercari', title: 'GAP arch logo hoodie', price: 19, sold: true },
+        { source: 'depop', price: 30, sold: false },
+      ],
+      sources: { ebay: 1, poshmark: 1, mercari: 1, depop: 1 },
     });
     expect(searches).toHaveLength(1);
     expect(new URL(searches[0]!).searchParams.get('LH_Sold')).toBe('1');

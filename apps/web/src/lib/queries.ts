@@ -481,9 +481,11 @@ export interface PriceCompsResult {
 }
 
 /**
- * Check prices. When the extension is installed it first reads recent eBay
- * sold prices in this browser; the server blends those with live eBay
- * listings, the seller's own sales and the AI estimate.
+ * Check prices. When the extension is installed it first reads recent sold
+ * prices on eBay, Poshmark and Mercari and live Depop listings in this
+ * browser; the server blends those with live eBay listings, the seller's own
+ * sales and the AI estimate, and reads Poshmark itself when the extension
+ * is missing.
  */
 export function usePriceComps() {
   const qc = useQueryClient();

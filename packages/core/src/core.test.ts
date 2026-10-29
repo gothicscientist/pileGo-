@@ -8,9 +8,12 @@ import {
   compQuery,
   computeAnalytics,
   looksLikeLot,
-  positionForPrice,
-  priceAtPosition,
-  priceLadder,
+  conditionFromText,
+  parsePoshmarkSearch,
+  priceAdvice,
+  priceTiers,
+  sanitizeClientComps,
+  weightedQuantile,
   sanitizeSoldComps,
   sizesInTitle,
   trimOutliers,
@@ -35,6 +38,7 @@ import {
   toHashtag,
   type Item,
   type Listing,
+  type PriceComp,
 } from './index.ts';
 
 const baseItem = (patch: Partial<Item> = {}): Item => ({
@@ -134,7 +138,7 @@ describe('suggestPrice', () => {
     expect(s.comps_used).toBe(3);
     // Sold, asking, AI, and the euro comparable that was left out.
     expect(s.reasons.length).toBe(4);
-    expect(s.sources).toEqual({ sold: 2, asking: 1, own: 0, ai: true, dropped: 1 });
+    expect(s.sources).toEqual({ sold: 2, asking: 1, own: 0, ai: true, dropped: 1, sold_by: { ebay: 2 } });
   });
   it('discounts an AI-only estimate', () => {
     const s = suggestPrice({ currency: 'USD', condition: 'good', ai: { low: 40, high: 60, suggested: 50 } })!;
@@ -191,7 +195,7 @@ describe('comparables', () => {
       { source: 'ebay', title: 'Fleece', price: 41.5, currency: 'USD', url: null, sold: true },
     ]);
     expect(sanitizeSoldComps('nope')).toEqual([]);
-    expect(sanitizeSoldComps(Array.from({ length: 100 }, () => ({ title: 'x', price: 1, currency: 'USD' }))).length).toBe(60);
+    expect(sanitizeSoldComps(Array.from({ length: 250 }, () => ({ title: 'x', price: 1, currency: 'USD' }))).length).toBe(200);
   });
   it('keeps comparables in the same size, currency and one piece', () => {
     const c = (title: string, price: number, currency = 'USD') => ({ source: 'ebay' as const, title, price, currency, sold: true });
@@ -204,40 +208,141 @@ describe('comparables', () => {
   });
 });
 
-describe('pricing slider', () => {
+describe('price picker', () => {
   const sold = [18, 20, 22, 24, 25, 26, 28, 30, 34, 38].map((price, i) => ({ source: 'ebay' as const, title: `t${i}`, price, currency: 'USD', sold: true }));
   const s = suggestPrice({ currency: 'USD', condition: 'good', comps: sold })!;
   const rule = feeRule('depop', 'US');
 
-  it('runs from sell fast to maximize profit', () => {
-    const ladder = priceLadder(s, 7, [{ id: 'depop', rule }]);
-    expect(ladder[0]!.price).toBe(s.quick);
-    expect(ladder[3]!.price).toBe(s.suggested);
-    expect(ladder[6]!.price).toBe(s.max);
-    for (let i = 1; i < ladder.length; i++) {
-      expect(ladder[i]!.price).toBeGreaterThanOrEqual(ladder[i - 1]!.price);
-      expect(ladder[i]!.percentile).toBeGreaterThanOrEqual(ladder[i - 1]!.percentile);
-      expect(ladder[i]!.take_home[0]!.keep).toBeGreaterThanOrEqual(ladder[i - 1]!.take_home[0]!.keep);
-    }
-    expect(ladder[0]!.speed).toBe('fast');
-    expect(['slow', 'stretch']).toContain(ladder[6]!.speed);
-    expect(ladder[0]!.rough).toBe(false);
+  it('offers three prices in order, from what sold', () => {
+    const t = priceTiers(s);
+    expect(t.likely).toBeLessThan(t.balanced);
+    expect(t.balanced).toBeLessThan(t.less_likely);
+    expect(t.balanced).toBe(s.suggested);
+    expect(t.likely).toBeGreaterThanOrEqual(18);
+    expect(t.less_likely).toBeLessThanOrEqual(38);
   });
-  it('round-trips a price to a position', () => {
-    expect(priceAtPosition(s, positionForPrice(s, s.suggested))).toBe(s.suggested);
-    expect(positionForPrice(s, 0)).toBe(0);
-    expect(positionForPrice(s, 10_000)).toBe(1);
+  it('says when a typed price is high, with the price to come down to', () => {
+    const t = priceTiers(s);
+    const high = priceAdvice(s, t.less_likely + 10, [{ id: 'depop', rule }]);
+    expect(high.tone).toBe('high');
+    expect(high.target).toBe(t.less_likely);
+    expect(high.text).toContain(`${t.less_likely}`);
+    expect(high.take_home[0]!.keep).toBeLessThan(t.less_likely + 10);
+    expect(priceAdvice(s, t.balanced).tone).toBe('fair');
+    expect(priceAdvice(s, t.likely).tone).toBe('fast');
+    expect(priceAdvice(s, 5).tone).toBe('low');
+    expect(priceAdvice(s, t.less_likely).tone).toBe('slow');
   });
-  it('calls time estimates rough without sold prices, and handles old suggestions', () => {
-    const old = { suggested: 48, low: 38, high: 60, currency: 'USD', confidence: 'medium' as const, reasons: [], comps_used: 11, computed_at: '' };
-    const ladder = priceLadder(old, 3);
-    expect(ladder.map(p => p.price)).toEqual([38, 48, 60]);
-    expect(ladder.every(p => p.rough)).toBe(true);
+  it('derives the cards for suggestions saved before the picker', () => {
+    const old = { suggested: 48, low: 38, high: 60, quick: 34, currency: 'USD', confidence: 'medium' as const, reasons: [], comps_used: 11, computed_at: '' };
+    expect(priceTiers(old)).toEqual({ likely: 34, balanced: 48, less_likely: 60 });
   });
   it('drops the price for stale listings', () => {
     const fresh = suggestPrice({ currency: 'USD', condition: 'good', ai: { low: 80, high: 120, suggested: 100 } })!;
     const stale = suggestPrice({ currency: 'USD', condition: 'good', ai: { low: 80, high: 120, suggested: 100 }, days_listed: 75 })!;
     expect(stale.suggested).toBeLessThan(fresh.suggested);
+  });
+});
+
+describe('weighing comparables', () => {
+  const now = new Date('2026-10-29T00:00:00Z');
+  const comp = (title: string, price: number, extra: Partial<PriceComp> = {}): PriceComp => ({ source: 'poshmark', title, price, currency: 'USD', sold: true, ...extra });
+
+  it('takes a weighted quantile', () => {
+    const pts = [10, 20, 30].map(price => ({ price, weight: 1 }));
+    expect(weightedQuantile(pts, 0.5)).toBe(20);
+    expect(weightedQuantile([{ price: 10, weight: 1 }, { price: 30, weight: 3 }], 0.5)).toBeGreaterThan(20);
+    expect(weightedQuantile([], 0.5)).toBeNull();
+  });
+  it('leans toward comparables with the same words', () => {
+    const comps = [
+      ...[60, 62, 64].map((p, i) => comp(`Patagonia Better Sweater fleece jacket ${i}`, p)),
+      ...[20, 22, 24, 26].map((p, i) => comp(`Patagonia tee shirt ${i}`, p)),
+    ];
+    const s = suggestPrice({ currency: 'USD', condition: null, comps, item: { title: 'Better Sweater fleece', brand: 'Patagonia' }, now })!;
+    expect(s.suggested).toBeGreaterThan(50);
+  });
+  it('moves prices toward this item’s condition and counts recent sales more', () => {
+    const nwt = Array.from({ length: 6 }, (_, i) => comp(`hoodie ${i}`, 40, { condition: 'new_with_tags' }));
+    const asNew = suggestPrice({ currency: 'USD', condition: 'new_with_tags', comps: nwt, now })!;
+    const asFair = suggestPrice({ currency: 'USD', condition: 'fair', comps: nwt, now })!;
+    expect(asFair.suggested).toBeLessThan(asNew.suggested);
+    const mixed = [
+      ...[50, 52, 54].map((p, i) => comp(`a${i}`, p, { sold_at: '2026-10-20T00:00:00Z' })),
+      ...[20, 22, 24].map((p, i) => comp(`b${i}`, p, { sold_at: '2023-01-01T00:00:00Z' })),
+    ];
+    expect(suggestPrice({ currency: 'USD', condition: null, comps: mixed, now })!.suggested).toBeGreaterThan(37);
+  });
+  it('says how long similar pieces took to sell', () => {
+    const comps = [2, 4, 6, 8].map((d, i) =>
+      comp(`x${i}`, 30, { listed_at: '2026-10-01T00:00:00Z', sold_at: new Date(Date.UTC(2026, 9, 1 + d)).toISOString() }),
+    );
+    expect(suggestPrice({ currency: 'USD', condition: null, comps, now })!.days_to_sell).toBe(5);
+  });
+});
+
+describe('comparables from marketplaces', () => {
+  it('reads Poshmark’s search state', () => {
+    const state = {
+      $_search: {
+        gridData: {
+          data: [
+            {
+              id: 'abc123',
+              title: 'Levi’s 501  Jeans',
+              price_amount: { val: '35.0', currency_code: 'USD' },
+              condition: 'uln',
+              size: '32',
+              first_published_at: '2026-10-01T10:00:00-07:00',
+              inventory: { status: 'sold_out', status_changed_at: '2026-10-05T10:00:00-07:00' },
+            },
+            { id: 'def', title: 'Live one', price_amount: { val: '20', currency_code: 'USD' }, inventory: { status: 'available' } },
+            { id: 'bad', title: 'No price', price_amount: {} },
+          ],
+        },
+      },
+    };
+    const html = `<script>window.__INITIAL_STATE__=${JSON.stringify(state).replace('Jeans', 'Jeans \\"}{'
+    )};(function(){var s;}());</script>`;
+    const comps = parsePoshmarkSearch(html);
+    expect(comps).toHaveLength(2);
+    expect(comps[0]).toMatchObject({
+      source: 'poshmark',
+      price: 35,
+      sold: true,
+      condition: 'excellent',
+      size: '32',
+      url: 'https://poshmark.com/listing/abc123',
+      sold_at: '2026-10-05T17:00:00.000Z',
+    });
+    expect(comps[0]!.title).toContain('"}{');
+    expect(comps[1]).toMatchObject({ sold: false, sold_at: null });
+    expect(parsePoshmarkSearch('<html>captcha</html>')).toEqual([]);
+  });
+  it('maps marketplaces’ condition words', () => {
+    expect(conditionFromText('New with tags')).toBe('new_with_tags');
+    expect(conditionFromText('New (Other)')).toBe('new_without_tags');
+    expect(conditionFromText('Pre-owned - Excellent')).toBe('excellent');
+    expect(conditionFromText('Pre-Owned')).toBe('good');
+    expect(conditionFromText('Pre-owned - Fair')).toBe('fair');
+    expect(conditionFromText('')).toBeNull();
+  });
+  it('checks comparables from every marketplace the extension reads', () => {
+    const out = sanitizeClientComps([
+      { source: 'poshmark', title: 'A', price: 30, currency: 'USD', url: 'https://poshmark.com/listing/1', sold: true, sold_at: '2026-10-01T00:00:00Z', condition: 'good', size: 'M' },
+      { source: 'mercari', title: 'B', price: 25, currency: 'USD', url: 'https://www.mercari.com/us/item/m1/', sold: true },
+      { source: 'depop', title: 'C', price: 40, currency: 'USD', url: 'https://www.depop.com/products/x/', sold: true },
+      { source: 'grailed', title: 'D', price: 40, currency: 'USD' },
+      { source: 'poshmark', title: 'E', price: 30, currency: 'USD', url: 'https://evil.example/', condition: 'mint', sold_at: 'yesterday' },
+    ]);
+    expect(out.map(c => [c.source, c.sold])).toEqual([
+      ['poshmark', true],
+      ['mercari', true],
+      ['depop', false],
+      ['poshmark', true],
+    ]);
+    expect(out[0]).toMatchObject({ condition: 'good', size: 'M', sold_at: '2026-10-01T00:00:00.000Z' });
+    expect(out[3]).toEqual({ source: 'poshmark', title: 'E', price: 30, currency: 'USD', url: null, sold: true });
   });
 });
 

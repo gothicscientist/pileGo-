@@ -5,6 +5,7 @@ export * from './conditions.ts';
 export * from './taxonomy.ts';
 export * from './text.ts';
 export * from './pricing.ts';
+export * from './comps.ts';
 export * from './listing.ts';
 export * from './analytics.ts';
 export * from './sku.ts';
