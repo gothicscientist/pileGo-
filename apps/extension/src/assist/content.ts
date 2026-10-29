@@ -6,6 +6,7 @@
 import { MARKETPLACES, type MarketplaceId } from '@pilego/core';
 import { ext, fromBase64, send, sleep } from '../shared/browser.ts';
 import type { AssistProgress, AssistReport, AssistRequest, FillResult, ListingWork } from '../shared/messages.ts';
+import { readComps } from './comps.ts';
 import { fillDepop } from './depop.ts';
 import { waitFor } from './dom.ts';
 import { Stopped, type Driver, type DriverContext } from './driver.ts';
@@ -345,6 +346,15 @@ ext.runtime.onMessage.addListener((msg: AssistRequest, _sender, reply) => {
     startRemoval(msg.work, msg.reason);
     reply({ ok: true });
     return false;
+  }
+  if (msg.type === 'assist:comps') {
+    // A search the background opened to read prices: wait for the cards to draw.
+    const market = msg.market;
+    waitFor(() => readComps(document, market).length > 0, 15_000)
+      // The first cards draw before the rest.
+      .then(() => sleep(1500))
+      .then(() => reply({ comps: readComps(document, market) }));
+    return true;
   }
   startFill(msg.work).then(
     r => reply(r),

@@ -229,9 +229,10 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
       const sold = [32, 35, 38, 40, 42, 44, 45, 48, 52, 58];
       return json(route, {
         suggestion: {
-          suggested: 44, low: 38, high: 48, quick: 34, max: 56, currency: 'USD', confidence: 'high',
-          reasons: ['10 similar pieces sold for a median of 43 USD.'], comps_used: 10, computed_at: daysAgo(0),
-          sold_prices: sold, asking_prices: [], sources: { sold: 10, asking: 0, own: 0, ai: false, dropped: 2 },
+          suggested: 44, low: 38, high: 52, quick: 34, max: 56, currency: 'USD', confidence: 'high',
+          tiers: { likely: 38, balanced: 44, less_likely: 52 }, days_to_sell: 9,
+          reasons: ['10 similar pieces sold (6 on eBay, 4 on Poshmark). The middle is 44 USD.'], comps_used: 10, computed_at: daysAgo(0),
+          sold_prices: sold, asking_prices: [], sources: { sold: 10, asking: 0, own: 0, ai: false, dropped: 2, sold_by: { ebay: 6, poshmark: 4 } },
         },
         comps: sold.map((price, i) => ({ source: 'ebay', title: `Levi's 501 jeans W32 #${i}`, price, currency: 'USD', url: `https://www.ebay.com/itm/${i}`, sold: true })),
         sources: { ebay_configured: false, asking: 0, sold: 10, own_sales: 0, notes: ['eBay is not connected on this server yet, so live eBay listings are not included.'] },

@@ -98,12 +98,12 @@ export function askExtensionToImport(marketplace: string) {
 }
 
 /**
- * Ask the extension for recent eBay sold prices for `query`. It reads eBay's
- * sold search in the seller's own browser, which eBay does not offer the
- * server. Resolves null when the extension is not installed, cannot answer,
- * or takes longer than `timeoutMs`.
+ * Ask the extension for comparables for `query`: recent sold prices on eBay,
+ * Poshmark and Mercari and live Depop listings, read in the seller's own
+ * browser, which those sites do not offer the server. Resolves null when the
+ * extension is not installed, cannot answer, or takes longer than `timeoutMs`.
  */
-export function fetchSoldComps(query: string, region: string, timeoutMs = 20_000): Promise<PriceComp[] | null> {
+export function fetchSoldComps(query: string, region: string, timeoutMs = 60_000): Promise<PriceComp[] | null> {
   if (typeof window === 'undefined' || !latest.installed || !query.trim()) return Promise.resolve(null);
   const request_id = crypto.randomUUID();
   return new Promise(resolve => {

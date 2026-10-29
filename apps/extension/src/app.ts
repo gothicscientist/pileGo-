@@ -24,12 +24,13 @@ function onAppMessage(event: MessageEvent) {
   if (type === 'sold-comps') {
     // Answered by request id, since several can be in flight at once.
     const requestId = (payload as { request_id?: unknown }).request_id;
-    void send<{ comps?: unknown; error?: string; url?: string }>({ type: 'app:sold-comps', payload }).then(r =>
+    void send<{ comps?: unknown; error?: string; url?: string; sources?: unknown }>({ type: 'app:sold-comps', payload }).then(r =>
       post('sold-comps', {
         request_id: requestId,
         comps: r?.comps ?? null,
         error: r ? r.error : 'The extension was restarting. Try again.',
         url: r?.url,
+        sources: r?.sources ?? null,
       }),
     );
     return;

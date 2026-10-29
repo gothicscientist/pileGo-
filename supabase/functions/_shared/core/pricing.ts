@@ -2,7 +2,7 @@
 import { MARKETPLACES, type FeeRule } from './marketplaces.ts';
 import { findSubcategory } from './taxonomy.ts';
 import { roundPrice } from './text.ts';
-import type { Condition, Item, MarketplaceId, PriceComp, PriceSuggestion, Profile } from './types.ts';
+import type { Condition, Item, MarketplaceId, PriceComp, PriceSuggestion, PriceTiers, Profile } from './types.ts';
 
 type Region = Profile['region'];
 type Overrides = Profile['fee_overrides'];
@@ -209,13 +209,22 @@ export interface CleanedComps {
   sold: number[];
   /** Asking prices of live listings, sorted. */
   asking: number[];
+  /** The sold comparables kept, in the order given. */
+  soldComps: PriceComp[];
+  /** The live listings kept, in the order given. */
+  askingComps: PriceComp[];
   dropped: number;
+}
+
+function compSizes(c: PriceComp): string[] {
+  const own = normLetterSize(c.size);
+  return own ? [own] : sizesInTitle(c.title ?? '');
 }
 
 /**
  * Keep the comparables that say something about this piece: the seller's
  * currency, one piece rather than a bundle, the same letter size when the
- * title names one, and nothing wildly off the rest.
+ * listing names one, and nothing wildly off the rest.
  */
 export function cleanComps(comps: PriceComp[], opts: { currency: string; size?: string | null }): CleanedComps {
   const want = normLetterSize(opts.size);
@@ -223,36 +232,204 @@ export function cleanComps(comps: PriceComp[], opts: { currency: string; size?: 
   let kept = usable;
   if (want) {
     const sameSize = usable.filter(c => {
-      const sizes = sizesInTitle(c.title ?? '');
+      const sizes = compSizes(c);
       return !sizes.length || sizes.includes(want);
     });
     // A size filter that leaves almost nothing is worse than none.
     if (sameSize.length >= Math.min(3, usable.length)) kept = sameSize;
   }
-  const sold = trimOutliers(kept.filter(c => c.sold).map(c => c.price));
-  const asking = trimOutliers(kept.filter(c => !c.sold).map(c => c.price));
-  return { sold, asking, dropped: comps.length - sold.length - asking.length };
+  const inRange = (list: PriceComp[]) => {
+    const prices = trimOutliers(list.map(c => c.price));
+    const lo = prices[0] ?? 0;
+    const hi = prices.at(-1) ?? 0;
+    return list.filter(c => c.price >= lo && c.price <= hi);
+  };
+  const soldComps = inRange(kept.filter(c => c.sold));
+  const askingComps = inRange(kept.filter(c => !c.sold));
+  const sorted = (list: PriceComp[]) => list.map(c => c.price).sort((a, b) => a - b);
+  return {
+    sold: sorted(soldComps),
+    asking: sorted(askingComps),
+    soldComps,
+    askingComps,
+    dropped: comps.length - soldComps.length - askingComps.length,
+  };
+}
+
+const CONDITIONS: Condition[] = ['new_with_tags', 'new_without_tags', 'excellent', 'good', 'fair'];
+const COMP_SOURCES: Partial<Record<PriceComp['source'], { url: RegExp; sold: boolean | null }>> = {
+  ebay: { url: /^https:\/\/www\.ebay\.[a-z.]{2,8}\//, sold: true },
+  poshmark: { url: /^https:\/\/poshmark\.(com|ca)\//, sold: null },
+  mercari: { url: /^https:\/\/www\.mercari\.com\//, sold: null },
+  // Depop's search shows live listings only.
+  depop: { url: /^https:\/\/www\.depop\.com\//, sold: false },
+};
+
+function dateOrNull(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length > 40) return null;
+  const t = Date.parse(value);
+  return Number.isFinite(t) ? new Date(t).toISOString() : null;
 }
 
 /**
- * eBay sold prices the extension read in the seller's browser. They arrive
- * from outside the server, so every field is checked: at most 60, a real
- * price under 10,000, a currency code, a title and only eBay links.
+ * Comparables the extension read in the seller's browser: sold prices from
+ * eBay, Poshmark and Mercari, live asking prices from Depop. They arrive from
+ * outside the server, so every field is checked: at most 200, a known
+ * marketplace, a real price under 10,000, a currency code, a title, links
+ * only to that marketplace, and dates and conditions that parse. Comparables
+ * with no source are eBay sales, as older extensions sent them.
  */
-export function sanitizeSoldComps(raw: unknown): PriceComp[] {
+export function sanitizeClientComps(raw: unknown): PriceComp[] {
   if (!Array.isArray(raw)) return [];
   const out: PriceComp[] = [];
-  for (const c of raw.slice(0, 60)) {
+  for (const c of raw.slice(0, 200)) {
     if (!c || typeof c !== 'object') continue;
     const r = c as Record<string, unknown>;
+    const source = (r.source === undefined ? 'ebay' : r.source) as PriceComp['source'];
+    const rule = typeof source === 'string' ? COMP_SOURCES[source] : undefined;
+    if (!rule) continue;
     const price = typeof r.price === 'number' ? r.price : Number(r.price);
     const currency = typeof r.currency === 'string' ? r.currency.toUpperCase() : '';
     const title = typeof r.title === 'string' ? r.title.trim().slice(0, 200) : '';
-    const url = typeof r.url === 'string' && /^https:\/\/www\.ebay\.[a-z.]{2,8}\//.test(r.url) ? r.url.slice(0, 500) : null;
+    const url = typeof r.url === 'string' && rule.url.test(r.url) ? r.url.slice(0, 500) : null;
     if (!Number.isFinite(price) || price <= 0 || price >= 10_000 || !/^[A-Z]{3}$/.test(currency) || !title) continue;
-    out.push({ source: 'ebay', title, price: round2(price), currency, url, sold: true });
+    const sold = rule.sold ?? r.sold !== false;
+    const comp: PriceComp = { source, title, price: round2(price), currency, url, sold };
+    const soldAt = sold ? dateOrNull(r.sold_at) : null;
+    const listedAt = dateOrNull(r.listed_at);
+    if (soldAt) comp.sold_at = soldAt;
+    if (listedAt) comp.listed_at = listedAt;
+    if (CONDITIONS.includes(r.condition as Condition)) comp.condition = r.condition as Condition;
+    if (typeof r.size === 'string' && r.size.trim()) comp.size = r.size.trim().slice(0, 20);
+    out.push(comp);
   }
   return out;
+}
+
+/** @deprecated Use sanitizeClientComps. */
+export const sanitizeSoldComps = sanitizeClientComps;
+
+// ---------------------------------------------------------------------------
+// Weighing comparables
+// ---------------------------------------------------------------------------
+
+/**
+ * What each condition is worth next to "excellent", from the median price by
+ * condition within the same search across 87 Poshmark searches (see
+ * docs/pricing.md). A comparable's price is moved part of the way toward this
+ * item's condition.
+ */
+export const CONDITION_VALUE: Record<Condition, number> = {
+  new_with_tags: 1.3,
+  new_without_tags: 1.05,
+  excellent: 1,
+  good: 0.91,
+  fair: 0.7,
+};
+/** How far a comparable's price moves toward this item's condition, 0 to 1. */
+export const CONDITION_ADJUST = 0.75;
+/** A sale this many days old counts half as much as one today. */
+export const RECENCY_HALF_LIFE_DAYS = 180;
+const RECENCY_FLOOR = 0.2;
+const SIMILARITY_BASE = 0.05;
+const SIMILARITY_POWER = 4;
+
+/** Where the three picker prices sit among similar sales, weighted. */
+export const TIER_QUANTILES = { likely: 0.2, balanced: 0.5, less_likely: 0.75 } as const;
+/**
+ * The tiers as a share of the balanced price when there are too few sales to
+ * read them from: the median spread across the calibration searches.
+ */
+export const TIER_SPREAD = { likely: 0.8, less_likely: 1.2 } as const;
+
+function words(text: string): Set<string> {
+  const out = new Set<string>();
+  for (const raw of text.toLowerCase().replace(/[’`]/g, "'").split(/[^a-z0-9']+/)) {
+    const w = raw.replace(/^'+|'+$/g, '').replace(/'s$/, '');
+    if (w.length > 1 && !GENERIC_WORDS.has(w)) out.add(w);
+  }
+  return out;
+}
+
+/** The words that describe the item, to compare with comparables' titles. */
+export function itemWords(item: Partial<CompItem> | null | undefined): Set<string> {
+  if (!item) return new Set();
+  const sub = item.category ? findSubcategory(item.category, item.subcategory ?? null) : null;
+  return words([item.brand, item.title, sub?.label].filter(Boolean).join(' '));
+}
+
+/** Share of the item's words a comparable's title has, 0 to 1. */
+export function titleOverlap(mine: Set<string>, title: string): number {
+  if (!mine.size) return 1;
+  const theirs = words(title);
+  let hit = 0;
+  for (const w of mine) if (theirs.has(w)) hit++;
+  return hit / mine.size;
+}
+
+export interface WeighedComp {
+  comp: PriceComp;
+  /** Its price moved toward this item's condition. */
+  price: number;
+  weight: number;
+}
+
+/**
+ * Weigh sold comparables by how alike their titles are to this item and how
+ * recently they sold, and move each price toward this item's condition.
+ */
+export function weighComps(
+  comps: PriceComp[],
+  opts: { words?: Set<string>; condition?: Condition | null; now?: Date },
+): WeighedComp[] {
+  const now = (opts.now ?? new Date()).getTime();
+  const mine = opts.words ?? new Set<string>();
+  return comps.map(comp => {
+    let weight = 1;
+    let price = comp.price;
+    const soldAt = comp.sold_at ? Date.parse(comp.sold_at) : NaN;
+    if (Number.isFinite(soldAt)) {
+      const days = Math.max(0, (now - soldAt) / 86400_000);
+      weight *= Math.max(RECENCY_FLOOR, 0.5 ** (days / RECENCY_HALF_LIFE_DAYS));
+    }
+    if (mine.size) weight *= (SIMILARITY_BASE + titleOverlap(mine, comp.title ?? '')) ** SIMILARITY_POWER;
+    if (opts.condition && comp.condition && comp.condition !== opts.condition) {
+      price *= (CONDITION_VALUE[opts.condition] / CONDITION_VALUE[comp.condition]) ** CONDITION_ADJUST;
+    }
+    return { comp, price, weight };
+  });
+}
+
+/**
+ * The weighted quantile q (0 to 1) of `values`: each point sits at the middle
+ * of its weight, with straight lines between points.
+ */
+export function weightedQuantile(points: Array<{ price: number; weight: number }>, q: number): number | null {
+  const pts = points.filter(p => Number.isFinite(p.price) && p.price > 0 && p.weight > 0).sort((a, b) => a.price - b.price);
+  if (!pts.length) return null;
+  const total = pts.reduce((s, p) => s + p.weight, 0);
+  let acc = 0;
+  const at = pts.map(p => {
+    const mid = (acc + p.weight / 2) / total;
+    acc += p.weight;
+    return mid;
+  });
+  if (q <= at[0]!) return pts[0]!.price;
+  if (q >= at.at(-1)!) return pts.at(-1)!.price;
+  for (let i = 1; i < pts.length; i++) {
+    if (q <= at[i]!) {
+      const t = (q - at[i - 1]!) / (at[i]! - at[i - 1]!);
+      return pts[i - 1]!.price + t * (pts[i]!.price - pts[i - 1]!.price);
+    }
+  }
+  return pts.at(-1)!.price;
+}
+
+/** Effective number of comparables once weights are counted (Kish). */
+function effectiveCount(points: Array<{ weight: number }>): number {
+  const s = points.reduce((a, p) => a + p.weight, 0);
+  const s2 = points.reduce((a, p) => a + p.weight * p.weight, 0);
+  return s2 > 0 ? (s * s) / s2 : 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -277,53 +454,64 @@ export interface SuggestInput {
   own_sales?: number[];
   /** The item's size, to leave out comparables in other sizes. */
   size?: string | null;
+  /** The item, to weigh comparables by how alike their titles are. */
+  item?: Partial<CompItem> | null;
   /** Listed this many days without selling. */
   days_listed?: number;
   now?: Date;
 }
 
 /**
- * Blend comparable listings, the seller's own history and the AI estimate
- * into one asking price, a realistic range, and the two ends of the pricing
- * slider. Sold prices count most and asking prices are discounted. The AI
- * estimate is a weak prior: discounted, and nearly ignored once there is
- * market data.
+ * Price an item the way an appraiser prices a house: from comparable sales.
+ * Each sold comparable is weighed by how alike its title is and how recently
+ * it sold, and its price is moved toward this item's condition. The weighted
+ * median is the balanced price; the weighted quartiles are the likely-to-sell
+ * and less-likely prices. Live asking prices (discounted), the seller's own
+ * sales and the photo scan's guess are blended in, the scan counting for
+ * little once there is market data.
  */
 export function suggestPrice(input: SuggestInput): PriceSuggestion | null {
   const reasons: string[] = [];
-  const weighted: Array<{ value: number; weight: number }> = [];
+  const blend: Array<{ value: number; weight: number }> = [];
   const cur = input.currency;
+  const now = input.now ?? new Date();
 
-  const { sold, asking, dropped } = cleanComps(input.comps ?? [], { currency: cur, size: input.size });
+  const { sold, asking, soldComps, askingComps, dropped } = cleanComps(input.comps ?? [], { currency: cur, size: input.size });
   const own = trimOutliers(input.own_sales ?? []);
-  // Sold prices from the extension and the seller's own sales are not filtered
-  // by condition, so the extremes get a nudge.
-  const conditionFactor = input.condition === 'new_with_tags' ? 1.1 : input.condition === 'fair' ? 0.85 : 1;
+  const mine = itemWords(input.item);
+  const weighed = weighComps(soldComps, { words: mine, condition: input.condition, now });
+  // Comparables without a condition of their own get the old nudge at the extremes.
+  const nudge = input.condition === 'new_with_tags' ? 1.1 : input.condition === 'fair' ? 0.85 : 1;
+  for (const w of weighed) if (!w.comp.condition) w.price *= nudge;
+  const effective = effectiveCount(weighed);
 
-  const soldMedian = median(sold);
-  if (soldMedian != null) {
-    weighted.push({ value: soldMedian * conditionFactor, weight: Math.min(4, 1 + sold.length / 3) });
-    reasons.push(`${sold.length} similar ${sold.length === 1 ? 'piece' : 'pieces'} sold for a median of ${fmt(soldMedian)} ${cur}.`);
+  const soldCenter = weightedQuantile(weighed, 0.5);
+  if (soldCenter != null) {
+    blend.push({ value: soldCenter, weight: Math.min(5, 1 + effective / 3) });
+    const where = soldBySource(soldComps);
+    reasons.push(
+      `${sold.length} similar ${sold.length === 1 ? 'piece' : 'pieces'} sold${where ? ` (${where})` : ''}. Weighed by how alike and how recent they are, and adjusted for condition, the middle is ${fmt(soldCenter)} ${cur}.`,
+    );
   }
 
-  const askingMedian = median(asking);
-  if (askingMedian != null) {
-    weighted.push({ value: askingMedian * ASKING_DISCOUNT, weight: Math.min(1.5, 0.4 + asking.length / 10) });
+  const askingCenter = weightedQuantile(weighComps(askingComps, { words: mine, condition: input.condition, now }), 0.5);
+  if (askingCenter != null) {
+    blend.push({ value: askingCenter * ASKING_DISCOUNT, weight: Math.min(1.5, 0.4 + asking.length / 10) });
     reasons.push(
-      `${asking.length} similar ${asking.length === 1 ? 'listing is' : 'listings are'} asking a median of ${fmt(askingMedian)} ${cur}. Asking prices run about 15% above what sells.`,
+      `${asking.length} similar ${asking.length === 1 ? 'listing is' : 'listings are'} asking around ${fmt(askingCenter)} ${cur}. Asking prices run about 15% above what sells.`,
     );
   }
 
   const ownMedian = median(own);
   if (ownMedian != null) {
-    weighted.push({ value: ownMedian, weight: Math.min(2, 0.75 + own.length / 4) });
+    blend.push({ value: ownMedian, weight: Math.min(2, 0.75 + own.length / 4) });
     reasons.push(`You sold ${own.length} similar ${own.length === 1 ? 'piece' : 'pieces'} for a median of ${fmt(ownMedian)} ${cur}.`);
   }
 
-  const market = weighted.length > 0;
+  const market = blend.length > 0;
   const ai = input.ai && input.ai.suggested > 0 ? input.ai : null;
   if (ai) {
-    weighted.push({ value: ai.suggested * AI_DISCOUNT, weight: market ? 0.3 : 1 });
+    blend.push({ value: ai.suggested * AI_DISCOUNT, weight: market ? 0.3 : 1 });
     reasons.push(
       market
         ? `The photo scan guessed ${fmt(ai.low)} to ${fmt(ai.high)} ${cur}. It counts for little next to market prices.`
@@ -336,10 +524,10 @@ export function suggestPrice(input: SuggestInput): PriceSuggestion | null {
     );
   }
 
-  if (!weighted.length) return null;
+  if (!blend.length) return null;
 
-  const total = weighted.reduce((s, w) => s + w.weight, 0);
-  let suggested = weighted.reduce((s, w) => s + w.value * w.weight, 0) / total;
+  const total = blend.reduce((s, w) => s + w.weight, 0);
+  let suggested = blend.reduce((s, w) => s + w.value * w.weight, 0) / total;
 
   let stale = 1;
   if ((input.days_listed ?? 0) >= 60) {
@@ -351,113 +539,131 @@ export function suggestPrice(input: SuggestInput): PriceSuggestion | null {
   }
   suggested *= stale;
 
-  // The realistic range comes from sold prices, or from discounted asking
-  // prices and the seller's sales when too little has sold.
-  const spread = sold.length >= 3 ? sold : [...sold, ...asking.map(v => v * ASKING_DISCOUNT), ...own];
-  let low: number;
-  let high: number;
-  let quick: number;
-  let max: number;
-  if (spread.length >= 3) {
-    low = quantile(spread, 0.25) * stale;
-    high = quantile(spread, 0.75) * stale;
-    quick = quantile(spread, 0.1) * stale;
-    // Above most live listings, buyers go elsewhere.
-    const askTop = asking.length >= 3 ? quantile(asking, 0.75) : Infinity;
-    max = Math.min(quantile(spread, 0.9) * 1.05, askTop) * stale;
-  } else if (ai && !market) {
-    low = ai.low * AI_DISCOUNT * stale;
-    high = ai.high * AI_DISCOUNT * stale;
-    quick = low * 0.9;
-    max = high;
-  } else {
-    low = suggested * 0.85;
-    high = suggested * 1.15;
-    quick = suggested * 0.75;
-    max = suggested * 1.3;
-  }
+  // The spread of what sells, as shares of the middle. Read from sold prices
+  // when there are enough; else from discounted asking prices and the
+  // seller's own sales; else the typical spread.
+  const spreadPoints =
+    effective >= 3
+      ? weighed
+      : [
+          ...weighed,
+          ...askingComps.map(c => ({ price: c.price * ASKING_DISCOUNT, weight: 0.5 })),
+          ...own.map(price => ({ price, weight: 1 })),
+        ];
+  const mid = weightedQuantile(spreadPoints, 0.5);
+  const share = (q: number) => {
+    const v = weightedQuantile(spreadPoints, q);
+    return v != null && mid ? v / mid : null;
+  };
+  const enough = spreadPoints.length >= 3;
+  const aiOnly = ai && !market;
+  const ratio = {
+    quick: (enough && share(0.1)) || (aiOnly ? (ai.low / ai.suggested) * 0.9 : 0.7),
+    likely: (enough && share(TIER_QUANTILES.likely)) || (aiOnly ? ai.low / ai.suggested : TIER_SPREAD.likely),
+    less: (enough && share(TIER_QUANTILES.less_likely)) || (aiOnly ? ai.high / ai.suggested : TIER_SPREAD.less_likely),
+    max: (enough && share(0.9)) || (aiOnly ? ai.high / ai.suggested : 1.35),
+  };
+  // Keep the cards apart and sane however lumpy the comparables are.
+  const likelyShare = clamp(ratio.likely, 0.6, 0.94);
+  const lessShare = clamp(ratio.less, 1.06, 1.6);
+  // Above most live listings, buyers go elsewhere.
+  const askTop = asking.length >= 3 ? (quantile(asking, 0.75) * stale) / suggested : Infinity;
 
   const evidence = sold.length + asking.length + own.length;
   const confidence: PriceSuggestion['confidence'] =
-    sold.length >= 5 || evidence >= 12 ? 'high' : evidence >= 4 ? 'medium' : 'low';
+    effective >= 6 || (sold.length >= 5 && evidence >= 12) ? 'high' : evidence >= 4 ? 'medium' : 'low';
 
   const r = (v: number) => roundPrice(Math.max(v, 0.5));
-  const s = r(suggested);
-  const lowR = Math.min(r(low), s);
-  const highR = Math.max(r(high), s);
+  const balanced = r(suggested);
+  const likely = Math.min(r(suggested * likelyShare), Math.max(balanced - step(balanced), 0.5));
+  const lessLikely = Math.max(r(suggested * Math.min(lessShare, Math.max(askTop, 1.06))), balanced + step(balanced));
+
+  const days = daysToSell(soldComps);
+  if (days != null) reasons.push(`Similar pieces that sold took a median of ${days} ${days === 1 ? 'day' : 'days'} to sell.`);
 
   return {
-    suggested: s,
-    low: lowR,
-    high: highR,
-    quick: Math.min(r(quick), lowR),
-    max: Math.max(r(max), highR),
+    suggested: balanced,
+    low: likely,
+    high: lessLikely,
+    quick: Math.min(r(suggested * clamp(ratio.quick, 0.45, 0.9)), likely),
+    max: Math.max(r(suggested * Math.min(clamp(ratio.max, 1.1, 2), Math.max(askTop * 1.05, 1.1))), lessLikely),
+    tiers: { likely, balanced, less_likely: lessLikely },
     currency: cur,
     confidence,
     reasons,
     comps_used: evidence,
-    computed_at: (input.now ?? new Date()).toISOString(),
-    sold_prices: sold.slice(0, 60).map(round2),
+    computed_at: now.toISOString(),
+    sold_prices: sold.slice(0, 120).map(round2),
     asking_prices: asking.slice(0, 60).map(round2),
-    sources: { sold: sold.length, asking: asking.length, own: own.length, ai: Boolean(ai), dropped },
+    days_to_sell: days,
+    sources: {
+      sold: sold.length,
+      asking: asking.length,
+      own: own.length,
+      ai: Boolean(ai),
+      dropped,
+      sold_by: countBy(soldComps.map(c => c.source)),
+    },
   };
 }
 
+/** The smallest price step that still reads as a different price. */
+function step(price: number): number {
+  return price < 10 ? 0.5 : price < 100 ? 1 : 5;
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, v));
+}
+
+function countBy(values: string[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const v of values) out[v] = (out[v] ?? 0) + 1;
+  return out;
+}
+
+function soldBySource(comps: PriceComp[]): string {
+  const counts = countBy(comps.map(c => c.source));
+  const names: Record<string, string> = { ebay: 'eBay', poshmark: 'Poshmark' };
+  const parts = Object.entries(counts).map(([k, n]) => `${n} on ${names[k] ?? k}`);
+  return parts.length > 1 ? parts.join(', ') : '';
+}
+
+/** Median days from listing to sale among sold comparables that give both dates. */
+export function daysToSell(comps: PriceComp[]): number | null {
+  const days = comps
+    .map(c => (c.sold_at && c.listed_at ? (Date.parse(c.sold_at) - Date.parse(c.listed_at)) / 86400_000 : NaN))
+    .filter(d => Number.isFinite(d) && d >= 0 && d < 3 * 365);
+  if (days.length < 3) return null;
+  return Math.max(1, Math.round(median(days)!));
+}
+
 // ---------------------------------------------------------------------------
-// The pricing slider: sell fast ↔ maximize profit
+// The price picker: likely to sell, balanced, less likely
 // ---------------------------------------------------------------------------
 
-export type SellSpeed = 'fast' | 'steady' | 'slow' | 'stretch';
+/** The three picker prices. Rows saved before the picker get theirs from quick, suggested and max. */
+export function priceTiers(s: PriceSuggestion): PriceTiers {
+  if (s.tiers) return s.tiers;
+  const balanced = s.suggested;
+  return {
+    likely: Math.min(s.quick ?? s.low, s.low, balanced),
+    balanced,
+    less_likely: Math.max(s.high, balanced),
+  };
+}
 
-export interface PricePoint {
-  /** 0 is sell fast, 1 is maximize profit. */
-  position: number;
-  price: number;
-  /** Where the price sits among what similar pieces sell for, 0 to 1. */
-  percentile: number;
-  speed: SellSpeed;
-  /** Plain words on how long it may take, like "Usually sells in 1–3 weeks". */
-  speed_label: string;
-  /** Fewer than five sold comparables: the time estimate is a rough guide. */
-  rough: boolean;
+export type PriceTone = 'low' | 'fast' | 'fair' | 'slow' | 'high';
+
+export interface PriceAdvice {
+  tone: PriceTone;
+  /** One plain sentence about the price, like eBay's hint under its price box. */
+  text: string;
+  /** The price the hint points to, if any. */
+  target: number | null;
+  /** Share of similar sales below this price, 0 to 1, when there are enough sales to say. */
+  percentile: number | null;
   take_home: Array<{ marketplace: MarketplaceId; fee: number; keep: number }>;
-}
-
-const SPEED_BANDS: Array<{ upTo: number; speed: SellSpeed; label: string }> = [
-  { upTo: 0.2, speed: 'fast', label: 'Likely sells within about a week' },
-  { upTo: 0.45, speed: 'steady', label: 'Usually sells in 1–3 weeks' },
-  { upTo: 0.7, speed: 'steady', label: 'Usually sells in 2–6 weeks' },
-  { upTo: 0.88, speed: 'slow', label: 'Often takes 1–3 months' },
-  { upTo: Infinity, speed: 'stretch', label: 'Could sit 3 months or more; expect offers below it' },
-];
-
-export function quickPrice(s: PriceSuggestion): number {
-  return Math.min(s.quick ?? s.low, s.suggested);
-}
-
-export function maxPrice(s: PriceSuggestion): number {
-  return Math.max(s.max ?? s.high, s.suggested);
-}
-
-/** The price at slider position `p`: sell fast at 0, the suggestion at 0.5, maximize profit at 1. */
-export function priceAtPosition(s: PriceSuggestion, p: number): number {
-  const t = Math.min(1, Math.max(0, p));
-  const lo = quickPrice(s);
-  const hi = maxPrice(s);
-  const mid = s.suggested;
-  const raw = t <= 0.5 ? lo + (mid - lo) * (t / 0.5) : mid + (hi - mid) * ((t - 0.5) / 0.5);
-  return roundPrice(raw);
-}
-
-/** The slider position for `price`, the inverse of priceAtPosition. */
-export function positionForPrice(s: PriceSuggestion, price: number): number {
-  const lo = quickPrice(s);
-  const hi = maxPrice(s);
-  const mid = s.suggested;
-  if (price <= lo) return 0;
-  if (price >= hi) return 1;
-  if (price <= mid) return mid > lo ? ((price - lo) / (mid - lo)) * 0.5 : 0.5;
-  return hi > mid ? 0.5 + ((price - mid) / (hi - mid)) * 0.5 : 0.5;
 }
 
 /** Share of sales below `price`, with ties counting half. */
@@ -472,49 +678,42 @@ function shareBelow(sorted: number[], price: number): number {
 }
 
 /**
- * What a price at slider position `p` means: where it sits among what similar
- * pieces sold for, roughly how long it may take, and what the seller keeps on
- * each marketplace given.
+ * What a price the seller typed means next to the picker: too high (with the
+ * price to come down to), on the low side, or where it sits between the
+ * cards; and what the seller keeps on each marketplace given.
  */
-export function pricePoint(
+export function priceAdvice(
   s: PriceSuggestion,
-  p: number,
+  price: number,
   fees: Array<{ id: MarketplaceId; rule: FeeRule }> = [],
-): PricePoint {
-  const price = priceAtPosition(s, p);
+  money: (v: number) => string = v => `${fmt(v)} ${s.currency}`,
+): PriceAdvice {
+  const t = priceTiers(s);
   const sold = s.sold_prices ?? [];
-  const rough = sold.length < 5;
-  let pct: number;
-  if (!rough) {
-    pct = shareBelow(sold, price);
-  } else if (s.high > s.low) {
-    // Too few sales to rank against: low and high stand for the 25th and
-    // 75th percentile of what sells.
-    pct = 0.25 + ((price - s.low) / (s.high - s.low)) * 0.5;
+  const percentile = sold.length >= 5 && price > 0 ? shareBelow(sold, price) : null;
+  const take_home = fees.map(({ id, rule }) => ({ marketplace: id, fee: round2(feeFor(price, rule)), keep: takeHome(price, rule) }));
+  let tone: PriceTone;
+  let text: string;
+  let target: number | null = null;
+  if (price > t.less_likely) {
+    tone = 'high';
+    target = t.less_likely;
+    text = `Your price is high. Try pricing at or below ${money(t.less_likely)} to help your item sell.`;
+  } else if (price < roundPrice(t.likely * 0.85)) {
+    tone = 'low';
+    target = t.balanced;
+    text = `Your price is on the low side. Similar pieces sell for about ${money(t.balanced)}, so you could ask more.`;
+  } else if (price <= t.likely) {
+    tone = 'fast';
+    text = 'Priced to sell: below most recent sales of similar pieces.';
+  } else if (price <= t.balanced) {
+    tone = 'fair';
+    text = 'In line with what similar pieces sell for.';
   } else {
-    pct = positionForPrice(s, price);
+    tone = 'slow';
+    text = 'Above most recent sales. It may take longer and draw offers.';
   }
-  pct = Math.min(1, Math.max(0, pct));
-  const band = SPEED_BANDS.find(b => pct <= b.upTo)!;
-  return {
-    position: Math.min(1, Math.max(0, p)),
-    price,
-    percentile: pct,
-    speed: band.speed,
-    speed_label: band.label,
-    rough,
-    take_home: fees.map(({ id, rule }) => ({ marketplace: id, fee: round2(feeFor(price, rule)), keep: takeHome(price, rule) })),
-  };
-}
-
-/** Evenly spaced points along the slider, from sell fast to maximize profit. */
-export function priceLadder(
-  s: PriceSuggestion,
-  steps = 5,
-  fees: Array<{ id: MarketplaceId; rule: FeeRule }> = [],
-): PricePoint[] {
-  const n = Math.max(2, Math.round(steps));
-  return Array.from({ length: n }, (_, i) => pricePoint(s, i / (n - 1), fees));
+  return { tone, text, target, percentile, take_home };
 }
 
 function fmt(value: number): string {

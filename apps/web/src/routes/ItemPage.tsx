@@ -30,7 +30,7 @@ import { CrossListSheet } from '~/components/CrossListSheet';
 import { EbayAspects, missingEbayAspects } from '~/components/EbayAspects';
 import { diffForm, formFromItem, ItemForm, type FormValue } from '~/components/ItemForm';
 import { ListingKit } from '~/components/ListingKit';
-import { PricingTool } from '~/components/PricingTool';
+import { PricePicker } from '~/components/PricePicker';
 import { Sheet, useToast } from '~/components/overlay';
 import { SaleSheet } from '~/components/SaleSheet';
 import { Button, Empty, ErrorNote, Paper, Spinner } from '~/components/ui';
@@ -610,6 +610,8 @@ function PriceTab({ item }: { item: Item }) {
   const toast = useToast();
   const [result, setResult] = useState<PriceCompsResult | null>(null);
   const suggestion = result?.suggestion ?? item.price_suggestion;
+  const [draft, setDraft] = useState<number | null>(item.price);
+  useEffect(() => setDraft(item.price), [item.price]);
   const region = profile?.region ?? 'US';
   const markets = profile?.marketplaces?.length ? profile.marketplaces : (['ebay', 'vinted', 'depop', 'poshmark'] as const);
   const live = (item.listings ?? []).filter(l => l.status === 'listed');
@@ -647,8 +649,7 @@ function PriceTab({ item }: { item: Item }) {
               </p>
             ) : (
               <p className="mt-1 text-sm text-muted">
-                Check what similar pieces sold for on eBay and what live listings ask, then pick a price between selling fast and
-                making the most.
+                Check what similar pieces sold for on eBay, Poshmark and Mercari and what live listings ask, then pick a price.
               </p>
             )}
           </div>
@@ -669,14 +670,20 @@ function PriceTab({ item }: { item: Item }) {
 
         {suggestion && (
           <div className="mt-4">
-            <PricingTool
-              suggestion={suggestion}
-              currency={item.currency}
-              current={item.price}
-              busy={update.isPending}
-              disabled={item.status === 'sold'}
-              onUse={item.status === 'sold' ? undefined : setPrice}
-            />
+            <PricePicker suggestion={suggestion} currency={item.currency} value={draft} onChange={setDraft} disabled={item.status === 'sold'}>
+              {item.status !== 'sold' && (
+                <div>
+                  <Button
+                    variant="ink"
+                    busy={update.isPending}
+                    disabled={draft == null || draft === item.price}
+                    onClick={() => draft != null && setPrice(draft)}
+                  >
+                    {draft != null && draft === item.price ? `Priced at ${money(draft, item.currency)}` : draft != null ? `Use ${money(draft, item.currency)}` : 'Pick a price'}
+                  </Button>
+                </div>
+              )}
+            </PricePicker>
             <details className="mt-4 text-sm text-ink-2">
               <summary className="cursor-pointer font-semibold text-ink">How this was worked out</summary>
               <ul className="mt-2 flex flex-col gap-1">
@@ -724,6 +731,9 @@ function PriceTab({ item }: { item: Item }) {
                     c.title
                   )}
                 </span>
+                {c.source !== 'own_sales' && MARKETPLACES[c.source] && (
+                  <span className="hidden shrink-0 text-xs text-muted sm:inline">{MARKETPLACES[c.source].name}</span>
+                )}
                 <span className="font-semibold tabular">{money(c.price, c.currency)}</span>
               </li>
             ))}

@@ -23,7 +23,7 @@ import { Sparkles } from 'lucide-react';
 import { useId, useMemo } from 'react';
 import { cx, money } from '~/lib/format';
 import type { ItemDraft } from '~/lib/queries';
-import { PricingTool } from './PricingTool';
+import { PricePicker } from './PricePicker';
 import { ChipInput, ChoiceChips, Field, Input, Select, TextArea, TextField } from './ui';
 
 export type FormValue = Required<
@@ -336,32 +336,31 @@ export function ItemForm({
       </Field>
 
       {aiPrice && (
-        <div className="rounded-xl border-2 border-dashed border-line p-4">
-          <p className="mb-3 text-sm">
-            <span className="font-semibold">AI estimate</span>
-            <span className="text-ink-2">
-              {' '}
-              from the photos only, cut by 20% because photo guesses run high. Check prices after saving for market data.
-            </span>
-          </p>
-          <PricingTool suggestion={aiPrice} currency={currency} current={value.price} compact onUse={p => set('price', p)} />
-        </div>
+        <section className="flex flex-col gap-2" aria-labelledby={ids.price}>
+          <div>
+            <h3 id={ids.price} className="text-sm font-semibold text-ink-2">
+              Price
+            </h3>
+            <p className="text-xs text-muted">
+              From the photos only, so a rough guide. Check prices after saving to see what similar pieces sold for.
+            </p>
+          </div>
+          <PricePicker suggestion={aiPrice} currency={currency} value={value.price} onChange={p => set('price', p)} compact />
+        </section>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Field
-          label={`Price (${currency})`}
-          htmlFor={ids.price}
-          hint={scan && aiPrice ? `AI estimate ${money(aiPrice.low, currency)} to ${money(aiPrice.high, currency)}` : undefined}
-        >
-          <Input
-            id={ids.price}
-            inputMode="decimal"
-            value={value.price ?? ''}
-            onChange={e => set('price', numOrNull(e.target.value))}
-            placeholder="0"
-          />
-        </Field>
+      <div className={cx('grid gap-4', aiPrice ? 'sm:grid-cols-2' : 'sm:grid-cols-3')}>
+        {!aiPrice && (
+          <Field label={`Price (${currency})`} htmlFor={ids.price}>
+            <Input
+              id={ids.price}
+              inputMode="decimal"
+              value={value.price ?? ''}
+              onChange={e => set('price', numOrNull(e.target.value))}
+              placeholder="0"
+            />
+          </Field>
+        )}
         <TextField
           label="Original retail"
           inputMode="decimal"
