@@ -70,6 +70,10 @@ describe('pages', () => {
       url: 'https://www.depop.com/products/sam-levis-jacket-1234/',
     });
     expect(postedListing('depop', 'https://www.depop.com/products/create/')).toBeNull();
+    expect(postedListing('depop', 'https://www.depop.com/products/sam-levis-jacket-1234/manage/?x=1')).toEqual({
+      id: 'sam-levis-jacket-1234', url: 'https://www.depop.com/products/sam-levis-jacket-1234/',
+    });
+    expect(postedListing('depop', 'https://www.depop.com/products/create/success/?productId=976402921')).toBeNull();
     expect(postedListing('poshmark', 'https://poshmark.com/listing/Levis-Jacket-65a1b2?x=1')?.id).toBe('Levis-Jacket-65a1b2');
     expect(postedListing('mercari', 'https://www.mercari.com/us/item/m12345678/')?.id).toBe('m12345678');
     expect(postedListing('grailed', 'https://www.grailed.com/listings/5551234-levis')?.id).toBe('5551234');
@@ -86,6 +90,7 @@ describe('after pressing post', () => {
     expect(leftForm('poshmark', 'https://poshmark.com/login')).toBe(false);
     expect(leftForm('depop', 'https://www.depop.com/sam/')).toBe(true);
     expect(leftForm('depop', 'https://www.depop.com/products/create/')).toBe(false);
+    expect(leftForm('depop', 'https://www.depop.com/products/create/success/?productId=976402921')).toBe(true);
     expect(leftForm('mercari', 'https://www.mercari.com/mypage/')).toBe(false);
   });
 });

@@ -3,6 +3,27 @@ import { DEPOP_FORM, POSHMARK_FORM } from './mocks.ts';
 
 const VINTED = 'https://www.vinted.co.uk';
 
+test('Depop success under products/create captures the public link from View listing', async ({ context, worker }) => {
+  const body = DEPOP_FORM.replace(
+    "history.pushState({}, '', '/products/seller-gap-jacket-1234/');",
+    `history.pushState({}, '', '/products/create/success/?productId=976402921');
+     document.querySelector('main').innerHTML = '<h2>Nice! It is listed</h2><a href="/products/seller-gap-brown-jacket-1234/manage/">View listing</a>';`,
+  );
+  await context.route('https://www.depop.com/**', route => route.fulfill({ contentType: 'text/html', body }));
+  const page = await context.newPage();
+  await page.goto('https://www.depop.com/products/create/');
+  const id = await tabId(worker, 'https://www.depop.com/*');
+  const base = work();
+  const out = await worker.evaluate(({ id, work }) => chrome.tabs.sendMessage(id, { type: 'assist:fill', work }), {
+    id, work: work({ marketplace: 'depop', item: { ...base.item, brand: 'Gap', department: 'men', colors: ['brown'] }, listing: { ...base.listing, title: '', description: 'GAP brown jacket' } }),
+  });
+  expect(out).toMatchObject({ ok: true, posted: true });
+  expect(page.url()).toContain('/products/create/success/');
+  const found = await worker.evaluate(id => chrome.tabs.sendMessage(id, { type: 'assist:find', marketplace: 'depop', title: 'GAP brown jacket' }), id);
+  expect(found).toEqual({ url: 'https://www.depop.com/products/seller-gap-brown-jacket-1234/' });
+  await expect(page.locator('pilego-panel')).toHaveCount(0);
+});
+
 test('Depop keeps a remounted size when the menu closes before aria-expanded updates', async ({ context, worker }) => {
   const errors: string[] = [];
   await context.route('https://www.depop.com/**', route => route.fulfill({ contentType: 'text/html', body: DEPOP_FORM }));

@@ -16,6 +16,45 @@ test('signed-out visitors see the sign-in floor', async ({ page }, info) => {
   await snap(page, 'signin', info.project.name);
 });
 
+test('one List click on three marketplaces resumes after linking and a refresh without queuing again', async ({ page }) => {
+  await mockSupabase(page);
+  const queued: Array<{ p_marketplaces: string[] }> = [];
+  await page.route(`${SUPABASE}/rest/v1/rpc/queue_publish`, route => {
+    queued.push(route.request().postDataJSON());
+    return route.fulfill({ contentType: 'application/json', body: '[]' });
+  });
+  await page.addInitScript(uid => {
+    window.addEventListener('message', e => {
+      if (e.data?.source !== 'pilego-app') return;
+      const linked = sessionStorage.getItem('test-linked') === 'yes';
+      if (e.data.type === 'run-jobs') {
+        const requests = JSON.parse(sessionStorage.getItem('test-wakeups') ?? '[]');
+        requests.push(e.data.request_id);
+        sessionStorage.setItem('test-wakeups', JSON.stringify(requests));
+      }
+      if (!['hello', 'run-jobs'].includes(e.data.type)) return;
+      window.postMessage({ source: 'pilego-ext', type: 'status', status: {
+        version: '0.3.9', installed: true, linked, needs_approval: !linked,
+        user_id: linked ? uid : null, tabs: {}, running: 0,
+        ...(linked && e.data.type === 'run-jobs' ? { jobs_accepted: e.data.request_id } : {}),
+      } }, location.origin);
+    });
+  }, UID);
+  await page.goto('/item/a4?crosslist=1');
+  const sheet = page.getByRole('dialog', { name: 'Cross-list', exact: true });
+  await sheet.getByRole('button', { name: /eBay Automatic/ }).click();
+  await sheet.getByRole('button', { name: 'List on 3 marketplaces', exact: true }).click();
+  await expect(sheet).not.toBeVisible();
+  await expect.poll(() => page.evaluate(() => JSON.parse(sessionStorage.getItem('test-wakeups') ?? '[]').length)).toBeGreaterThan(1);
+  await page.reload();
+  await page.evaluate(() => { sessionStorage.setItem('test-linked', 'yes'); });
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('pilego-run-jobs'))).toBeNull();
+  expect(queued).toHaveLength(1);
+  expect(queued[0]!.p_marketplaces).toEqual(['vinted', 'depop', 'poshmark']);
+  const requests = await page.evaluate(() => JSON.parse(sessionStorage.getItem('test-wakeups') ?? '[]') as string[]);
+  expect(new Set(requests).size).toBe(1);
+});
+
 test('the pile shows unsold pieces and the receipt', async ({ page }, info) => {
   await mockSupabase(page);
   await page.goto('/');

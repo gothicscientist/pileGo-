@@ -46,6 +46,13 @@ async function finish(
     p_retry_in_seconds: retryIn ?? null,
   });
   if (e) console.warn('[pileGo] finish_job failed', e.message);
+  if (!e && status === 'done' && job.listing_id && (job.kind === 'publish' || job.kind === 'relist')) {
+    // A successful retry supersedes older prompts and scheduled publishes for
+    // this listing. Otherwise the app still offers Retry after it is live.
+    const { error: cleanup } = await sb.from('jobs').update({ status: 'cancelled', error: 'Superseded by a confirmed listing.' })
+      .eq('listing_id', job.listing_id).in('kind', ['publish', 'relist']).in('status', ['pending', 'needs_user']).neq('id', job.id);
+    if (cleanup) console.warn('[pileGo] could not settle older listing jobs', cleanup.message);
+  }
 }
 
 async function setListing(sb: SupabaseClient, id: string, patch: Partial<Listing>) {
@@ -623,6 +630,14 @@ async function settlePosted(sb: SupabaseClient, w: Waiting, url: string | null) 
   }
   state.lastMessage = `Listed on ${MARKETPLACES[w.marketplace].name}.`;
   await finish(sb, w.job, 'done', null, { url: found?.url ?? null });
+  await editWaiting(list => {
+    for (const [id, older] of Object.entries(list)) {
+      if (older.listing_id === w.listing_id && older.kind === 'post') {
+        settled.add(id);
+        delete list[id];
+      }
+    }
+  });
 }
 
 /** A report from an assist tab: posted, removed, or the seller stopped. */
@@ -707,12 +722,18 @@ export async function onTabClosed(sb: SupabaseClient | null, tabId: number) {
  * Settle what a lost answer or a restarted worker left behind: a closed tab,
  * or an auto-post tab nobody has heard from since the fill should have ended.
  */
-async function sweepWaiting(sb: SupabaseClient) {
+export async function sweepWaiting(sb: SupabaseClient) {
   for (const [id, w] of Object.entries(await waitingList())) {
     if (state.running.has(id)) continue;
     const tab = await ext.tabs.get(w.tab_id).catch(() => null);
     if (!tab) {
       await onTabClosed(sb, w.tab_id);
+      continue;
+    }
+    // An extension reload loses the URL-change event. Reconcile a completed
+    // post before skipping a form that an older driver marked stuck.
+    if (w.kind === 'post' && tab.url && (postedListing(w.marketplace, tab.url) || (w.pressed && leftForm(w.marketplace, tab.url)))) {
+      await onTabUrl(sb, w.tab_id, tab.url);
       continue;
     }
     const age = Date.now() - (w.started_at ?? 0);

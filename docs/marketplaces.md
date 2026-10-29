@@ -88,6 +88,11 @@ After a redirect to your closet or feed, pileGo must find this item's listing
 link before marking it live. A redirect alone can also mean a cancellation
 or rejection. If no link is found, the item needs attention rather than
 silently appearing live without evidence.
+Depop's `/products/create/success/` screen counts as leaving the form; its
+View listing link ends in `/manage/`, which is normalized to the public URL.
+After a worker reload, completed tabs are reconciled before skipping older
+stuck forms. A confirmed post cancels obsolete publish/relist retry prompts
+for that same listing.
 
 The app retains its List wake-up until the linked extension acknowledges it,
 including across a refresh or initial account linking. Chrome's temporary

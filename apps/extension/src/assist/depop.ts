@@ -21,6 +21,7 @@ import {
 } from './choices.ts';
 import { giveFiles, isServerError, norm, pageError, pickOption, press, newServerAlert, serverAlertEls, serverAlerts, setValue, shown, text, typeText, waitFor } from './dom.ts';
 import { Tally, type Driver, type DriverContext } from './driver.ts';
+import { leftForm } from './sites.ts';
 
 const MAX_PHOTOS = 8;
 
@@ -329,7 +330,7 @@ export const fillDepop: Driver = async (work: ListingWork, files: File[], ctx: D
     let said: string | null = null;
     const outcome = await waitFor(
       () => {
-        if (!/\/products\/create/.test(location.pathname)) return 'posted';
+        if (leftForm('depop', location.href)) return 'posted';
         said = newServerAlert(before) ?? pageError();
         if (said) return 'server';
         // A 500 toast left from the last try is not Depop refusing the form.

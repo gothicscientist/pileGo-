@@ -31,9 +31,9 @@ export interface SiteAdapter {
 export const SITES: Partial<Record<MarketplaceId, SiteAdapter>> = {
   depop: {
     id: 'depop',
-    sellPage: /depop\.com\/products\/create/,
+    sellPage: /depop\.com\/products\/create\/?(?:[?#]|$)/,
     posted: /depop\.com\/products\/(?!create|edit)([a-z0-9-]+)\/?(?:\?|$)/i,
-    afterPost: /depop\.com\/(?!products\/create|login|signup)/,
+    afterPost: /depop\.com\/(?:products\/create\/success\/?(?:[?#]|$)|(?!products\/create|login|signup))/,
     selectors: {
       description: ['textarea[name="description"]', '#description', 'textarea[data-testid*="description" i]'],
       price: ['input[name="priceAmount"]', 'input[name="price"]', 'input[data-testid*="price" i]'],
@@ -94,6 +94,9 @@ export function siteFor(url: string): SiteAdapter | null {
 }
 
 export function postedListing(market: MarketplaceId, url: string): { id: string | null; url: string } | null {
+  // The seller's "View listing" link on Depop's success screen ends in
+  // /manage/. Store the public listing URL, not that management page.
+  if (market === 'depop') url = url.replace(/\/manage\/?(?=[?#]|$)/, '/');
   const site = SITES[market];
   if (!site || site.sellPage.test(url)) return null;
   const hit = url.match(site.posted);
