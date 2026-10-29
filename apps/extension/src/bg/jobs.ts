@@ -7,7 +7,7 @@ import { between, errorText, ext, sleep, toBase64, within } from '../shared/brow
 import type { AssistReport, FillResult, ListingWork, PhotoBytes, VintedOutcome, VintedRequest } from '../shared/messages.ts';
 import { blockMessage, capWait, noteWrite, readBlock } from '../shared/pace.ts';
 import { leftForm, postedListing } from '../assist/sites.ts';
-import { activate, navigate, openTabs, readyTab, sendToTab, vintedSiteFor, waitForLoad } from './tabs.ts';
+import { activate, createTab, navigate, openTabs, readyTab, removeTab, sendToTab, updateTab, vintedSiteFor, waitForLoad } from './tabs.ts';
 
 export const ASSIST_MARKETS: MarketplaceId[] = ['depop', 'poshmark', 'mercari', 'grailed', 'facebook'];
 
@@ -46,6 +46,13 @@ async function finish(
     p_retry_in_seconds: retryIn ?? null,
   });
   if (e) console.warn('[pileGo] finish_job failed', e.message);
+  if (!e && status === 'done' && job.listing_id && (job.kind === 'publish' || job.kind === 'relist')) {
+    // A successful retry supersedes older prompts and scheduled publishes for
+    // this listing. Otherwise the app still offers Retry after it is live.
+    const { error: cleanup } = await sb.from('jobs').update({ status: 'cancelled', error: 'Superseded by a confirmed listing.' })
+      .eq('listing_id', job.listing_id).in('kind', ['publish', 'relist']).in('status', ['pending', 'needs_user']).neq('id', job.id);
+    if (cleanup) console.warn('[pileGo] could not settle older listing jobs', cleanup.message);
+  }
 }
 
 async function setListing(sb: SupabaseClient, id: string, patch: Partial<Listing>) {
@@ -180,13 +187,13 @@ export async function vintedTab(open: boolean, region?: string | null): Promise<
   if (known && (await readyTab(known, { type: 'vinted:ping' }))) return known.id!;
   if (!open) return null;
   const site = ((await ext.storage.local.get('vinted.site'))['vinted.site'] as string | undefined) ?? vintedSiteFor(region);
-  const tab = await ext.tabs.create({ url: `${site}/`, active: false });
+  const tab = await createTab({ url: `${site}/`, active: false });
   if (tab.id == null) return null;
   state.openedTabs.add(tab.id);
   await waitForLoad(tab.id);
   const ping = await sendToTab<VintedOutcome>(tab.id, { type: 'vinted:ping' } satisfies VintedRequest).catch(() => null);
   if (ping?.status === 'done' && !(ping.data as { logged_in?: boolean }).logged_in) {
-    await ext.tabs.update(tab.id, { active: true });
+    await activate(tab.id);
     state.openedTabs.delete(tab.id);
     throw new Error('Log in to Vinted in the tab pileGo just opened, then try again.');
   }
@@ -194,7 +201,7 @@ export async function vintedTab(open: boolean, region?: string | null): Promise<
 }
 
 export async function closeOpenedTabs() {
-  for (const id of state.openedTabs) await ext.tabs.remove(id).catch(() => {});
+  for (const id of state.openedTabs) await removeTab(id).catch(() => {});
   state.openedTabs.clear();
 }
 
@@ -407,7 +414,7 @@ async function runAssist(sb: SupabaseClient, job: Job, first: boolean) {
   const auto = posting && AUTO_POST.includes(job.marketplace);
   // Pages in background tabs are throttled and some never finish rendering, so
   // a form pileGo fills by itself is filled in front.
-  const tab = await ext.tabs.create({ url, active: first || auto });
+  const tab = await createTab({ url, active: first || auto });
   if (tab.id == null) return finish(sb, job, 'pending', 'Could not open a tab.', null, 300);
   const tabId = tab.id;
   const message = auto
@@ -500,7 +507,7 @@ async function backToForm(tabId: number, url: string) {
     const now = await ext.tabs.get(tabId).catch(() => null);
     if (!now?.url) return;
     if (new URL(now.url).pathname.replace(/\/+$/, '').startsWith(want)) return;
-    await ext.tabs.update(tabId, { url }).catch(() => {});
+    await updateTab(tabId, { url });
     await sleep(500);
     await waitForLoad(tabId);
   }
@@ -510,7 +517,7 @@ async function backToForm(tabId: number, url: string) {
 async function retryLater(sb: SupabaseClient, jobId: string, tabId: number, error: string) {
   const w = await takeWaiting(jobId);
   if (!w) return;
-  await ext.tabs.remove(tabId).catch(() => {});
+  await removeTab(tabId).catch(() => {});
   const name = MARKETPLACES[w.marketplace].name;
   if (w.job.attempts < 4) {
     const message = `${error} pileGo will try ${name} again in 10 minutes.`;
@@ -589,7 +596,6 @@ async function settleAuto(sb: SupabaseClient, jobId: string, tabId: number, repl
 
 async function settlePosted(sb: SupabaseClient, w: Waiting, url: string | null) {
   if (settled.has(w.job.id)) return;
-  settled.add(w.job.id);
   pressedJobs.delete(w.job.id);
   let found = url ? postedListing(w.marketplace, url) : null;
   if (!found && w.title) {
@@ -599,6 +605,17 @@ async function settlePosted(sb: SupabaseClient, w: Waiting, url: string | null) 
     const link = (await within(ask, 20_000, undefined))?.url;
     found = link ? postedListing(w.marketplace, link) : null;
   }
+  // A redirect to the closet/feed is also used for cancelled or rejected
+  // posts. It is not evidence that this particular listing was created.
+  if (!found && AUTO_POST.includes(w.marketplace)) {
+    const message = `${MARKETPLACES[w.marketplace].name} did not show a link to this listing. Check the marketplace tab before retrying so it is not listed twice.`;
+    await editWaiting(list => { list[w.job.id] = { ...w, stuck: true }; });
+    state.lastMessage = message;
+    await setListing(sb, w.listing_id, { status: 'needs_action', error: message });
+    await finish(sb, w.job, 'needs_user', message);
+    return;
+  }
+  settled.add(w.job.id);
   const { data: listing } = await sb.from('listings').select('*').eq('id', w.listing_id).maybeSingle();
   const li = listing as Listing | null;
   if (li) {
@@ -613,6 +630,14 @@ async function settlePosted(sb: SupabaseClient, w: Waiting, url: string | null) 
   }
   state.lastMessage = `Listed on ${MARKETPLACES[w.marketplace].name}.`;
   await finish(sb, w.job, 'done', null, { url: found?.url ?? null });
+  await editWaiting(list => {
+    for (const [id, older] of Object.entries(list)) {
+      if (older.listing_id === w.listing_id && older.kind === 'post') {
+        settled.add(id);
+        delete list[id];
+      }
+    }
+  });
 }
 
 /** A report from an assist tab: posted, removed, or the seller stopped. */
@@ -697,12 +722,18 @@ export async function onTabClosed(sb: SupabaseClient | null, tabId: number) {
  * Settle what a lost answer or a restarted worker left behind: a closed tab,
  * or an auto-post tab nobody has heard from since the fill should have ended.
  */
-async function sweepWaiting(sb: SupabaseClient) {
+export async function sweepWaiting(sb: SupabaseClient) {
   for (const [id, w] of Object.entries(await waitingList())) {
     if (state.running.has(id)) continue;
     const tab = await ext.tabs.get(w.tab_id).catch(() => null);
     if (!tab) {
       await onTabClosed(sb, w.tab_id);
+      continue;
+    }
+    // An extension reload loses the URL-change event. Reconcile a completed
+    // post before skipping a form that an older driver marked stuck.
+    if (w.kind === 'post' && tab.url && (postedListing(w.marketplace, tab.url) || (w.pressed && leftForm(w.marketplace, tab.url)))) {
+      await onTabUrl(sb, w.tab_id, tab.url);
       continue;
     }
     const age = Date.now() - (w.started_at ?? 0);
@@ -712,6 +743,19 @@ async function sweepWaiting(sb: SupabaseClient) {
       continue;
     }
     if (w.kind === 'post' && AUTO_POST.includes(w.marketplace) && age > FILL_TIMEOUT + 60_000) await settleAuto(sb, id, w.tab_id, null);
+  }
+}
+
+/** Repair older auto-post runs that treated an unrelated redirect as success. */
+export async function recoverUnconfirmed(sb: SupabaseClient) {
+  const { data, error } = await sb.from('listings').select('id,marketplace')
+    .eq('status', 'listed').is('external_url', null).in('marketplace', AUTO_POST);
+  if (error) throw new Error(error.message);
+  for (const listing of (data ?? []) as Array<{ id: string; marketplace: MarketplaceId }>) {
+    await setListing(sb, listing.id, {
+      status: 'needs_action',
+      error: `The earlier ${MARKETPLACES[listing.marketplace].name} run did not confirm a listing link. Check your marketplace listings, then paste the link here or retry if it is absent.`,
+    });
   }
 }
 
@@ -744,6 +788,7 @@ export async function runQueue(sb: SupabaseClient, interactive: boolean): Promis
     if (!markets.length) return 0;
 
     await sweepWaiting(sb).catch(err => console.warn('[pileGo] could not check waiting tabs', errorText(err)));
+    await recoverUnconfirmed(sb).catch(err => console.warn('[pileGo] could not check unconfirmed listings', errorText(err)));
 
     const { data, error } = await sb.rpc('claim_jobs', { p_runner: 'extension', p_marketplaces: markets, p_limit: 6 });
     if (error) throw new Error(error.message);
@@ -764,8 +809,12 @@ export async function runQueue(sb: SupabaseClient, interactive: boolean): Promis
         ran += 1;
       } catch (err) {
         state.lastError = errorText(err);
-        if (job.listing_id) await setListing(sb, job.listing_id, { status: 'failed', error: errorText(err) }).catch(() => {});
-        await finish(sb, job, job.attempts < 3 ? 'pending' : 'failed', errorText(err), null, 300 * job.attempts);
+        const retry = job.attempts < 3;
+        if (job.listing_id) {
+          const status = retry ? (job.kind === 'delist' ? 'delisting' : 'queued') : 'failed';
+          await setListing(sb, job.listing_id, { status, error: errorText(err) }).catch(() => {});
+        }
+        await finish(sb, job, retry ? 'pending' : 'failed', errorText(err), null, 300 * job.attempts);
       } finally {
         state.running.delete(job.id);
       }

@@ -8,7 +8,7 @@
 import { conditionFromText, parsePoshmarkSearch, poshmarkBlocked, poshmarkSearchUrl, type PriceComp } from '@pilego/core';
 import type { TabCompsMarket } from '../assist/comps.ts';
 import { ext, sleep } from '../shared/browser.ts';
-import { sendToTab, waitForLoad } from './tabs.ts';
+import { createTab, removeTab, sendToTab, updateTab, waitForLoad } from './tabs.ts';
 
 export type Region = 'US' | 'UK' | 'EU' | 'AU' | 'CA';
 
@@ -282,10 +282,10 @@ async function tabSearch(market: TabCompsMarket, url: string): Promise<SourceRes
     try {
       // Opened blank, then sent to the search, so the tab exists before the
       // page loads (and test browsers can serve the page).
-      const tab = await ext.tabs.create({ url: 'about:blank', active: false });
+      const tab = await createTab({ url: 'about:blank', active: false });
       tabId = tab.id;
       if (tabId == null) return { comps: null, error: 'Could not open a tab.', url };
-      await ext.tabs.update(tabId, { url });
+      await updateTab(tabId, { url });
       await sleep(500);
       await waitForLoad(tabId, 25_000);
       const r = await sendToTab<{ comps?: PriceComp[] }>(tabId, { type: 'assist:comps', market }, 20_000);
@@ -293,7 +293,7 @@ async function tabSearch(market: TabCompsMarket, url: string): Promise<SourceRes
     } catch (err) {
       return { comps: null, error: err instanceof Error ? err.message : String(err), url };
     } finally {
-      if (tabId != null) await ext.tabs.remove(tabId).catch(() => {});
+      if (tabId != null) await removeTab(tabId).catch(() => {});
     }
   });
 }

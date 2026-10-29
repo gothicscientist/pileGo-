@@ -139,15 +139,22 @@ async function onApp(msg: Msg, origin: string, tabId: number | undefined) {
       try {
         await redeem(origin, req);
         state.lastError = null;
-        void run(false);
+        void run(true);
       } catch (err) {
         state.lastError = errorText(err);
       }
       break;
     }
-    case 'app:run-jobs':
-      if (trusted) void run(true);
-      break;
+    case 'app:run-jobs': {
+      // Do not acknowledge a wake-up until there is a session to claim jobs.
+      // The app retains and resends it if linking or a worker restart is in flight.
+      const session = trusted ? await authed().catch(() => null) : null;
+      if (!session) break;
+      const { request_id, user_id } = (msg.payload ?? {}) as { request_id?: string; user_id?: string };
+      if (user_id && user_id !== session.cfg.user_id) break;
+      void run(true);
+      return { ...(await status(origin)), jobs_accepted: request_id };
+    }
     case 'app:sync':
       if (trusted) void sync(true);
       break;
@@ -166,6 +173,7 @@ async function onPopup(msg: Msg) {
         try {
           await redeem(pending.origin, pending);
           state.lastError = null;
+          void run(true);
         } catch (err) {
           state.lastError = errorText(err);
           await dropPendingLink();
