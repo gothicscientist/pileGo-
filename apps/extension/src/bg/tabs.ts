@@ -3,6 +3,22 @@
 import { MARKETPLACES, type MarketplaceId } from '@pilego/core';
 import { ext, sleep } from '../shared/browser.ts';
 
+/** Chrome briefly locks all tab mutations while a tab strip is changing. */
+export async function editTab<T>(operation: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await operation();
+    } catch (err) {
+      if (attempt >= 7 || !/tabs cannot be edited|user may be dragging a tab/i.test(String((err as Error)?.message ?? err))) throw err;
+      await sleep(Math.min(200 * 2 ** attempt, 1000));
+    }
+  }
+}
+
+export const createTab = (properties: chrome.tabs.CreateProperties) => editTab(() => ext.tabs.create(properties));
+export const updateTab = (id: number, properties: chrome.tabs.UpdateProperties) => editTab(() => ext.tabs.update(id, properties));
+export const removeTab = (id: number) => editTab(() => ext.tabs.remove(id));
+
 export const VINTED_TABS = [
   'https://www.vinted.at/*', 'https://www.vinted.be/*', 'https://www.vinted.co.uk/*', 'https://www.vinted.com/*',
   'https://www.vinted.cz/*', 'https://www.vinted.de/*', 'https://www.vinted.dk/*', 'https://www.vinted.es/*',
@@ -66,7 +82,7 @@ export async function navigate(tabId: number, url: string): Promise<void> {
     }
     ext.tabs.onUpdated.addListener(listen);
   });
-  await ext.tabs.update(tabId, { url }).catch(() => {});
+  await updateTab(tabId, { url });
   await started;
   await waitForLoad(tabId);
 }
@@ -94,7 +110,7 @@ export async function readyTab(tab: chrome.tabs.Tab, ping: unknown): Promise<boo
     await ext.tabs.sendMessage(tab.id, ping);
     return true;
   } catch {
-    await ext.tabs.reload(tab.id);
+    await editTab(() => ext.tabs.reload(tab.id!));
     await waitForLoad(tab.id);
     try {
       await sendToTab(tab.id, ping, 15_000);
@@ -110,19 +126,11 @@ export async function readyTab(tab: chrome.tabs.Tab, ping: unknown): Promise<boo
  * tab ("Tabs cannot be edited right now"), so this tries again for a moment.
  */
 export async function activate(tabId: number): Promise<void> {
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    try {
-      const tab = await ext.tabs.update(tabId, { active: true });
-      if (tab?.windowId != null) {
-        // A minimised window hides the page, and some forms stop drawing while hidden.
-        const win = await ext.windows.get(tab.windowId).catch(() => null);
-        const restore = win?.state === 'minimized' ? { state: 'normal' as const } : {};
-        await ext.windows.update(tab.windowId, { focused: true, ...restore }).catch(() => {});
-      }
-      return;
-    } catch (err) {
-      if (!/cannot be edited|dragging/i.test(String((err as Error)?.message ?? err))) throw err;
-      await sleep(600);
-    }
+  const tab = await updateTab(tabId, { active: true });
+  if (tab?.windowId != null) {
+    // A minimised window hides the page, and some forms stop drawing while hidden.
+    const win = await ext.windows.get(tab.windowId).catch(() => null);
+    const restore = win?.state === 'minimized' ? { state: 'normal' as const } : {};
+    await ext.windows.update(tab.windowId, { focused: true, ...restore }).catch(() => {});
   }
 }

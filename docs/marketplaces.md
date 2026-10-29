@@ -64,9 +64,11 @@ tab opens in front, because browsers throttle pages in background tabs.
   condition, up to two colours (removing the colours Depop guesses from the
   photos), size, source, age, up to three styles, price and package size.
   Then Post. Worldwide shipping stays as you set it. Depop's prepaid labels
-  are domestic only, so worldwide needs its own international price, and
-  turning it on without one made every Post fail with a 500. If worldwide is
-  on with the international price empty, pileGo turns it off.
+  are domestic only, so worldwide needs its own international price. If
+  worldwide is on with the international price empty, pileGo turns it off.
+  Menus close through their own toggle and blur. Sending Escape after picking
+  a size can clear Downshift's selection and crash Depop's size handler into
+  a 500 page, even though no request to post has been made.
 - **Poshmark** (`apps/extension/src/assist/poshmark.ts`): photos and the
   cover-shot editor's Apply, title, description, department, category and
   subcategory, size (a custom size when it is not on the list), condition,
@@ -82,9 +84,15 @@ posted: the listing is marked as needing you, the tab stays open with the
 panel, and pressing "I've posted it" or posting from the tab settles it.
 
 When the tab lands on the new listing, pileGo records it as live with its link.
-Once pileGo has pressed post, landing on your closet or the feed counts too
-(pileGo looks for the new listing's link there), and so does Poshmark saying
-the listing is live while still on the editor's address.
+After a redirect to your closet or feed, pileGo must find this item's listing
+link before marking it live. A redirect alone can also mean a cancellation
+or rejection. If no link is found, the item needs attention rather than
+silently appearing live without evidence.
+
+The app retains its List wake-up until the linked extension acknowledges it,
+including across a refresh or initial account linking. Chrome's temporary
+"Tabs cannot be edited right now" lock is retried for opening, navigating,
+activating and closing tabs. Other tab errors are surfaced immediately.
 
 When the sell page itself loads as a 500 error, pileGo loads a fresh form and
 fills it again, up to three forms. After that it closes the tab and tries

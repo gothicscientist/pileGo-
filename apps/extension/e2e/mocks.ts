@@ -57,12 +57,32 @@ export const DEPOP_FORM = `<!doctype html><html><body><main><form id="f">
         const chip = document.createElement('button'); chip.type = 'button'; chip.setAttribute('aria-label', 'Remove ' + value); chip.textContent = value + ' x';
         chip.addEventListener('click', () => { window.picked[name] = window.picked[name].filter(v => v !== value); chip.remove(); });
         chips.append(chip);
-      } else { window.picked[name] = value; input.value = value; close(); }
+      } else {
+        window.picked[name] = value; input.value = value;
+        if (name === 'variants' && window.slowSizeClose) {
+          // The reducer closes first; React updates aria-expanded later.
+          menu.innerHTML = '';
+          setTimeout(() => input.setAttribute('aria-expanded', 'false'), 1000);
+        } else close();
+        if (name === 'variants' && window.replaceSizeInput) {
+          // React remounts the field while preserving its selected value.
+          const replacement = input.cloneNode(true); replacement.value = value;
+          input.replaceWith(replacement); input.value = '';
+        }
+      }
       if (name === 'group') onCategory();
     };
     wrap.querySelector('button').addEventListener('click', () => (input.getAttribute('aria-expanded') === 'true' ? close() : render('')));
     input.addEventListener('input', () => (def.search ? render(input.value) : null));
-    input.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+    input.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      if (name === 'variants' && window.slowSizeClose && window.picked[name]) {
+        // Downshift clears selectedItem on Escape when already closed.
+        document.querySelector('main').innerHTML = '<h2>Something went wrong</h2>500 Internal Server Error';
+        throw new TypeError("Cannot destructure property 'value' of 'object null' as it is null.");
+      }
+      close();
+    });
     return wrap;
   }
   const brandWrap = (() => { let w; for (const [n, d] of Object.entries(C)) { const x = combo(n, d); if (n === 'brand') w = x; } return w; })();

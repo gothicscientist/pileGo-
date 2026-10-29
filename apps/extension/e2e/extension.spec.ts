@@ -3,6 +3,26 @@ import { DEPOP_FORM, POSHMARK_FORM } from './mocks.ts';
 
 const VINTED = 'https://www.vinted.co.uk';
 
+test('Depop keeps a remounted size when the menu closes before aria-expanded updates', async ({ context, worker }) => {
+  const errors: string[] = [];
+  await context.route('https://www.depop.com/**', route => route.fulfill({ contentType: 'text/html', body: DEPOP_FORM }));
+  const page = await context.newPage();
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('https://www.depop.com/products/create/');
+  await page.evaluate(() => {
+    Object.assign(window, { slowSizeClose: true, replaceSizeInput: true });
+  });
+  const id = await tabId(worker, 'https://www.depop.com/*');
+  const base = work();
+  const out = await worker.evaluate(({ id, work }) => chrome.tabs.sendMessage(id, { type: 'assist:fill', work }), {
+    id, work: work({ marketplace: 'depop', item: { ...base.item, brand: 'Gap', department: 'men', colors: ['brown'] } }),
+  });
+  expect(out).toMatchObject({ ok: true, posted: true });
+  expect(errors).toEqual([]);
+  expect(await page.evaluate(() => (window as unknown as { picked: { variants: string }; posts: number }).picked.variants)).toBe('M');
+  expect(await page.evaluate(() => (window as unknown as { posts: number }).posts)).toBe(1);
+});
+
 const catalogs = [
   {
     id: 1904,

@@ -19,7 +19,7 @@ import {
   depopStyles,
   sizeWants,
 } from './choices.ts';
-import { giveFiles, isServerError, norm, pageError, pickOption, press, pressKey, newServerAlert, serverAlertEls, serverAlerts, setValue, shown, text, typeText, waitFor } from './dom.ts';
+import { giveFiles, isServerError, norm, pageError, pickOption, press, newServerAlert, serverAlertEls, serverAlerts, setValue, shown, text, typeText, waitFor } from './dom.ts';
 import { Tally, type Driver, type DriverContext } from './driver.ts';
 
 const MAX_PHOTOS = 8;
@@ -42,7 +42,14 @@ async function openMenu(name: string): Promise<HTMLElement[]> {
 
 function closeMenu(name: string) {
   const input = byId(`${name}-input`);
-  if (input && input.getAttribute('aria-expanded') === 'true') pressKey(input, 'Escape');
+  // Downshift's Escape clears selectedItem when its reducer has already
+  // closed the menu, even if aria-expanded has not caught up yet. Depop's
+  // size onChange destructures that null and crashes the whole form into a
+  // misleading 500 page. The toggle and blur close without clearing size.
+  if (input?.getAttribute('aria-expanded') === 'true') {
+    const toggle = byId(`${name}-toggle-button`);
+    if (toggle) press(toggle);
+  }
   (input as HTMLElement | null)?.blur();
 }
 
@@ -104,7 +111,9 @@ async function choose(name: string, wants: string[][], max = wants.length): Prom
   }
   closeMenu(name);
   // A single select shows its value in the input once React catches up; check it took.
-  const took = () => norm(input.value) === norm(picked[0]);
+  // Category/AI updates replace the size input. The old node can stay empty
+  // forever even though the replacement correctly displays the selected M.
+  const took = () => norm((byId(`${name}-input`) as HTMLInputElement | null)?.value) === norm(picked[0]);
   if (!chips(name).length && picked.length === 1 && !(await waitFor(took, 2000))) {
     const opts = await openMenu(name);
     const hit = opts.find(o => norm(label(o)) === norm(picked[0]));
@@ -158,6 +167,9 @@ async function category(item: ListingWork['item']): Promise<string | null> {
 
 async function brand(name: string | null): Promise<string | null> {
   if (!name) return null;
+  const input = byId('brand-input') as HTMLInputElement | null;
+  // Depop may already have selected the brand from the description/photos.
+  if (input && norm(input.value) === norm(name) && norm(input.getAttribute('value')) === norm(name)) return name;
   return search('brand', name, opts => {
     const want = norm(name);
     return opts.find(o => norm(label(o)) === want) ?? opts.find(o => norm(label(o)).startsWith(want)) ?? null;
@@ -246,7 +258,7 @@ export const fillDepop: Driver = async (work: ListingWork, files: File[], ctx: D
 
   ctx.check();
   if (item.materials.length && byId('attributes.material-input')) {
-    tally.ok('material', await choose('attributes.material', item.materials.map(m => [m]), 3));
+    tally.ok('material', await choose('attributes.material', item.materials.map(m => [m.replace(/\b\d+(?:\.\d+)?\s*%\s*/g, '').trim()]), 3));
   }
 
   ctx.step('Brand, condition and colour…');

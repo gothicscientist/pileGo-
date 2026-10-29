@@ -36,6 +36,26 @@ let latest: ExtensionStatus = EMPTY;
 let currentUser: string | null = null;
 let linking = false;
 const listeners = new Set<(s: ExtensionStatus) => void>();
+const RUN_KEY = 'pilego-run-jobs';
+// A one-shot message can race linking or a sleeping worker. Keep the intent
+// in this tab until the linked worker acknowledges it, including over reloads.
+let pendingRun: { request_id: string; user_id: string | null; at: number } | null = null;
+try { pendingRun = JSON.parse(sessionStorage.getItem(RUN_KEY) ?? 'null'); } catch { /* Storage may be unavailable. */ }
+let runTimer: number | undefined;
+
+function sendPendingRun() {
+  if (!pendingRun || !currentUser || pendingRun.user_id !== currentUser) return;
+  if (Date.now() - pendingRun.at > 10 * 60_000) {
+    pendingRun = null;
+    try { sessionStorage.removeItem(RUN_KEY); } catch { /* Storage may be unavailable. */ }
+    window.clearInterval(runTimer);
+    runTimer = undefined;
+    return;
+  }
+  post('hello');
+  post('run-jobs', { request_id: pendingRun.request_id, user_id: currentUser });
+  if (runTimer === undefined) runTimer = window.setInterval(sendPendingRun, 2000);
+}
 
 function post(type: string, payload: Record<string, unknown> = {}) {
   window.postMessage({ source: APP, type, ...payload }, window.location.origin);
@@ -67,10 +87,16 @@ async function linkIfNeeded() {
 if (typeof window !== 'undefined') {
   window.addEventListener('message', event => {
     if (event.source !== window || event.origin !== window.location.origin) return;
-    const data = event.data as { source?: string; type?: string; status?: Partial<ExtensionStatus> };
+    const data = event.data as { source?: string; type?: string; status?: Partial<ExtensionStatus> & { jobs_accepted?: string } };
     if (!data || data.source !== EXT) return;
     if (data.type === 'status' || data.type === 'hello') {
       latest = { ...latest, ...data.status, installed: true };
+      if (pendingRun && data.status?.jobs_accepted === pendingRun.request_id && latest.user_id === currentUser) {
+        pendingRun = null;
+        try { sessionStorage.removeItem(RUN_KEY); } catch { /* Storage may be unavailable. */ }
+        window.clearInterval(runTimer);
+        runTimer = undefined;
+      }
       for (const fn of listeners) fn(latest);
       void linkIfNeeded();
     }
@@ -82,11 +108,14 @@ export function setExtensionUser(userId: string | null) {
   currentUser = userId;
   if (typeof window === 'undefined') return;
   post('hello');
+  sendPendingRun();
 }
 
 /** Ask the extension to look for new jobs now rather than on its next timer. */
 export function pokeExtension() {
-  post('run-jobs');
+  pendingRun = { request_id: crypto.randomUUID(), user_id: currentUser, at: Date.now() };
+  try { sessionStorage.setItem(RUN_KEY, JSON.stringify(pendingRun)); } catch { /* Keep the in-memory request. */ }
+  sendPendingRun();
 }
 
 export function askExtensionToSync(marketplaces?: string[]) {
