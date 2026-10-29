@@ -15,6 +15,7 @@ import { useToast } from '~/components/overlay';
 import { Button, ChipInput, ChoiceChips, ErrorNote, Field, Paper, Select, Spinner, TextField } from '~/components/ui';
 import { useAuth } from '~/lib/auth';
 import { askExtensionToImport, askExtensionToSync, useExtension } from '~/lib/extension';
+import { extensionSetupUrl } from '~/lib/extension-flow';
 import { ago, cx } from '~/lib/format';
 import {
   useEbayActions,
@@ -494,7 +495,7 @@ function Extension() {
             Download it from pileGo, unzip it and load it in Chrome, Edge, Brave or Firefox. It takes about two minutes, and it links
             to your account by itself.
           </p>
-          <Link className="btn btn-tag self-start" to="/extension">
+          <Link className="btn btn-tag self-start" to={extensionSetupUrl('/settings#extension')}>
             <Download className="size-4" aria-hidden />
             Get the extension
           </Link>

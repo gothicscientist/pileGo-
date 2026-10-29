@@ -8,6 +8,7 @@ import { ListingStatusText, PhotoImg, Sticker } from '~/components/bits';
 import { useToast } from '~/components/overlay';
 import { Button, Empty, Paper, SectionTitle, Spinner } from '~/components/ui';
 import { askExtensionToSync, useExtension } from '~/lib/extension';
+import { extensionSetupUrl } from '~/lib/extension-flow';
 import { cx, daysSince, money, plural } from '~/lib/format';
 import { useEbayActions, useEbayStatus, useItems, useJobs, useListingJob, useProfile, useUpdateItem } from '~/lib/queries';
 import { errorMessage } from '~/lib/supabase';
@@ -134,7 +135,7 @@ export function OutThere() {
               {moving.some(j => j.runner === 'extension') && !ext.installed && (
                 <p className="mt-3 text-sm text-muted">
                   Some of these run in the browser extension. Open pileGo in a browser that has it, or{' '}
-                  <Link to="/extension" className="underline">
+                  <Link to={extensionSetupUrl('/out')} className="underline">
                     install it
                   </Link>
                   .

@@ -163,6 +163,85 @@ test('an installed extension shows up on the extension page', async ({ page }) =
   await expect(status).toContainText(/Version 0\.1\.0\. Version \d+\.\d+\.\d+ is out/);
 });
 
+test('extension setup resumes the listing with its selections and edits after a refresh', async ({ page }, info) => {
+  await mockSupabase(page);
+  // Stand in for the content script, including after refreshing the install tab.
+  await page.addInitScript(() => {
+    window.addEventListener('message', e => {
+      if (e.data?.source !== 'pilego-app' || e.data.type !== 'hello') return;
+      const status = JSON.parse(sessionStorage.getItem('test-extension-status') ?? 'null');
+      if (status) window.postMessage({ source: 'pilego-ext', type: 'status', status }, location.origin);
+    });
+  });
+  await page.goto('/item/a1?tab=listings&crosslist=1');
+  let dialog = page.getByRole('dialog', { name: 'Cross-list', exact: true });
+  await dialog.getByRole('tab', { name: 'Poshmark', exact: true }).click();
+  await dialog.getByLabel('Title', { exact: true }).fill('My edited jeans title');
+  await dialog.getByLabel('Price (USD)').fill('39');
+  await dialog.getByLabel('Description', { exact: true }).fill('My edited listing description');
+  await dialog.getByRole('button', { name: /Depop/ }).click();
+  await dialog.getByRole('button', { name: 'More marketplaces' }).click();
+  await dialog.getByRole('link', { name: 'Get the extension' }).click();
+  await expect(page.getByRole('link', { name: 'Back to listing' })).toHaveAttribute('href', '/item/a1?tab=listings&crosslist=1');
+  await page.reload();
+  await expect(page.getByText(/we’ll take you straight back to continue/)).toBeVisible();
+  await snap(page, 'extension-return', info.project.name);
+
+  const report = async (linked: boolean, needs_approval: boolean, user_id: string | null) => {
+    await page.evaluate(status => {
+      sessionStorage.setItem('test-extension-status', JSON.stringify(status));
+      window.postMessage({ source: 'pilego-ext', type: 'status', status }, location.origin);
+    }, { installed: true, version: '1.0.0', tabs: {}, running: 0, linked, needs_approval, user_id });
+  };
+  // Installation alone, pending approval and a different account cannot resume.
+  await report(false, false, null);
+  await expect(page.getByTestId('extension-status')).toContainText('Installed, linking');
+  await expect(page).toHaveURL(/\/extension\?/);
+  await report(true, true, UID);
+  await expect(page.getByTestId('extension-status')).toContainText('It needs your OK');
+  await expect(page).toHaveURL(/\/extension\?/);
+  await report(true, false, 'another-seller');
+  await expect(page.getByTestId('extension-status')).toContainText('Installed and linked');
+  await expect(page).toHaveURL(/\/extension\?/);
+  await report(true, false, UID);
+  await expect(page).toHaveURL('/item/a1?tab=listings&crosslist=1');
+  dialog = page.getByRole('dialog', { name: 'Cross-list', exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'List on 1 marketplace', exact: true })).toBeVisible();
+  await expect(dialog.getByLabel('Title', { exact: true })).toHaveValue('My edited jeans title');
+  await expect(dialog.getByLabel('Price (USD)')).toHaveValue('39');
+  await expect(dialog.getByLabel('Description', { exact: true })).toHaveValue('My edited listing description');
+  await expect(dialog.getByRole('button', { name: 'Only my marketplaces' })).toBeVisible();
+  await snap(page, 'crosslist-resumed', info.project.name);
+
+  // Setup must never submit or queue a listing on the seller’s behalf.
+  await expect(page.getByRole('button', { name: 'List on 1 marketplace', exact: true })).toBeEnabled();
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'Cross-list', exact: true }).first().click();
+  await expect(dialog.getByRole('button', { name: 'List on 2 marketplaces', exact: true })).toBeVisible();
+  await expect(dialog.getByLabel('Description', { exact: true })).not.toHaveValue('My edited listing description');
+});
+
+test('the extension page can return to the listing before installation finishes', async ({ page }) => {
+  await mockSupabase(page);
+  await page.goto('/item/a1?crosslist=1');
+  await page.getByRole('dialog', { name: 'Cross-list', exact: true }).getByRole('link', { name: 'Get the extension' }).click();
+  await page.getByRole('link', { name: 'Back to listing' }).click();
+  await expect(page.getByRole('dialog', { name: 'Cross-list', exact: true })).toBeVisible();
+});
+
+test('extension setup from Settings returns to Settings', async ({ page }) => {
+  await mockSupabase(page);
+  await page.goto('/settings#extension');
+  await page.getByRole('link', { name: 'Get the extension' }).click();
+  await expect(page.getByRole('link', { name: 'Back to where you left off' })).toHaveAttribute('href', '/settings#extension');
+  await page.evaluate(user_id => window.postMessage({
+    source: 'pilego-ext', type: 'status',
+    status: { installed: true, linked: true, user_id, needs_approval: false },
+  }, location.origin), UID);
+  await expect(page).toHaveURL('/settings#extension');
+});
+
 test('scan sends photo roles and marks measurement estimates', async ({ page }, info) => {
   await mockSupabase(page);
   await page.addInitScript(() => window.localStorage.setItem('pilego-cutouts', 'off'));

@@ -4,11 +4,12 @@
 
 import { CheckCircle2, Copy, Download, PlugZap, TriangleAlert } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Wordmark } from '~/app/Shell';
 import { Paper } from '~/components/ui';
 import { useAuth } from '~/lib/auth';
 import { useExtension } from '~/lib/extension';
+import { extensionReturnTo } from '~/lib/extension-flow';
 import { cx } from '~/lib/format';
 
 declare const __EXTENSION_VERSION__: string;
@@ -45,7 +46,16 @@ export function older(installed: string | null, latest: string | null): boolean 
 export function ExtensionPage() {
   const ext = useExtension();
   const { session } = useAuth();
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const returnTo = extensionReturnTo(params.get('returnTo'));
+  const returnLabel = returnTo?.startsWith('/item/') ? 'Back to listing' : 'Back to where you left off';
   const [browser] = useState(detectBrowser);
+  useEffect(() => {
+    if (returnTo && session && ext.installed && ext.linked && !ext.needs_approval && ext.user_id === session.user.id) {
+      navigate(returnTo, { replace: true });
+    }
+  }, [returnTo, session, ext.installed, ext.linked, ext.needs_approval, ext.user_id, navigate]);
   // The extension answers within a moment; until then, say so rather than "not found".
   const [checking, setChecking] = useState(true);
   useEffect(() => {
@@ -62,8 +72,8 @@ export function ExtensionPage() {
         <Link to="/">
           <Wordmark />
         </Link>
-        <Link to={session ? '/settings#extension' : '/'} className="text-sm font-semibold text-ink-2 underline">
-          {session ? 'Back to Settings' : 'Back to pileGo'}
+        <Link to={returnTo ?? (session ? '/settings#extension' : '/')} className="text-sm font-semibold text-ink-2 underline">
+          {returnTo ? returnLabel : session ? 'Back to Settings' : 'Back to pileGo'}
         </Link>
       </div>
 
@@ -77,6 +87,14 @@ export function ExtensionPage() {
       </header>
 
       <StatusCard ext={ext} checking={checking} signedIn={Boolean(session)} />
+
+      {returnTo && (
+        <p role="status" className="mt-3 text-sm text-ink-2">
+          {returnTo.startsWith('/item/')
+            ? 'Your listing is saved here. Once the extension is installed and linked, we’ll take you straight back to continue.'
+            : 'Once the extension is installed and linked, we’ll take you back to where you left off.'}
+        </p>
+      )}
 
       {isPhone() && (
         <p className="mt-4 flex items-start gap-2 rounded-lg bg-sticker/70 p-3 text-sm text-[#16172b]">

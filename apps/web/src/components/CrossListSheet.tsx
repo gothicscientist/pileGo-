@@ -15,8 +15,10 @@ import {
 } from '@pilego/core';
 import { AlertTriangle, Check, PlugZap } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
+import { useUserId } from '~/lib/auth';
 import { useExtension } from '~/lib/extension';
+import { extensionSetupUrl } from '~/lib/extension-flow';
 import { cx, money } from '~/lib/format';
 import { useEbayActions, useEbayStatus, useProfile, useQueuePublish, type ListingOverride } from '~/lib/queries';
 import { errorMessage } from '~/lib/supabase';
@@ -27,9 +29,37 @@ import { Button, ErrorNote, Field, Input, TextArea } from './ui';
 
 type Edits = Partial<Record<MarketplaceId, { title?: string; price?: string; description?: string }>>;
 
+interface Draft {
+  selected: MarketplaceId[];
+  active: MarketplaceId | null;
+  edits: Edits;
+  showAll: boolean;
+}
+
+// Scoped to the seller, item and browser tab; survives refreshing after install.
+const drafts = new Map<string, Draft>();
+function readDraft(key: string): Draft | undefined {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (raw) {
+      const draft = JSON.parse(raw) as Draft;
+      if (Array.isArray(draft.selected) && draft.edits && typeof draft.edits === 'object') return draft;
+    }
+  } catch { /* Storage may be disabled; the in-memory copy still works. */ }
+  return drafts.get(key);
+}
+
+function clearDraft(key: string) {
+  drafts.delete(key);
+  try { sessionStorage.removeItem(key); } catch { /* Storage may be disabled. */ }
+}
+
 const LIVE = new Set(['listed', 'publishing', 'queued', 'delisting']);
 
 export function CrossListSheet({ item, open, onClose }: { item: Item; open: boolean; onClose: () => void }) {
+  const userId = useUserId();
+  const location = useLocation();
+  const draftKey = `pilego-crosslist:${userId}:${item.id}`;
   const { data: profile } = useProfile();
   const ext = useExtension();
   const ebay = useEbayStatus();
@@ -54,14 +84,31 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
 
   useEffect(() => {
     if (!open) return;
-    const start = mine.filter(m => !isLive(m));
+    const draft = readDraft(draftKey);
+    const start = (draft?.selected ?? mine).filter(m => MARKETPLACE_IDS.includes(m) && !isLive(m));
     setSelected(start);
-    setActive(start[0] ?? null);
-    setEdits({});
+    setActive(draft?.active && start.includes(draft.active) ? draft.active : (start[0] ?? null));
+    setEdits(draft?.edits ?? {});
+    setShowAll(draft?.showAll ?? false);
     setError(null);
     setSentKits([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, item.id]);
+  }, [open, item.id, userId]);
+
+  const close = () => {
+    clearDraft(draftKey);
+    onClose();
+  };
+
+  const returnParams = new URLSearchParams(location.search);
+  returnParams.set('crosslist', '1');
+  const extensionUrl = extensionSetupUrl(`/item/${encodeURIComponent(item.id)}?${returnParams}${location.hash}`);
+  const rememberDraft = () => {
+    const draft: Draft = { selected, active, edits, showAll };
+    drafts.set(draftKey, draft);
+    try { sessionStorage.setItem(draftKey, JSON.stringify(draft)); } catch { /* Keep the in-memory copy. */ }
+    // Navigating unmounts the sheet. Keep crosslist=1 so it reopens on return.
+  };
 
   const generated = useMemo(() => {
     const out: Partial<Record<MarketplaceId, GeneratedListing>> = {};
@@ -112,13 +159,14 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
     }
     try {
       await publish.mutateAsync({ itemId: item.id, marketplaces: selected, overrides });
+      clearDraft(draftKey);
       const kits = selected.filter(m => MARKETPLACES[m].capabilities.create === 'manual');
       const automatic = selected.length - kits.length;
       if (automatic) toast(`Sent to ${automatic} ${automatic === 1 ? 'marketplace' : 'marketplaces'}`);
       if (kits.length) {
         setSentKits(kits);
         setActive(kits[0]!);
-      } else onClose();
+      } else close();
     } catch (err) {
       setError(errorMessage(err));
     }
@@ -133,7 +181,7 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
   if (sentKits.length) {
     const m = active && sentKits.includes(active) ? active : sentKits[0]!;
     return (
-      <Sheet open={open} onClose={onClose} title="Paste these by hand" wide>
+      <Sheet open={open} onClose={close} title="Paste these by hand" wide>
         <p className="mb-4 text-ink-2">
           {sentKits.map(k => MARKETPLACES[k].name).join(' and ')} {sentKits.length === 1 ? 'has' : 'have'} no way for pileGo to post for you yet.
           Here is everything to copy.
@@ -155,7 +203,7 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
   return (
     <Sheet
       open={open}
-      onClose={onClose}
+      onClose={close}
       title="Cross-list"
       wide
       footer={
@@ -230,7 +278,7 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
             <Notice icon={<PlugZap className="size-5" aria-hidden />}>
               {needsExtension.map(m => MARKETPLACES[m].name).join(', ')} {needsExtension.length === 1 ? 'needs' : 'need'} the pileGo browser
               extension. They will wait in the queue until you open pileGo in a browser that has it.{' '}
-              <Link to="/extension" className="font-semibold underline" onClick={onClose}>
+              <Link to={extensionUrl} className="font-semibold underline" onClick={rememberDraft}>
                 Get the extension
               </Link>
             </Notice>
