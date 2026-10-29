@@ -29,6 +29,7 @@ import { ItemStatusTag, ListingStatusText, PhotoImg, Sticker, TierLabel } from '
 import { CrossListSheet } from '~/components/CrossListSheet';
 import { diffForm, formFromItem, ItemForm, type FormValue } from '~/components/ItemForm';
 import { ListingKit } from '~/components/ListingKit';
+import { PricingTool } from '~/components/PricingTool';
 import { Sheet, useToast } from '~/components/overlay';
 import { SaleSheet } from '~/components/SaleSheet';
 import { Button, Empty, ErrorNote, Paper, Spinner } from '~/components/ui';
@@ -638,7 +639,10 @@ function PriceTab({ item }: { item: Item }) {
                 {ago(suggestion.computed_at)}
               </p>
             ) : (
-              <p className="mt-1 text-sm text-muted">Check what similar pieces are listed and sold for.</p>
+              <p className="mt-1 text-sm text-muted">
+                Check what similar pieces sold for on eBay and what live listings ask, then pick a price between selling fast and
+                making the most.
+              </p>
             )}
           </div>
           <Button
@@ -646,36 +650,43 @@ function PriceTab({ item }: { item: Item }) {
             icon={<Search className="size-4" aria-hidden />}
             busy={comps.isPending}
             onClick={() =>
-              comps.mutate(item.id, {
+              comps.mutate(item, {
                 onSuccess: setResult,
                 onError: err => toast(errorMessage(err), { tone: 'error' }),
               })
             }
           >
-            {suggestion ? 'Check again' : 'Check prices'}
+            {comps.isPending ? 'Checking prices' : suggestion ? 'Check again' : 'Check prices'}
           </Button>
         </div>
 
         {suggestion && (
-          <>
-            <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-              <span className="font-display text-5xl font-extrabold tabular">{money(suggestion.suggested, item.currency)}</span>
-              <span className="text-ink-2 tabular">
-                range {money(suggestion.low, item.currency)} to {money(suggestion.high, item.currency)}
-              </span>
-            </div>
-            <ul className="mt-3 flex flex-col gap-1 text-sm text-ink-2">
-              {suggestion.reasons.map(r => (
-                <li key={r}>{r}</li>
-              ))}
-            </ul>
-            {item.price !== suggestion.suggested && item.status !== 'sold' && (
-              <Button variant="ink" className="mt-4" busy={update.isPending} onClick={() => setPrice(suggestion.suggested)}>
-                Use {money(suggestion.suggested, item.currency)}
-              </Button>
-            )}
-          </>
+          <div className="mt-4">
+            <PricingTool
+              suggestion={suggestion}
+              currency={item.currency}
+              current={item.price}
+              busy={update.isPending}
+              disabled={item.status === 'sold'}
+              onUse={item.status === 'sold' ? undefined : setPrice}
+            />
+            <details className="mt-4 text-sm text-ink-2">
+              <summary className="cursor-pointer font-semibold text-ink">How this was worked out</summary>
+              <ul className="mt-2 flex flex-col gap-1">
+                {suggestion.reasons.map(r => (
+                  <li key={r}>{r}</li>
+                ))}
+              </ul>
+            </details>
+          </div>
         )}
+        {result?.sources?.notes.length ? (
+          <ul className="mt-3 flex flex-col gap-1 rounded-lg bg-paper-2 px-3 py-2 text-sm text-ink-2">
+            {result.sources.notes.map(n => (
+              <li key={n}>{n}</li>
+            ))}
+          </ul>
+        ) : null}
         {result?.error && <p className="mt-3 text-sm text-ink-2">{result.error}</p>}
       </Paper>
 

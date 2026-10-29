@@ -210,6 +210,25 @@ export interface PriceSuggestion {
   reasons: string[];
   comps_used: number;
   computed_at: string;
+  /** Sell-fast price: priced to go in about a week. Older rows lack it; use low. */
+  quick?: number;
+  /** Maximize-profit price: the top of what buyers realistically pay. Older rows lack it; use high. */
+  max?: number;
+  /** Cleaned sold prices behind the suggestion, sorted, for the pricing slider. */
+  sold_prices?: number[];
+  /** Cleaned asking prices of live listings, sorted. */
+  asking_prices?: number[];
+  /** How much of each kind of evidence went in. */
+  sources?: PriceSources;
+}
+
+export interface PriceSources {
+  sold: number;
+  asking: number;
+  own: number;
+  ai: boolean;
+  /** Comparables left out: bundles, other sizes, other currencies, outliers. */
+  dropped: number;
 }
 
 export interface SellerVoice {

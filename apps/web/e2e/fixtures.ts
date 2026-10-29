@@ -225,6 +225,19 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
         returns: [{ id: 'r1', name: '30 day returns' }],
       });
     }
+    if (path.startsWith('/functions/v1/price-comps')) {
+      const sold = [32, 35, 38, 40, 42, 44, 45, 48, 52, 58];
+      return json(route, {
+        suggestion: {
+          suggested: 44, low: 38, high: 48, quick: 34, max: 56, currency: 'USD', confidence: 'high',
+          reasons: ['10 similar pieces sold for a median of 43 USD.'], comps_used: 10, computed_at: daysAgo(0),
+          sold_prices: sold, asking_prices: [], sources: { sold: 10, asking: 0, own: 0, ai: false, dropped: 2 },
+        },
+        comps: sold.map((price, i) => ({ source: 'ebay', title: `Levi's 501 jeans W32 #${i}`, price, currency: 'USD', url: `https://www.ebay.com/itm/${i}`, sold: true })),
+        sources: { ebay_configured: false, asking: 0, sold: 10, own_sales: 0, notes: ['eBay is not connected on this server yet, so live eBay listings are not included.'] },
+        error: null,
+      });
+    }
     if (path.startsWith('/functions/v1/')) return json(route, {});
     if (path.startsWith('/storage/v1/object/sign/photos') && req.method() === 'POST') {
       const body = req.postDataJSON() as { paths?: string[] };
