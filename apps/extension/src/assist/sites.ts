@@ -79,13 +79,6 @@ export const SITES: Partial<Record<MarketplaceId, SiteAdapter>> = {
     },
     skip: ['original_price'],
   },
-  facebook: {
-    id: 'facebook',
-    sellPage: /facebook\.com\/marketplace\/create\/item/,
-    posted: /facebook\.com\/marketplace\/(?:item\/(\d+)|you\/selling)/,
-    selectors: {},
-    skip: ['original_price', 'brand', 'size'],
-  },
 };
 
 export function siteFor(url: string): SiteAdapter | null {

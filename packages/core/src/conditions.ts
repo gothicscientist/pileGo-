@@ -58,13 +58,6 @@ export const CONDITION_WORDS: Partial<Record<MarketplaceId, Record<Condition, st
     good: ['Used'],
     fair: ['Very Worn'],
   },
-  facebook: {
-    new_with_tags: ['New'],
-    new_without_tags: ['Used - Like New', 'Like New'],
-    excellent: ['Used - Like New', 'Like New'],
-    good: ['Used - Good', 'Good'],
-    fair: ['Used - Fair', 'Fair'],
-  },
 };
 
 /** Vinted's condition ids, as written into item_attributes { code: 'condition' }. */

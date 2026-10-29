@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 afterEach(() => { vi.resetModules(); delete (globalThis as { chrome?: unknown }).chrome; });
 
-async function waitingJob(link: string | null, sweep = false) {
-  const job = { id: 'job-1', listing_id: 'listing-1', marketplace: 'poshmark', kind: 'publish', attempts: 1 };
-  const waiting = { job, tab_id: 42, listing_id: 'listing-1', marketplace: 'poshmark', kind: 'post', title: 'Gildan Berkeley hoodie', pressed: true, stuck: sweep };
+async function waitingJob(link: string | null, sweep = false, marketplace = 'poshmark') {
+  const job = { id: 'job-1', listing_id: 'listing-1', marketplace, kind: 'publish', attempts: 1 };
+  const waiting = { job, tab_id: 42, listing_id: 'listing-1', marketplace, kind: 'post', title: 'Gildan Berkeley hoodie', pressed: true, stuck: sweep };
   const storage: Record<string, unknown> = { 'assist.waiting': { 'job-1': waiting } };
   (globalThis as { chrome?: unknown }).chrome = {
     storage: { local: {
@@ -32,6 +32,12 @@ async function waitingJob(link: string | null, sweep = false) {
 }
 
 describe('marketplace confirmation', () => {
+  it('ignores work saved for a removed marketplace after an extension update', async () => {
+    const { patches, rpc } = await waitingJob(null, true, 'facebook');
+    expect(patches).toEqual([]);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it('does not mark an item live just because the tab redirected to the closet', async () => {
     const { patches, rpc, storage } = await waitingJob(null);
     expect(patches).toEqual([expect.objectContaining({ status: 'needs_action' })]);

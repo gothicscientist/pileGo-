@@ -1,5 +1,5 @@
 // The listing kit: everything a seller needs to paste a listing into any
-// marketplace by hand. Used for Etsy and Vestiaire, and as the fallback for
+// marketplace by hand. Used as the fallback for
 // every other marketplace when the extension is not around.
 
 import { listingKitText, MARKETPLACES, type GeneratedListing, type Item, type Listing } from '@pilego/core';

@@ -2,7 +2,7 @@
 
 A free, open-source closet for people who resell clothes. Photograph a piece,
 let the AI fill in the listing, and send it to eBay, Vinted, Depop, Poshmark,
-Mercari, Grailed and Facebook Marketplace from one place. When it sells
+Mercari and Grailed from one place. When it sells
 somewhere, pileGo! takes it down everywhere else.
 
 ![The pile: unsold everyday pieces scattered on a paper floor with kraft price tags, with a receipt of what is listed and what to do next](docs/screenshots/pile.webp)
@@ -58,9 +58,6 @@ how much it can do, and the app labels every marketplace with one of these:
 | Poshmark | Auto-post | Assisted | | Public listing page | |
 | Mercari | Assisted | Assisted | | Public listing page | |
 | Grailed | Assisted | Assisted | | Public listing page | |
-| Facebook Marketplace | Assisted | By hand | | By hand | |
-| Etsy | Listing kit | By hand | | By hand | |
-| Vestiaire Collective | Listing kit | By hand | | By hand | |
 
 The Vinted engine keeps a human pace. It pauses between steps, caps how many
 listings it creates per hour and per day, and stops for a while if Vinted rate

@@ -425,7 +425,7 @@ function Extension() {
     <Section
       id="extension"
       title="Browser extension"
-      intro="Vinted, Depop, Poshmark, Mercari, Grailed and Facebook have no public API for sellers. The pileGo! extension works in your own logged-in tabs: one click on Vinted, a filled-in form on the others."
+      intro="Vinted, Depop, Poshmark, Mercari and Grailed have no public API for sellers. The pileGo! extension works in your own logged-in tabs: one click on Vinted, a filled-in form on the others."
     >
       {ext.installed && ext.needs_approval ? (
         <p className="flex items-start gap-2 kraft rounded-xl p-3 text-sm font-semibold">

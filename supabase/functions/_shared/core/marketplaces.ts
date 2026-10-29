@@ -180,57 +180,6 @@ export const MARKETPLACES: Record<MarketplaceId, MarketplaceInfo> = {
     color: '#111111',
     hosts: ['https://www.grailed.com/*'],
   },
-  facebook: {
-    id: 'facebook',
-    name: 'Facebook Marketplace',
-    blurb: 'The extension fills the Marketplace form in your tab; you check it and publish.',
-    regions: ['US', 'UK', 'EU', 'CA', 'AU'],
-    capabilities: {
-      create: 'assist',
-      delist: 'manual',
-      relist: null,
-      sold_sync: 'manual',
-      import: null,
-    },
-    sell_url: 'https://www.facebook.com/marketplace/create/item',
-    title_max: 99,
-    description_max: 1500,
-    photos_max: 10,
-    hashtags_max: 0,
-    fees: { US: { percent: 10, fixed: 0, min: 0.8 }, UK: { percent: 0, fixed: 0 } },
-    color: '#1877F2',
-    hosts: ['https://www.facebook.com/*'],
-  },
-  etsy: {
-    id: 'etsy',
-    name: 'Etsy',
-    blurb: 'Vintage only (20 years or older). Listing kit today; API connection is planned.',
-    regions: ['US', 'UK', 'EU', 'CA', 'AU'],
-    capabilities: { create: 'manual', delist: 'manual', relist: null, sold_sync: 'manual', import: null },
-    sell_url: 'https://www.etsy.com/your/shops/me/listing-editor/create',
-    title_max: 140,
-    description_max: 5000,
-    photos_max: 20,
-    hashtags_max: 13,
-    fees: { US: { percent: 9.5, fixed: 0.45 }, UK: { percent: 10.5, fixed: 0.4 } },
-    color: '#F1641E',
-    hosts: [],
-  },
-  vestiaire: {
-    id: 'vestiaire',
-    name: 'Vestiaire Collective',
-    blurb: 'Designer pieces. Listing kit with a link to Vestiaire’s submission form.',
-    regions: ['US', 'UK', 'EU'],
-    capabilities: { create: 'manual', delist: 'manual', relist: null, sold_sync: 'manual', import: null },
-    sell_url: 'https://www.vestiairecollective.com/sell-clothes-online/',
-    title_max: 80,
-    description_max: 1500,
-    photos_max: 10,
-    hashtags_max: 0,
-    fees: { US: { percent: 15, fixed: 0 }, UK: { percent: 15, fixed: 0 }, EU: { percent: 15, fixed: 0 } },
-    color: '#8C6A3C',
-    hosts: [],
-  },
 };
 
 export const MARKETPLACE_IDS = Object.keys(MARKETPLACES) as MarketplaceId[];
@@ -257,5 +206,5 @@ export function marketplace(id: MarketplaceId): MarketplaceInfo {
 }
 
 export function isMarketplaceId(value: unknown): value is MarketplaceId {
-  return typeof value === 'string' && value in MARKETPLACES;
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(MARKETPLACES, value);
 }

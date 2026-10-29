@@ -161,9 +161,23 @@ test('settings show marketplaces, eBay and extension', async ({ page }, info) =>
   await mockSupabase(page);
   await page.goto('/settings');
   await expect(page.getByRole('heading', { name: 'Where you sell' })).toBeVisible();
+  for (const name of ['eBay', 'Vinted', 'Depop', 'Poshmark', 'Mercari', 'Grailed']) {
+    await expect(page.getByRole('checkbox', { name: `Sell on ${name}`, exact: true })).toBeVisible();
+  }
+  await expect(page.getByRole('checkbox', { name: /Sell on (Etsy|Vestiaire|Facebook)/ })).toHaveCount(0);
   await expect(page.getByText(/Connected as sam_resells/)).toBeVisible();
   await expect(page.getByText('Not installed in this browser')).toBeVisible();
   await snap(page, 'settings', info.project.name);
+});
+
+test('old marketplace preferences and listings do not break the closet or cross-listing', async ({ page }) => {
+  await mockSupabase(page, { marketplaces: ['etsy', 'facebook', 'vestiaire', 'depop'], legacyMarketplace: 'facebook' });
+  await page.goto('/closet');
+  await expect(page.getByText('Raw selvedge straight jeans', { exact: true }).first()).toBeVisible();
+  await page.goto('/item/a4?crosslist=1');
+  const sheet = page.getByRole('dialog');
+  await expect(sheet.getByRole('button', { name: 'List on 1 marketplace', exact: true })).toBeVisible();
+  await expect(sheet.getByText(/Etsy|Vestiaire|Facebook/)).toHaveCount(0);
 });
 
 test('scan page offers camera and file pickers', async ({ page }, info) => {

@@ -46,7 +46,6 @@ const assistMatches = [
   'https://poshmark.ca/*',
   'https://www.mercari.com/*',
   'https://www.grailed.com/*',
-  'https://www.facebook.com/*',
 ];
 
 const appMatches = [...appOrigins.map(o => `${o}/*`), 'https://*.pages.dev/*'];
@@ -61,7 +60,7 @@ function manifest(browser) {
     name: 'pileGo',
     short_name: 'pileGo',
     version: pkg.version,
-    description: 'Cross-list your secondhand clothes from pileGo to Vinted, Depop, Poshmark, Mercari, Grailed and Facebook.',
+    description: 'Cross-list your secondhand clothes from pileGo to Vinted, Depop, Poshmark, Mercari and Grailed.',
     icons: { 16: 'icons/16.png', 32: 'icons/32.png', 48: 'icons/48.png', 128: 'icons/128.png' },
     action: { default_title: 'pileGo', default_popup: 'popup.html', default_icon: { 16: 'icons/16.png', 32: 'icons/32.png' } },
     permissions: ['storage', 'alarms', 'webRequest'],
