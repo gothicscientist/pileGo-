@@ -52,10 +52,37 @@ real Vinted accounts.
     The pause doubles with each refusal in a day and honours Vinted's
     Retry-After.
 
-## Depop, Poshmark, Mercari, Grailed: Assisted
+## Depop and Poshmark: Auto-post
 
-These sites' APIs are closed to individual sellers, and their sell forms
-change often. The extension:
+These sites' APIs are closed to individual sellers, so the extension works
+their sell forms the way a person would, in the seller's logged-in tab. The
+tab opens in front, because browsers throttle pages in background tabs.
+
+- **Depop** (`apps/extension/src/assist/depop.ts`): photos (JPEG or PNG, up to
+  8, checked and sent again if the page was still loading), description,
+  category under the right MEN / WOMEN / KIDS heading, material, brand,
+  condition, up to two colours (removing the colours Depop guesses from the
+  photos), size, source, age, up to three styles, price, worldwide shipping
+  and package size. Then Post.
+- **Poshmark** (`apps/extension/src/assist/poshmark.ts`): photos and the
+  cover-shot editor's Apply, title, description, department, category and
+  subcategory, size (a custom size when it is not on the list), condition,
+  brand, up to two colours, up to three style tags, and price through the price
+  pop-up. Then Next and List This Item.
+
+What to pick for each item is in `apps/extension/src/assist/choices.ts`:
+source and age come from the item's era, styles and tags from its style tags,
+era and materials, and package size from its category. A panel shows each step
+and counts down for three seconds before posting, with a Stop button. If a
+required field cannot be filled, or the site refuses the form, nothing is
+posted: the listing is marked as needing you, the tab stays open with the
+panel, and pressing "I've posted it" or posting from the tab settles it.
+
+When the tab lands on the new listing, pileGo records it as live with its link.
+
+## Mercari, Grailed: Assisted
+
+The extension:
 
 1. Opens the sell form in a new tab.
 2. Adds your photos, up to each site's limit.
@@ -72,6 +99,8 @@ pileGo records it as live with its link. You can also press "I've posted it".
 - **Sales:** pileGo checks each live listing's public page about every 30
   minutes while your browser is open. It reads schema.org availability first,
   then each site's own markers.
+These also apply to Depop and Poshmark:
+
 - **Taking down after a sale elsewhere:** pileGo opens the listing with a panel
   that asks you to delete it or mark it sold. Then you press Done.
 - **Relisting and import:** not supported on these sites yet.

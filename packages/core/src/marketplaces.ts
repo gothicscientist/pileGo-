@@ -85,7 +85,7 @@ export const MARKETPLACES: Record<MarketplaceId, MarketplaceInfo> = {
   depop: {
     id: 'depop',
     name: 'Depop',
-    blurb: 'The extension fills Depop’s sell form in your tab; you check it and post.',
+    blurb: 'The extension fills every field of Depop’s sell form in your logged-in tab and posts it.',
     regions: ['US', 'UK', 'EU', 'AU'],
     capabilities: {
       create: 'assist',
@@ -111,7 +111,7 @@ export const MARKETPLACES: Record<MarketplaceId, MarketplaceInfo> = {
   poshmark: {
     id: 'poshmark',
     name: 'Poshmark',
-    blurb: 'The extension fills Poshmark’s listing form in your tab; you check it and list.',
+    blurb: 'The extension fills every field of Poshmark’s listing form in your logged-in tab and lists it.',
     regions: ['US', 'CA', 'AU'],
     capabilities: {
       create: 'assist',

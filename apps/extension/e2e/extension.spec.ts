@@ -1,4 +1,5 @@
 import { expect, tabId, test, work } from './fixtures.ts';
+import { DEPOP_FORM, POSHMARK_FORM } from './mocks.ts';
 
 const VINTED = 'https://www.vinted.co.uk';
 
@@ -85,6 +86,36 @@ test.describe('Vinted', () => {
     expect(completed).toBe(false);
   });
 
+  test('on vinted.com, finds the login and sizes without the member cookie', async ({ context, worker }) => {
+    const US = 'https://www.vinted.com';
+    const sizes: string[] = [];
+    await context.route(`${US}/**`, async route => {
+      const url = new URL(route.request().url());
+      const json = (body: unknown) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
+      if (!url.pathname.startsWith('/api/')) return route.fulfill({ contentType: 'text/html', body: '<html><body><script>x={"CSRF_TOKEN":"t"}</script></body></html>' });
+      if (url.pathname === '/api/v2/users/current') return json({ user: { id: 99 } });
+      if (url.pathname === '/api/v2/item_upload/catalogs') return json({ catalogs });
+      if (url.pathname === '/api/v2/size_groups') {
+        sizes.push(url.search);
+        return json({ size_groups: [{ id: 4, sizes: [{ id: 207, title: 'M' }] }] });
+      }
+      if (url.pathname === '/api/v2/item_upload/colors') return json({ colors: [] });
+      if (url.pathname === '/api/v2/item_upload/brands') return json({ brands: [] });
+      if (url.pathname === '/api/v2/photos') return json({ id: 1 });
+      if (url.pathname === '/api/v2/item_upload/drafts') return json({ draft: { id: 5 } });
+      if (url.pathname.endsWith('/completion')) return json({ item: { id: 6 } });
+      return route.fulfill({ status: 404, body: '{}' });
+    });
+    const page = await context.newPage();
+    await page.goto(`${US}/`);
+    const id = await tabId(worker, `${US}/*`);
+    const ping = await worker.evaluate(({ id }) => chrome.tabs.sendMessage(id, { type: 'vinted:ping' }), { id });
+    expect(ping).toMatchObject({ status: 'done', data: { logged_in: true } });
+    const out = await worker.evaluate(({ id, work }) => chrome.tabs.sendMessage(id, { type: 'vinted:publish', work }), { id, work: work() });
+    expect(out).toMatchObject({ status: 'listed', external_id: '6' });
+    expect(sizes).toEqual(['?catalog_ids=2525']);
+  });
+
   test('stops for a while after a rate limit', async ({ context, worker }) => {
     await context.addCookies([{ name: 'v_uid', value: '4242', domain: 'www.vinted.co.uk', path: '/' }]);
     await context.route(`${VINTED}/**`, async route => {
@@ -106,38 +137,67 @@ test.describe('Vinted', () => {
   });
 });
 
-test('fills the Depop sell form and shows the panel', async ({ context, worker }) => {
-  await context.route('https://www.depop.com/**', route =>
-    route.fulfill({
-      contentType: 'text/html',
-      body: `<!doctype html><html><body><form>
-        <input type="file" accept="image/*" multiple id="photos" />
-        <label for="d">Description</label><textarea id="d" name="description"></textarea>
-        <label>Brand <input name="brand" id="b" /></label>
-        <label>Price <input name="priceAmount" id="p" /></label>
-      </form>
-      <script>
-        window.events = [];
-        document.querySelector('textarea').addEventListener('input', e => window.events.push('desc:' + e.target.value.length));
-      </script></body></html>`,
-    }),
-  );
+test('fills every field on Depop, removes its colour guess and posts', async ({ context, worker }) => {
+  await context.route('https://www.depop.com/**', route => route.fulfill({ contentType: 'text/html', body: DEPOP_FORM }));
   const page = await context.newPage();
   await page.goto('https://www.depop.com/products/create/');
   const id = await tabId(worker, 'https://www.depop.com/*');
-  const listing = { ...work().listing, marketplace: 'depop', title: '', description: 'Levi’s denim trucker jacket\n\nMid-wash.\n\n#levis #denim' };
-  const out = await worker.evaluate(
-    ({ id, work }) => chrome.tabs.sendMessage(id, { type: 'assist:fill', work }),
-    { id, work: work({ marketplace: 'depop', listing }) },
-  );
-  expect(out).toMatchObject({ ok: true, photos: 1 });
-  expect((out as { filled: string[] }).filled.sort()).toEqual(['brand', 'description', 'price']);
-  await expect(page.locator('#d')).toHaveValue(listing.description);
-  await expect(page.locator('#p')).toHaveValue('32');
-  await expect(page.locator('#b')).toHaveValue('Levi’s');
-  expect(await page.evaluate(() => (document.getElementById('photos') as HTMLInputElement).files?.length)).toBe(1);
-  expect(await page.evaluate(() => (window as unknown as { events: string[] }).events.length)).toBeGreaterThan(0);
-  await expect(page.locator('pilego-panel')).toHaveCount(1);
+  const base = work();
+  const listing = { ...base.listing, marketplace: 'depop', title: '', description: 'GAP brown jacket\n\nBarely worn.\n\n#gap' };
+  const item = { ...base.item, brand: 'GAP', department: 'unisex', subcategory: 'jackets', colors: ['brown'], condition: 'excellent', style_tags: ['workwear'], era: null };
+  const out = await worker.evaluate(({ id, work }) => chrome.tabs.sendMessage(id, { type: 'assist:fill', work }), {
+    id,
+    work: work({ marketplace: 'depop', listing, item, photos: [base.photos[0], base.photos[0]] }),
+  });
+  expect(out).toMatchObject({ ok: true, posted: true, photos: 2, missing: [] });
+  const sent = await page.evaluate(() => (window as unknown as { submitted: Record<string, unknown> }).submitted);
+  expect(sent).toEqual({
+    picked: {
+      group: 'Jackets',
+      brand: 'Gap',
+      condition: 'Used - Excellent',
+      colour: ['Brown'],
+      source: ['Preloved'],
+      age: ['Modern'],
+      style: ['Utility'],
+      shippingMethods: 'Extra large',
+      variants: 'M',
+    },
+    price: '32',
+    description: listing.description,
+    worldwide: true,
+    photos: 2,
+  });
+  expect(page.url()).toBe('https://www.depop.com/products/seller-gap-jacket-1234/');
+  await expect(page.locator('pilego-panel')).toHaveCount(0);
+});
+
+test('fills every field on Poshmark, through the photo and price pop-ups, and lists', async ({ context, worker }) => {
+  await context.route('https://poshmark.com/**', route => route.fulfill({ contentType: 'text/html', body: POSHMARK_FORM }));
+  const page = await context.newPage();
+  await page.goto('https://poshmark.com/create-listing');
+  const id = await tabId(worker, 'https://poshmark.com/*');
+  const base = work();
+  const item = { ...base.item, brand: 'GAP', department: 'men', subcategory: 'jackets', colors: ['brown'], condition: 'good', style_tags: ['workwear'], era: '90s', materials: ['cotton'] };
+  const out = await worker.evaluate(({ id, work }) => chrome.tabs.sendMessage(id, { type: 'assist:fill', work }), {
+    id,
+    work: work({ marketplace: 'poshmark', item, listing: { ...base.listing, marketplace: 'poshmark', title: 'GAP brown jacket' } }),
+  });
+  expect(out).toMatchObject({ ok: true, posted: true, photos: 1, missing: [] });
+  const listed = await page.evaluate(() => (window as unknown as { listed: Record<string, unknown> }).listed);
+  expect(listed).toMatchObject({
+    photos: 1,
+    category: 'men/Jackets & Coats',
+    subcategory: 'Lightweight & Shirt Jackets',
+    size: 'M',
+    condition: 'Good',
+    colors: ['Brown'],
+    tags: ['Workwear', '90s', 'Cotton'],
+    title: 'GAP brown jacket',
+    price: '32',
+    brand: 'GAP',
+  });
+  expect(page.url()).toBe('https://poshmark.com/listing/GAP-Jacket-65a1b2c3');
 });
 
 test.describe('linking', () => {

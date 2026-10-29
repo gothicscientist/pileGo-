@@ -5,7 +5,7 @@ import { errorText, ext } from './shared/browser.ts';
 import type { AssistReport, ExtStatus } from './shared/messages.ts';
 import { readBlock } from './shared/pace.ts';
 import { authed, config, dropPendingLink, holdLink, isTrusted, pendingLink, redeem, unlink, type LinkRequest } from './bg/session.ts';
-import { ASSIST_MARKETS, forgetTab, noteVintedTab, onAssistReport, onTabClosed, onTabUrl, runQueue, state, waitingCount } from './bg/jobs.ts';
+import { ASSIST_MARKETS, forgetTab, noteProgress, noteVintedTab, onAssistReport, onTabClosed, onTabUrl, runQueue, state, waitingCount } from './bg/jobs.ts';
 import { soldComps } from './bg/comps.ts';
 import { importVinted, syncSales } from './bg/sync.ts';
 import { openTabs, VINTED_TABS } from './bg/tabs.ts';
@@ -214,6 +214,12 @@ ext.runtime.onMessage.addListener((raw: unknown, sender, reply) => {
   }
   if (msg.type === 'vinted:tokens') {
     reply(seenTokens);
+    return false;
+  }
+  if (msg.type === 'assist:progress') {
+    // Also keeps this worker awake while a form fills.
+    noteProgress(String(msg.job_id), String(msg.step));
+    state.lastMessage = String(msg.step);
     return false;
   }
   if (msg.type.startsWith('assist:') && sender.tab) {

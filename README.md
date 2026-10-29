@@ -45,6 +45,7 @@ how much it can do, and the app labels every marketplace with one of these:
 |---|---|
 | **Automatic** | The server uses the marketplace's official API. This works with your browser closed. |
 | **One click** | The pileGo browser extension uses the marketplace's own web endpoints from your logged-in tab. You don't touch a form. |
+| **Auto-post** | The extension opens the sell form in your logged-in tab, fills every field and presses the site's own post button. You can press Stop in the first few seconds. |
 | **Assisted** | The extension opens the sell form, adds the photos and fills in what it can. You check it and press the site's own post button. |
 | **Listing kit** | Copy-ready text, a photo download and a link to the sell page. |
 
@@ -52,8 +53,8 @@ how much it can do, and the app labels every marketplace with one of these:
 |---|---|---|---|---|---|
 | eBay | Automatic | Automatic | Automatic | Automatic | Automatic |
 | Vinted | One click | One click | One click | One click (wardrobe) | One click |
-| Depop | Assisted | Assisted | | Public listing page | |
-| Poshmark | Assisted | Assisted | | Public listing page | |
+| Depop | Auto-post | Assisted | | Public listing page | |
+| Poshmark | Auto-post | Assisted | | Public listing page | |
 | Mercari | Assisted | Assisted | | Public listing page | |
 | Grailed | Assisted | Assisted | | Public listing page | |
 | Facebook Marketplace | Assisted | By hand | | By hand | |

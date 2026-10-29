@@ -1,22 +1,16 @@
 // Runs on the sell pages of Depop, Poshmark, Mercari, Grailed and Facebook.
-// Fills the site's own form from a pileGo item and shows a small panel with
-// everything else to copy. The seller checks the form and presses the site's
-// own button; pileGo never posts on these sites by itself.
+// On Depop and Poshmark it fills every field and presses the site's own post
+// button, with a few seconds to press Stop first. Elsewhere it fills what it
+// can find and shows a panel with the rest to copy; the seller posts.
 
-import { MARKETPLACES } from '@pilego/core';
+import { MARKETPLACES, type MarketplaceId } from '@pilego/core';
 import { ext, fromBase64, sleep } from '../shared/browser.ts';
-import type { AssistReport, AssistRequest, ListingWork } from '../shared/messages.ts';
+import type { AssistProgress, AssistReport, AssistRequest, FillResult, ListingWork } from '../shared/messages.ts';
+import { fillDepop } from './depop.ts';
+import { waitFor } from './dom.ts';
+import { Stopped, type Driver, type DriverContext } from './driver.ts';
+import { fillPoshmark } from './poshmark.ts';
 import { addPhotos, findField, findPhotoInput, setValue, siteFor, SITES, type FieldKey } from './sites.ts';
-
-async function waitFor<T>(find: () => T | null, ms: number): Promise<T | null> {
-  const end = Date.now() + ms;
-  while (Date.now() < end) {
-    const hit = find();
-    if (hit) return hit;
-    await sleep(500);
-  }
-  return null;
-}
 
 function files(work: ListingWork): File[] {
   const max = MARKETPLACES[work.marketplace].photos_max;
@@ -170,11 +164,125 @@ function panel(opts: {
   document.documentElement.append(panelHost);
 }
 
-function report(msg: AssistReport) {
+function report(msg: AssistReport | AssistProgress) {
   void ext.runtime.sendMessage(msg).catch(() => {});
 }
 
-async function startFill(work: ListingWork) {
+// ---------------------------------------------------------------------------
+// Depop and Poshmark: fill everything and post, with a Stop button.
+// ---------------------------------------------------------------------------
+
+const DRIVERS: Partial<Record<MarketplaceId, Driver>> = { depop: fillDepop, poshmark: fillPoshmark };
+
+/** Seconds the seller has to press Stop before pileGo presses the site's post button. */
+const GRACE_SECONDS = 3;
+
+let stopped = false;
+
+function progressPanel(work: ListingWork, message: string) {
+  const name = MARKETPLACES[work.marketplace].name;
+  panel({
+    title: `Listing on ${name}`,
+    message,
+    rows: [],
+    go: 'Hide',
+    no: 'Stop',
+    onGo: () => {},
+    onNo: () => {
+      stopped = true;
+    },
+  });
+}
+
+async function runDriver(work: ListingWork, driver: Driver): Promise<FillResult> {
+  const name = MARKETPLACES[work.marketplace].name;
+  stopped = false;
+  let shownStep = '';
+  const ctx: DriverContext = {
+    step(message) {
+      shownStep = message;
+      if (panelHost) progressPanel(work, message);
+      report({ type: 'assist:progress', job_id: work.job_id, step: message });
+    },
+    check() {
+      if (stopped) throw new Stopped();
+    },
+    async beforePost() {
+      for (let left = GRACE_SECONDS; left > 0; left -= 1) {
+        if (stopped) return false;
+        ctx.step(`Everything is filled in. Posting in ${left}…`);
+        await sleep(1000);
+      }
+      return !stopped;
+    },
+  };
+  progressPanel(work, 'Starting…');
+  // Chrome stops an idle background worker after 30 seconds; a photo upload can take longer.
+  const heartbeat = setInterval(() => report({ type: 'assist:progress', job_id: work.job_id, step: shownStep }), 10_000);
+  let result: FillResult;
+  try {
+    result = await driver(work, files(work), ctx);
+  } catch (err) {
+    if (err instanceof Stopped) {
+      report({ type: 'assist:gave-up', job_id: work.job_id, message: `You stopped pileGo on ${name}.` });
+      closePanel();
+      return { ok: false, filled: [], missing: [], photos: 0, posted: false, error: 'Stopped' };
+    }
+    result = { ok: false, filled: [], missing: [], photos: 0, posted: false, error: `${shownStep} ${String(err)}`.trim() };
+  } finally {
+    clearInterval(heartbeat);
+  }
+
+  if (result.posted) {
+    closePanel();
+    report({ type: 'assist:posted', job_id: work.job_id, url: location.href });
+    return result;
+  }
+  if (stopped) {
+    report({ type: 'assist:gave-up', job_id: work.job_id, message: `You stopped pileGo on ${name}.` });
+    closePanel();
+    return result;
+  }
+  const why = [
+    result.error ?? '',
+    result.missing.length ? `pileGo could not fill ${result.missing.join(', ')}.` : '',
+    `Finish the ${name} form in this tab and post it.`,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  report({ type: 'assist:stuck', job_id: work.job_id, message: why });
+  const rows = work.listing.fields.map(f => ({ label: f.label, value: f.value, done: result.filled.includes(f.key) }));
+  panel({
+    title: 'Needs you',
+    message: why,
+    rows,
+    go: 'I’ve posted it',
+    no: 'Stop',
+    onGo: () => report({ type: 'assist:posted', job_id: work.job_id, url: null }),
+    onNo: () => report({ type: 'assist:gave-up', job_id: work.job_id, message: `You stopped the ${name} form.` }),
+  });
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Other sites: fill what can be found, the seller posts.
+// ---------------------------------------------------------------------------
+
+let filling: string | null = null;
+
+async function startFill(work: ListingWork): Promise<FillResult> {
+  // The same job sent twice (a retry after a slow load) must not fill twice.
+  if (filling === work.job_id) return { ok: false, filled: [], missing: [], photos: 0, posted: false, error: 'Already filling.' };
+  filling = work.job_id;
+  try {
+    const driver = DRIVERS[work.marketplace];
+    return driver ? await runDriver(work, driver) : await assistFill(work);
+  } finally {
+    filling = null;
+  }
+}
+
+async function assistFill(work: ListingWork): Promise<FillResult> {
   const name = MARKETPLACES[work.marketplace].name;
   panel({
     title: `Filling ${name}`,
@@ -205,7 +313,7 @@ async function startFill(work: ListingWork) {
     onGo: () => report({ type: 'assist:posted', job_id: work.job_id, url: null }),
     onNo: () => report({ type: 'assist:gave-up', job_id: work.job_id, message: `You stopped the ${name} form.` }),
   });
-  return { filled, photos };
+  return { ok: true, filled, missing: [], photos, posted: false };
 }
 
 function startRemoval(work: ListingWork, reason: string) {
@@ -233,7 +341,7 @@ ext.runtime.onMessage.addListener((msg: AssistRequest, _sender, reply) => {
     return false;
   }
   startFill(msg.work).then(
-    r => reply({ ok: true, ...r }),
+    r => reply(r),
     err => reply({ ok: false, error: String(err) }),
   );
   return true;

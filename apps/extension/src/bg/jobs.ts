@@ -4,12 +4,15 @@
 import { generateListing, MARKETPLACES, type Item, type Job, type Listing, type MarketplaceId, type Profile } from '@pilego/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { between, errorText, ext, sleep, toBase64 } from '../shared/browser.ts';
-import type { AssistReport, ListingWork, PhotoBytes, VintedOutcome, VintedRequest } from '../shared/messages.ts';
+import type { AssistReport, FillResult, ListingWork, PhotoBytes, VintedOutcome, VintedRequest } from '../shared/messages.ts';
 import { blockMessage, capWait, noteWrite, readBlock } from '../shared/pace.ts';
-import { postedListing } from '../assist/sites.ts';
-import { openTabs, readyTab, sendToTab, vintedSiteFor, waitForLoad } from './tabs.ts';
+import { postedListing, SITES } from '../assist/sites.ts';
+import { activate, openTabs, readyTab, sendToTab, vintedSiteFor, waitForLoad } from './tabs.ts';
 
 export const ASSIST_MARKETS: MarketplaceId[] = ['depop', 'poshmark', 'mercari', 'grailed', 'facebook'];
+
+/** Marketplaces where pileGo fills every field and presses the site's own post button. */
+export const AUTO_POST: MarketplaceId[] = ['depop', 'poshmark'];
 
 type FullProfile = Profile & { price_strategy?: 'same' | 'match_take_home' };
 
@@ -65,6 +68,17 @@ export async function loadProfile(sb: SupabaseClient): Promise<FullProfile | nul
   return (data as FullProfile | null) ?? null;
 }
 
+async function toJpeg(blob: Blob): Promise<Blob> {
+  const bitmap = await createImageBitmap(blob);
+  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+  const g = canvas.getContext('2d')!;
+  g.fillStyle = '#fff';
+  g.fillRect(0, 0, bitmap.width, bitmap.height);
+  g.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  return canvas.convertToBlob({ type: 'image/jpeg', quality: 0.92 });
+}
+
 async function photoBytes(sb: SupabaseClient, item: Item, max: number): Promise<PhotoBytes[]> {
   const photos = [...(item.photos ?? [])].sort((a, b) => a.position - b.position).slice(0, max);
   if (!photos.length) return [];
@@ -75,8 +89,17 @@ async function photoBytes(sb: SupabaseClient, item: Item, max: number): Promise<
     if (!signed.signedUrl) continue;
     const r = await fetch(signed.signedUrl);
     if (!r.ok) continue;
-    const type = r.headers.get('content-type') || 'image/jpeg';
-    out.push({ data: toBase64(await r.arrayBuffer()), type, name: `${item.sku}-${i + 1}.${type.includes('png') ? 'png' : type.includes('webp') ? 'webp' : 'jpg'}` });
+    let type = r.headers.get('content-type') || 'image/jpeg';
+    let bytes = await r.arrayBuffer();
+    // Depop and Poshmark take JPEG and PNG only.
+    if (!/jpe?g|png/.test(type)) {
+      const jpeg = await toJpeg(new Blob([bytes], { type })).catch(() => null);
+      if (jpeg) {
+        bytes = await jpeg.arrayBuffer();
+        type = 'image/jpeg';
+      }
+    }
+    out.push({ data: toBase64(bytes), type, name: `${item.sku}-${i + 1}.${type.includes('png') ? 'png' : type.includes('webp') ? 'webp' : 'jpg'}` });
   }
   return out;
 }
@@ -122,6 +145,9 @@ async function buildWork(sb: SupabaseClient, job: Job, withPhotos: boolean) {
       colors: it.colors ?? [],
       condition: it.condition,
       original_price: it.original_price,
+      materials: it.materials ?? [],
+      style_tags: it.style_tags ?? [],
+      era: it.era ?? null,
     },
     photos: withPhotos ? await photoBytes(sb, it, MARKETPLACES[job.marketplace].photos_max) : [],
     learned,
@@ -295,6 +321,8 @@ interface Waiting {
   listing_id: string;
   marketplace: MarketplaceId;
   kind: 'post' | 'remove';
+  /** The tab could not post by itself and handed over to the seller. */
+  stuck?: boolean;
 }
 
 async function waitingList(): Promise<Record<string, Waiting>> {
@@ -338,26 +366,89 @@ async function runAssist(sb: SupabaseClient, job: Job, first: boolean) {
     reason = p.reason === 'sold_elsewhere' ? `Sold on ${MARKETPLACES[p.sold_on as MarketplaceId]?.name ?? 'another marketplace'}.` : 'You asked pileGo to take this down.';
   }
 
-  const tab = await ext.tabs.create({ url, active: first });
+  const auto = posting && AUTO_POST.includes(job.marketplace);
+  // Pages in background tabs are throttled and some never finish rendering, so
+  // a form pileGo fills by itself is filled in front.
+  const tab = await ext.tabs.create({ url, active: first || auto });
   if (tab.id == null) return finish(sb, job, 'pending', 'Could not open a tab.', null, 300);
-  const message = posting
-    ? `Check the form pileGo filled in your ${info.name} tab, then press ${info.name}’s own post button.`
-    : `${reason} Remove it in the ${info.name} tab pileGo opened.`;
+  const message = auto
+    ? `pileGo is listing this on ${info.name} in the tab it opened.`
+    : posting
+      ? `Check the form pileGo filled in your ${info.name} tab, then press ${info.name}’s own post button.`
+      : `${reason} Remove it in the ${info.name} tab pileGo opened.`;
   // needs_user before the form is filled, so the job is not handed out again
-  // while the seller is still looking at it.
-  await setListing(sb, listing.id, posting ? { status: 'needs_action', error: message } : { status: 'delisting', error: message });
+  // while the tab is working on it.
+  await setListing(
+    sb,
+    listing.id,
+    auto ? { status: 'publishing', error: null } : posting ? { status: 'needs_action', error: message } : { status: 'delisting', error: message },
+  );
   await finish(sb, job, 'needs_user', message, { tab: true });
   const list = await waitingList();
   list[job.id] = { job, tab_id: tab.id, listing_id: listing.id, marketplace: job.marketplace, kind: posting ? 'post' : 'remove' };
   await setWaiting(list);
 
   await waitForLoad(tab.id);
-  await sendToTab(tab.id, posting ? { type: 'assist:fill', work } : { type: 'assist:remove', work, reason }, 30_000).catch(err =>
-    console.warn('[pileGo] assist tab did not answer', errorText(err)),
-  );
+  if (!auto) {
+    await sendToTab(tab.id, posting ? { type: 'assist:fill', work } : { type: 'assist:remove', work, reason }, 30_000).catch(err =>
+      console.warn('[pileGo] assist tab did not answer', errorText(err)),
+    );
+    return;
+  }
+
+  await activate(tab.id).catch(() => {});
+  state.lastMessage = `Listing on ${info.name}…`;
+  const reply = await sendToTab<FillResult>(tab.id, { type: 'assist:fill', work }, 30_000).catch(err => {
+    // Posting navigates away, which closes the channel before the tab answers.
+    console.debug('[pileGo] assist tab closed the channel', errorText(err));
+    return null;
+  });
+  await settleAuto(sb, job.id, tab.id, reply);
+}
+
+/** Jobs already marked posted, so a report and a URL change do not both count. */
+const settled = new Set<string>();
+
+/** Steps the auto-post tabs last reported, by job: "Posting on Depop…" means the button was pressed. */
+const lastStep = new Map<string, string>();
+
+export function noteProgress(jobId: string, step: string) {
+  lastStep.set(jobId, step);
+}
+
+/**
+ * After an auto-post tab is done: the report or the new URL usually settles
+ * the job. If neither has, the tab's address decides.
+ */
+async function settleAuto(sb: SupabaseClient, jobId: string, tabId: number, reply: FillResult | null) {
+  const pressed = reply?.posted || /^(posting|listing) on/i.test(lastStep.get(jobId) ?? '');
+  const end = Date.now() + (pressed ? 30_000 : 5_000);
+  while (Date.now() < end) {
+    const w = (await waitingList())[jobId];
+    if (!w || w.stuck) break;
+    await sleep(1000);
+  }
+  lastStep.delete(jobId);
+  const list = await waitingList();
+  const w = list[jobId];
+  if (!w || w.stuck) return;
+  const tab = await ext.tabs.get(tabId).catch(() => null);
+  const url = tab?.url ?? null;
+  const site = SITES[w.marketplace];
+  delete list[jobId];
+  await setWaiting(list);
+  if (pressed && url && site && !site.sellPage.test(url)) return settlePosted(sb, w, url);
+  const name = MARKETPLACES[w.marketplace].name;
+  const message = reply?.error
+    ? `${reply.error} Finish it in the ${name} tab.`
+    : `pileGo could not finish the ${name} form. Finish it in the tab it opened, or press Retry.`;
+  await setListing(sb, w.listing_id, { status: 'needs_action', error: message });
+  await finish(sb, w.job, 'needs_user', message);
 }
 
 async function settlePosted(sb: SupabaseClient, w: Waiting, url: string | null) {
+  if (settled.has(w.job.id)) return;
+  settled.add(w.job.id);
   const found = url ? postedListing(w.marketplace, url) : null;
   const { data: listing } = await sb.from('listings').select('*').eq('id', w.listing_id).maybeSingle();
   const li = listing as Listing | null;
@@ -379,6 +470,14 @@ export async function onAssistReport(sb: SupabaseClient, report: AssistReport, t
   const list = await waitingList();
   const w = list[report.job_id];
   if (!w) return;
+  if (report.type === 'assist:stuck') {
+    // Still waiting: the seller finishes the form, and posting it settles the job.
+    w.stuck = true;
+    await setWaiting(list);
+    await setListing(sb, w.listing_id, { status: 'needs_action', error: report.message });
+    await finish(sb, w.job, 'needs_user', report.message);
+    return;
+  }
   delete list[report.job_id];
   await setWaiting(list);
   const name = MARKETPLACES[w.marketplace].name;

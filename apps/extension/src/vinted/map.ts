@@ -92,11 +92,17 @@ export function catalogKey(item: { department: string | null; category: string |
  */
 export function matchCatalog(
   tree: CatalogNode[],
-  item: { department: string | null; category: string | null; subcategory: string | null; title?: string },
+  item: { department: string | null; category: string | null; subcategory: string | null; title?: string; style_tags?: string[]; materials?: string[] },
 ): { id: number; path: string[]; score: number } | null {
   const root = rootFor(item.department, tree);
   if (!root) return null;
-  const leaves = flattenCatalogs([root]);
+  const roots = [root];
+  // Some domains (vinted.com) keep accessories under their own root.
+  if (item.category === 'accessories') roots.push(...tree.filter(n => /accessor/i.test(n.title) && n !== root));
+  const leaves = flattenCatalogs(roots);
+  // Words from the item itself break ties between equally good leaves:
+  // a "denim" jacket goes to Denim jackets rather than the first jacket leaf.
+  const own = new Set(norm([item.title ?? '', ...(item.style_tags ?? []), ...(item.materials ?? [])].join(' ')).split(' ').filter(w => w.length > 3).map(singular));
   const cat = CATEGORIES.find(c => c.id === item.category);
   const sub = cat?.subcategories.find(s => s.id === item.subcategory);
   const words = [...new Set([...(sub ? [sub.label, ...sub.search] : []), ...(cat && !sub ? [cat.label] : [])].map(norm))];
@@ -114,6 +120,7 @@ export function matchCatalog(
       else if (` ${parents} `.includes(` ${w} `)) score = Math.max(score, 3);
     }
     if (score && catWords.some(w => parents.includes(singular(w)))) score += 2;
+    if (score) for (const w of title.split(' ')) if (w.length > 3 && own.has(singular(w)) && !words.some(x => singular(x) === singular(w))) score += 1;
     // "Other …" leaves only win when nothing better exists.
     if (/^other\b|^autres?\b|^sonstige/.test(title)) score -= 1;
     if (score > (best?.score ?? 0)) best = { id: leaf.id, path: leaf.path, score };
