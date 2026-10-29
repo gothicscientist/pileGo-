@@ -86,7 +86,11 @@ async function migrations() {
 async function apiKeys() {
   const keys = (await api('GET', `/projects/${ref}/api-keys?reveal=true`)) ?? [];
   const pick = name => keys.find(k => k.name === name)?.api_key;
-  return { anon: pick('anon'), service: pick('service_role') };
+  // Projects with the newer API keys hand edge functions the sb_secret_ key as
+  // SUPABASE_SERVICE_ROLE_KEY, and isServiceCall compares against that, so the
+  // schedules must send the same key or every cron call is turned away.
+  const secret = keys.find(k => k.type === 'secret' && k.name === 'default') ?? keys.find(k => k.type === 'secret');
+  return { anon: pick('anon'), service: secret?.api_key ?? pick('service_role') };
 }
 
 async function vault(keys) {
