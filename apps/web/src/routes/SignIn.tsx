@@ -151,15 +151,7 @@ export function SignIn() {
                       <ArrowRight className="size-4" aria-hidden />
                     </Button>
                     <p className="text-xs leading-relaxed text-muted">
-                      Free and open source. Read the{' '}
-                      <a className="underline decoration-line underline-offset-2 hover:text-ink" href="/privacy">
-                        privacy notes
-                      </a>
-                      , or{' '}
-                      <a className="underline decoration-line underline-offset-2 hover:text-ink" href="/extension">
-                        get the browser extension
-                      </a>
-                      .
+                      Free and open source.
                     </p>
                   </form>
                 )}
@@ -208,10 +200,6 @@ export function SignIn() {
           </div>
         </div>
 
-        <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 text-xs text-muted">
-          <span>Real photos, real cutouts. No AI recreations.</span>
-          <span>pileGo! is free and open source.</span>
-        </footer>
       </div>
     </div>
   );
