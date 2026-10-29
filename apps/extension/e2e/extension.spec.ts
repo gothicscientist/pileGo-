@@ -165,11 +165,65 @@ test('fills every field on Depop, removes its colour guess and posts', async ({ 
     },
     price: '32',
     description: listing.description,
-    worldwide: true,
+    worldwide: false,
     photos: 2,
   });
+  expect(await page.evaluate(() => (window as unknown as { posts: number }).posts)).toBe(1);
   expect(page.url()).toBe('https://www.depop.com/products/seller-gap-jacket-1234/');
   await expect(page.locator('pilego-panel')).toHaveCount(0);
+});
+
+test.describe('Depop worldwide shipping', () => {
+  const depopItem = (base: ReturnType<typeof work>) => ({
+    ...base.item,
+    brand: 'GAP',
+    department: 'unisex',
+    subcategory: 'jackets',
+    colors: ['brown'],
+    condition: 'excellent',
+    style_tags: ['workwear'],
+    era: null,
+  });
+  const UNCHECKED = '<input type="checkbox" name="isInternationalShippingEnabled" />';
+  const CHECKED = '<input type="checkbox" name="isInternationalShippingEnabled" checked />';
+  const HIDDEN_INTL = '<div id="intl" style="display:none">';
+
+  async function fillDepop(context: import('@playwright/test').BrowserContext, worker: import('@playwright/test').Worker, body: string) {
+    await context.route('https://www.depop.com/**', route => route.fulfill({ contentType: 'text/html', body }));
+    const page = await context.newPage();
+    await page.goto('https://www.depop.com/products/create/');
+    const id = await tabId(worker, 'https://www.depop.com/*');
+    const base = work();
+    const out = await worker.evaluate(({ id, work }) => chrome.tabs.sendMessage(id, { type: 'assist:fill', work }), {
+      id,
+      work: work({ marketplace: 'depop', item: depopItem(base), listing: { ...base.listing, marketplace: 'depop', title: '', description: 'GAP brown jacket' } }),
+    });
+    const seen = await page.evaluate(() => {
+      const w = window as unknown as { posts: number; submitted?: { worldwide: boolean } };
+      return { posts: w.posts, worldwide: w.submitted?.worldwide ?? null };
+    });
+    return { page, out, ...seen };
+  }
+
+  test('switched on with no international price, it goes off, and the post goes through first time', async ({ context, worker }) => {
+    expect(DEPOP_FORM).toContain(UNCHECKED);
+    const body = DEPOP_FORM.replace(UNCHECKED, CHECKED).replace(HIDDEN_INTL, '<div id="intl">');
+    const { page, out, posts, worldwide } = await fillDepop(context, worker, body);
+    expect(out).toMatchObject({ ok: true, posted: true });
+    expect(posts).toBe(1);
+    expect(worldwide).toBe(false);
+    expect(page.url()).toBe('https://www.depop.com/products/seller-gap-jacket-1234/');
+  });
+
+  test('switched on with the seller’s own international price, it stays on', async ({ context, worker }) => {
+    const body = DEPOP_FORM.replace(UNCHECKED, CHECKED)
+      .replace(HIDDEN_INTL, '<div id="intl">')
+      .replace('id="internationalShippingCost__input" />', 'id="internationalShippingCost__input" value="15" />');
+    const { out, posts, worldwide } = await fillDepop(context, worker, body);
+    expect(out).toMatchObject({ ok: true, posted: true });
+    expect(posts).toBe(1);
+    expect(worldwide).toBe(true);
+  });
 });
 
 test('a fill that reaches the closet after posting is ignored, not reported as stuck', async ({ context, worker }) => {
@@ -264,12 +318,14 @@ test.describe('after pressing post', () => {
     expect(page.url()).toBe('https://poshmark.com/create-listing');
   });
 
+  const gate = `if (e.submitter && e.submitter.textContent !== 'Post') return;`;
+  const failing = (times: number) =>
+    gate +
+    ` window.fails = (window.fails || 0) + 1; if (window.fails <= ${times}) { window.posts += 1; const t = document.createElement('div'); t.setAttribute('role', 'alert');` +
+    ` t.textContent = 'Request failed with status code 500'; document.querySelector('main').append(t); return; }`;
+
   test('Depop answering Post with a 500 gets pressed again, and the listing goes up', async ({ context, worker }) => {
-    const gate = `if (e.submitter && e.submitter.textContent !== 'Post') return;`;
-    const flaky =
-      gate +
-      ` window.posts = (window.posts || 0) + 1; if (window.posts === 1) { const t = document.createElement('div'); t.setAttribute('role', 'alert');` +
-      ` t.textContent = 'Request failed with status code 500'; document.querySelector('main').append(t); return; }`;
+    const flaky = failing(1);
     expect(DEPOP_FORM).toContain(gate);
     await context.route('https://www.depop.com/**', route => route.fulfill({ contentType: 'text/html', body: DEPOP_FORM.replace(gate, flaky) }));
     const page = await context.newPage();
@@ -284,6 +340,26 @@ test.describe('after pressing post', () => {
     expect(out).toMatchObject({ ok: true, posted: true });
     expect(await page.evaluate(() => (window as unknown as { posts: number }).posts)).toBe(2);
     expect(page.url()).toBe('https://www.depop.com/products/seller-gap-jacket-1234/');
+  });
+
+  test('Depop answering every Post with a 500 hands the form to the seller after two presses', async ({ context, worker }) => {
+    expect(DEPOP_FORM).toContain(gate);
+    await context.route('https://www.depop.com/**', route => route.fulfill({ contentType: 'text/html', body: DEPOP_FORM.replace(gate, failing(99)) }));
+    const page = await context.newPage();
+    await page.goto('https://www.depop.com/products/create/');
+    const id = await tabId(worker, 'https://www.depop.com/*');
+    const base = work();
+    const item = { ...base.item, brand: 'GAP', department: 'unisex', subcategory: 'jackets', colors: ['brown'], condition: 'excellent', style_tags: ['workwear'], era: null };
+    const out = await worker.evaluate(({ id, work }) => chrome.tabs.sendMessage(id, { type: 'assist:fill', work }), {
+      id,
+      work: work({ marketplace: 'depop', item, listing: { ...base.listing, marketplace: 'depop', title: '', description: 'GAP brown jacket' } }),
+    });
+    expect(out).toMatchObject({ ok: false, posted: false });
+    expect(out).not.toHaveProperty('retry');
+    expect((out as { error: string }).error).toMatch(/500.*check your Depop listings/);
+    expect(await page.evaluate(() => (window as unknown as { posts: number }).posts)).toBe(2);
+    expect(page.url()).toBe('https://www.depop.com/products/create/');
+    await expect(page.locator('pilego-panel')).toHaveCount(1);
   });
 
   test('a Depop 500 page asks for a fresh form instead of handing over to the seller', async ({ context, worker }) => {

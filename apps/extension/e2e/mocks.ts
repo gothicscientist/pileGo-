@@ -8,6 +8,7 @@ export const DEPOP_FORM = `<!doctype html><html><body><main><form id="f">
   <div id="combos"></div>
   <label for="priceAmount__input">Item price</label><input type="number" id="priceAmount__input" />
   <input type="checkbox" name="isInternationalShippingEnabled" />
+  <div id="intl" style="display:none"><label for="internationalShippingCost__input">International shipping</label><input type="number" id="internationalShippingCost__input" /></div>
   <button type="submit">Post</button>
   <button type="submit">Save as a draft</button>
 </form></main>
@@ -77,9 +78,20 @@ export const DEPOP_FORM = `<!doctype html><html><body><main><form id="f">
     for (const f of e.target.files) { const img = document.createElement('img'); img.style.cssText = 'display:block;width:40px;height:40px'; document.getElementById('thumbs').append(img); }
     e.target.value = '';
   });
+  // Worldwide shipping brings up an international price; the server falls over without one.
+  const worldwide = document.querySelector('[name=isInternationalShippingEnabled]');
+  const intl = document.getElementById('internationalShippingCost__input');
+  worldwide.addEventListener('change', () => (document.getElementById('intl').style.display = worldwide.checked ? 'block' : 'none'));
+  window.posts = 0;
   document.getElementById('f').addEventListener('submit', e => {
     e.preventDefault();
     if (e.submitter && e.submitter.textContent !== 'Post') return;
+    window.posts += 1;
+    if (worldwide.checked && !intl.value) {
+      const t = document.createElement('div'); t.setAttribute('role', 'alert'); t.textContent = 'Request failed with status code 500';
+      document.querySelector('main').append(t);
+      return;
+    }
     window.submitted = { picked: window.picked, price: document.getElementById('priceAmount__input').value,
       description: document.getElementById('description').value, worldwide: document.querySelector('[name=isInternationalShippingEnabled]').checked,
       photos: document.querySelectorAll('#thumbs img').length };
