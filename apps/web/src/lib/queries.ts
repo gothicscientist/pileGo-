@@ -3,6 +3,7 @@
 // changes from the extension and the server invalidate the same keys.
 
 import {
+  compQuery,
   makeSku,
   type Item,
   type ItemEvent,
@@ -18,7 +19,7 @@ import {
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useAuth } from './auth';
-import { pokeExtension } from './extension';
+import { fetchSoldComps, pokeExtension } from './extension';
 import { cutOut, newId, prepareImage, removePhotos, signedUrls, uploadPhoto } from './photos';
 import { callFunction, supabase } from './supabase';
 
@@ -441,18 +442,39 @@ export function scanPhotos(paths: string[], currency: string, hint?: string): Pr
   return callFunction<ScanResult>('scan-item', { photos: paths, currency, hint: hint || undefined });
 }
 
+export interface PriceSources {
+  ebay_configured: boolean;
+  /** Live eBay listings found. */
+  asking: number;
+  /** eBay sold prices the extension read. */
+  sold: number;
+  own_sales: number;
+  /** What was missing and why, in plain words. */
+  notes: string[];
+}
+
 export interface PriceCompsResult {
   suggestion: PriceSuggestion | null;
   comps: PriceComp[];
+  sources?: PriceSources;
   error: string | null;
 }
 
+/**
+ * Check prices. When the extension is installed it first reads recent eBay
+ * sold prices in this browser; the server blends those with live eBay
+ * listings, the seller's own sales and the AI estimate.
+ */
 export function usePriceComps() {
   const qc = useQueryClient();
+  const { data: profile } = useProfile();
   return useMutation({
-    mutationFn: (itemId: string) => callFunction<PriceCompsResult>('price-comps', { item_id: itemId }),
-    onSuccess: (_d, itemId) => {
-      void qc.invalidateQueries({ queryKey: keys.item(itemId) });
+    mutationFn: async (item: Item) => {
+      const sold = await fetchSoldComps(compQuery(item), profile?.region ?? 'US');
+      return callFunction<PriceCompsResult>('price-comps', { item_id: item.id, ...(sold ? { client_comps: sold } : {}) });
+    },
+    onSuccess: (_d, item) => {
+      void qc.invalidateQueries({ queryKey: keys.item(item.id) });
       refreshItems(qc);
     },
   });

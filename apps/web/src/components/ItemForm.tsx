@@ -7,15 +7,19 @@ import {
   CONDITIONS,
   DEPARTMENTS,
   findCategory,
+  suggestPrice,
   type Condition,
   type Department,
   type Item,
   type Measurements,
+  type PriceSuggestion,
   type ScanResult,
 } from '@pilego/core';
 import { Sparkles } from 'lucide-react';
-import { useId } from 'react';
+import { useId, useMemo } from 'react';
+import { money } from '~/lib/format';
 import type { ItemDraft } from '~/lib/queries';
+import { PricingTool } from './PricingTool';
 import { ChipInput, ChoiceChips, Field, Input, Select, TextArea, TextField } from './ui';
 
 export type FormValue = Required<
@@ -94,8 +98,14 @@ export function formFromScan(scan: ScanResult, base: FormValue = emptyForm()): F
     era: scan.era,
     style_tags: scan.style_tags,
     description: scan.description,
-    price: base.price ?? scan.price.suggested ?? null,
+    price: base.price ?? aiSuggestion(scan, scan.condition)?.suggested ?? null,
   };
+}
+
+/** The scan's price, discounted the way the pricing tool treats a photo-only guess. */
+function aiSuggestion(scan: ScanResult, condition: Condition | null): PriceSuggestion | null {
+  if (!scan.price?.suggested) return null;
+  return suggestPrice({ currency: scan.price.currency, condition, ai: scan.price, now: new Date(0) });
 }
 
 /** Only the fields that changed, for an update. */
@@ -164,6 +174,7 @@ export function ItemForm({
   const measures = measureSet(value.category);
   const m = value.measurements ?? { unit };
   const ids = { cat: useId(), sub: useId(), desc: useId(), price: useId() };
+  const aiPrice = useMemo(() => (scan ? aiSuggestion(scan, value.condition) : null), [scan, value.condition]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -287,11 +298,24 @@ export function ItemForm({
         <TextArea id={ids.desc} rows={6} value={value.description} onChange={e => set('description', e.target.value)} />
       </Field>
 
+      {aiPrice && (
+        <div className="rounded-xl border-2 border-dashed border-line p-4">
+          <p className="mb-3 text-sm">
+            <span className="font-semibold">AI estimate</span>
+            <span className="text-ink-2">
+              {' '}
+              from the photos only, cut by 20% because photo guesses run high. Check prices after saving for market data.
+            </span>
+          </p>
+          <PricingTool suggestion={aiPrice} currency={currency} current={value.price} compact onUse={p => set('price', p)} />
+        </div>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-3">
         <Field
           label={`Price (${currency})`}
           htmlFor={ids.price}
-          hint={scan ? `AI guess ${scan.price.low} to ${scan.price.high}` : undefined}
+          hint={scan && aiPrice ? `AI estimate ${money(aiPrice.low, currency)} to ${money(aiPrice.high, currency)}` : undefined}
         >
           <Input
             id={ids.price}

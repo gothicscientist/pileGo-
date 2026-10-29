@@ -67,6 +67,17 @@ test('item page shows listings, price and cross-list sheet', async ({ page }, in
   await page.getByRole('tab', { name: 'Price' }).click();
   await expect(page.getByText('Suggested price')).toBeVisible();
   await expect(page.getByText('What you keep')).toBeVisible();
+  // The slider runs from selling fast to maximizing profit.
+  const slider = page.getByRole('slider', { name: /sell fast to maximize profit/ });
+  await expect(slider).toBeVisible();
+  await page.getByRole('button', { name: 'Check again' }).click();
+  await expect(page.getByText('eBay is not connected on this server yet')).toBeVisible();
+  await slider.focus();
+  await page.keyboard.press('Home');
+  await expect(page.getByText('Likely sells within about a week')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Use $34' })).toBeVisible();
+  await page.keyboard.press('End');
+  await expect(page.getByRole('button', { name: 'Use $56' })).toBeVisible();
   await snap(page, 'item-price', info.project.name);
   await page.getByRole('button', { name: 'Cross-list' }).first().click();
   const dialog = page.getByRole('dialog', { name: 'Cross-list' });
