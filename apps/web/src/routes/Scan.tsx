@@ -3,7 +3,7 @@
 // role to the AI. Photos upload as soon as they are picked so the AI can read
 // them; the garment is cut out for the pile while the AI works.
 
-import type { PhotoRole, ScanResult } from '@pilego/core';
+import { DEFAULT_VOICE, type PhotoRole, type ScanResult, type SellerVoice } from '@pilego/core';
 import { Camera, Check, ImagePlus, Scissors, Smartphone, Wand2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
@@ -12,13 +12,13 @@ import { emptyForm, formFromScan, ItemForm, type FormValue } from '~/components/
 import { useToast } from '~/components/overlay';
 import { PhoneSheet } from '~/components/PhoneSheet';
 import { CoverPreview, ShotGuide, type Shot } from '~/components/ShotGuide';
-import { Button, ErrorNote, Paper, TextField } from '~/components/ui';
+import { Button, ChoiceChips, ErrorNote, Paper, TextField } from '~/components/ui';
 import { useUserId } from '~/lib/auth';
 import { cx } from '~/lib/format';
 import { imageFiles, takeHandedOffFiles } from '~/lib/handoff';
 import { onComputer, usePhoneCapture } from '~/lib/phone';
 import { newId, removePhotos } from '~/lib/photos';
-import { scanPhotos, stageCutout, stagePhoto, useCreateItem, useProfile, type StagedPhoto } from '~/lib/queries';
+import { scanPhotos, stageCutout, stagePhoto, useCreateItem, useProfile, useUpdateProfile, type PriceStrategyName, type StagedPhoto } from '~/lib/queries';
 import { assignRoles, listWords, missingShots, orderShots, withRole } from '~/lib/shots';
 import { errorMessage } from '~/lib/supabase';
 
@@ -43,6 +43,12 @@ export function Scan() {
   const navigate = useNavigate();
   const toast = useToast();
   const create = useCreateItem();
+  const preferences = useUpdateProfile();
+  const [priceStrategy, setPriceStrategy] = useState<PriceStrategyName | null>(null);
+  const [listingTone, setListingTone] = useState<SellerVoice['tone'] | null>(null);
+  const strategy = priceStrategy ?? profile?.price_strategy ?? 'same';
+  const voice = { ...DEFAULT_VOICE, ...profile?.voice };
+  const tone = listingTone ?? voice.tone;
 
   const [itemId, setItemId] = useState(newId);
   const [shots, setShots] = useState<Shot[]>([]);
@@ -191,11 +197,19 @@ export function Scan() {
       .catch(() => setCut(c => (c.coverKey === coverKey ? { state: 'error', progress: 0, coverKey } : c)));
   }
 
+  async function savePreferences() {
+    if (!profile) throw new Error('Your listing settings have not loaded. Please try again.');
+    if (strategy !== profile.price_strategy || tone !== voice.tone) {
+      await preferences.mutateAsync({ price_strategy: strategy, voice: { ...voice, tone } });
+    }
+  }
+
   async function runScan() {
     setError(null);
     setPhase('scanning');
     if (cutouts && cut.state === 'idle') startCutout();
     try {
+      await savePreferences();
       const result = await scanPhotos(
         ready.map(s => s.staged!.path),
         currency,
@@ -210,9 +224,15 @@ export function Scan() {
     }
   }
 
-  function fillByHand() {
-    if (cutouts && cut.state === 'idle') startCutout();
-    setPhase('review');
+  async function fillByHand() {
+    setError(null);
+    try {
+      await savePreferences();
+      if (cutouts && cut.state === 'idle') startCutout();
+      setPhase('review');
+    } catch (err) {
+      setError(errorMessage(err));
+    }
   }
 
   async function save(thenCrossList: boolean) {
@@ -378,6 +398,33 @@ export function Scan() {
                     onChange={e => setHint(e.target.value)}
                     placeholder="Label says M but fits like L. Bought new in 2021."
                   />
+                  <fieldset disabled={!profile || preferences.isPending} className="flex flex-col gap-5 disabled:opacity-60">
+                    <legend className="mb-3 font-semibold">Set up your listings</legend>
+                    <ChoiceChips<PriceStrategyName>
+                      label="How should prices work across marketplaces?"
+                      value={strategy}
+                      onChange={v => v && setPriceStrategy(v)}
+                      options={[
+                        { value: 'same', label: 'Same price everywhere' },
+                        { value: 'match_take_home', label: 'Same take-home everywhere' },
+                      ]}
+                      hint={strategy === 'match_take_home'
+                        ? 'Adjust prices for each marketplace’s fees so you keep about the same amount after fees.'
+                        : 'Buyers see the same asking price on every marketplace. What you keep varies with fees.'}
+                    />
+                    <ChoiceChips<SellerVoice['tone']>
+                      label="How should your listings sound?"
+                      value={tone}
+                      onChange={v => v && setListingTone(v)}
+                      options={[
+                        { value: 'friendly', label: 'Friendly', title: 'Warm, plain sentences. Invites questions.' },
+                        { value: 'minimal', label: 'Minimal', title: 'Just the facts.' },
+                        { value: 'hype', label: 'Hype', title: 'Short, punchy, streetwear energy.' },
+                        { value: 'vintage-nerd', label: 'Vintage nerd', title: 'Era, construction and label details up front.' },
+                      ]}
+                    />
+                    <p className="text-xs text-muted">Saved as your defaults when you continue. You can change them in Settings.</p>
+                  </fieldset>
                   {ready.length > 0 && missing.length > 0 && (
                     <p className="kraft rounded-xl px-3.5 py-2.5 text-sm" role="note" data-testid="missing-shots">
                       <strong>No {listWords(missing.map(k => k.label.toLowerCase()))} photo yet.</strong>{' '}
@@ -393,13 +440,13 @@ export function Scan() {
                       variant="tag"
                       className="text-base"
                       icon={<Wand2 className="size-5" aria-hidden />}
-                      disabled={!ready.length || uploading}
-                      busy={uploading && ready.length > 0}
+                      disabled={!ready.length || uploading || !profile || preferences.isPending}
+                      busy={preferences.isPending || (uploading && ready.length > 0)}
                       onClick={runScan}
                     >
                       {uploading ? 'Uploading photos' : 'Scan with AI'}
                     </Button>
-                    <Button variant="ghost" onClick={fillByHand}>
+                    <Button variant="ghost" disabled={!profile || preferences.isPending} onClick={fillByHand}>
                       Fill it in myself
                     </Button>
                   </div>
