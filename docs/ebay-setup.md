@@ -17,7 +17,7 @@ These are the addresses you will paste into eBay's portal. The project ref
 | OAuth declined URL | `https://jobkhbfymwgyfadpmeqk.supabase.co/functions/v1/ebay-connect` |
 | Privacy policy URL | `https://pilego.app/privacy` |
 | Account deletion endpoint | `https://jobkhbfymwgyfadpmeqk.supabase.co/functions/v1/ebay-account-deletion` |
-| Account deletion verification token | `<I will give you this token>` |
+| Account deletion verification token | the same 32 to 80 letters and digits you store as `EBAY_VERIFICATION_TOKEN` |
 
 ## 1. Join the eBay Developers Program
 
@@ -45,9 +45,10 @@ eBay requires every production keyset to receive notices when an eBay user
 deletes their account. pileGo has an endpoint for it that answers eBay's
 check and, for a real notice, removes that eBay account's tokens.
 
-1. Make sure the verification token is already on pilego.app's server (the
-   coordinator sets `EBAY_VERIFICATION_TOKEN` before you start). eBay checks
-   the endpoint the moment you save, and the check fails without it.
+1. First put the verification token on pilego.app's server: add the secret
+   `EBAY_VERIFICATION_TOKEN` (32 to 80 letters and digits, made up by you)
+   as in step 6. eBay checks the endpoint the moment you save, and the check
+   fails without it.
 2. On the Application Keysets page, open **Notifications** next to the
    production App ID (eBay may show this as the **Alerts & Notifications**
    page, or prompt for it right after creating the keyset).
@@ -57,7 +58,7 @@ check and, for a real notice, removes that eBay account's tokens.
      endpoint is down:** your email.
    - **Marketplace account deletion notification endpoint:**
      `https://jobkhbfymwgyfadpmeqk.supabase.co/functions/v1/ebay-account-deletion`
-   - **Verification token:** `<I will give you this token>`
+   - **Verification token:** the value of `EBAY_VERIFICATION_TOKEN`
 5. Choose **Save**. eBay sends a challenge to the endpoint and shows a green
    tick when pileGo answers correctly.
 6. Optional: choose **Send Test Notification**. pileGo answers 204 when the
@@ -110,9 +111,11 @@ them yourself in Supabase:
    | `EBAY_CLIENT_SECRET` | Cert ID from step 4 |
    | `EBAY_RU_NAME` | RuName from step 5 |
    | `EBAY_ENV` | `production` |
+   | `EBAY_VERIFICATION_TOKEN` | the token from step 3 |
+   | `PILEGO_APP_URL` | `https://pilego.app` |
+   | `PILEGO_ALLOWED_ORIGINS` | `https://pilego.app,https://www.pilego.app,http://localhost:5173` |
 
-   `EBAY_VERIFICATION_TOKEN`, `PILEGO_APP_URL` and `PILEGO_ALLOWED_ORIGINS`
-   are already set.
+   `PILEGO_APP_URL` is where eBay sends sellers back after connecting.
 3. Save. Edge functions read secrets on their next start, within a minute.
 
 From a clone of the repository the same can be done with:
