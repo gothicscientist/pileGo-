@@ -142,6 +142,57 @@ body {
   background: var(--paper);
 }
 
+/* The hero is a physical pile: sleepy when idle, lively in your hands. */
+.hero-effects {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  pointer-events: none;
+  z-index: 80;
+}
+.hero-piece { cursor: grab; -webkit-tap-highlight-color: transparent; }
+.hero-piece:active { cursor: grabbing; }
+.hero-piece:focus-visible { outline: 3px dashed var(--accent); outline-offset: 8px; border-radius: 14px; }
+.hero-piece-float { animation: hero-breathe 6s ease-in-out infinite; }
+.hero-piece:active .hero-piece-float { animation-play-state: paused !important; }
+.hero-burst { animation: hero-spin 40s linear infinite; }
+.hero-drag-note { transition: transform 250ms var(--ease-out-soft); }
+.hero-board[data-active='true'] .hero-drag-note { transform: rotate(5deg) translateY(-6px); }
+.hero-toss-button, .hero-reset-button, .hero-pause-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 10px 15px;
+  border: 0;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 150ms, transform 150ms var(--ease-out-soft);
+}
+.hero-toss-button { background: var(--ink); color: var(--paper); box-shadow: 0 6px 16px -8px rgb(var(--shadow) / 0.45); }
+.hero-toss-button:hover { transform: translateY(-2px) rotate(-2deg); }
+.hero-toss-button:active { transform: scale(0.96); }
+.hero-reset-button, .hero-pause-button { background: var(--paper-2); color: var(--ink); }
+.hero-reset-button:hover, .hero-pause-button:hover { background: var(--line); }
+.hero-pause-button { width: 44px; padding: 10px; }
+.hero-play-controls button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.hero-copy { pointer-events: none; }
+.hero-copy form, .hero-copy a, .hero-copy button, .hero-copy [role='status'] { pointer-events: auto; }
+@keyframes hero-breathe {
+  0%, 100% { transform: translateY(0) rotate(-0.6deg); }
+  50% { transform: translateY(-9px) rotate(0.8deg); }
+}
+@keyframes hero-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .hero-piece-float, .hero-burst { animation: none; }
+  .hero-drag-note, .hero-play-controls button { transition: none; }
+  .hero-toss-button:hover { transform: none; }
+}
+
 /* Component classes live in a layer so Tailwind utilities can override them. */
 @layer components {
   /* Paper grain: fine fibre noise, the "layered paper" texture from the moodboard. */
