@@ -1,6 +1,7 @@
 // Runs in every Vinted tab. Does nothing until the background worker hands it
 // a job, then talks to Vinted the way Vinted's own upload form does.
 
+import { watchSellerAddress } from '../assist/seller-address.ts';
 import { between, errorText, ext, fromBase64, sleep, uuid } from '../shared/browser.ts';
 import type { ListingWork, VintedOutcome, VintedRequest } from '../shared/messages.ts';
 import * as api from './api.ts';
@@ -20,6 +21,7 @@ import {
 /** A pause between steps, so a listing takes as long as a quick person would. */
 const step = () => sleep(between(900, 2400));
 
+let stopAddressFill = () => {};
 let catalogTree: CatalogNode[] | null = null;
 let colourList: Array<{ id: number; title: string }> | null | undefined;
 
@@ -88,7 +90,13 @@ function needsUser(message: string, draftId: number, learned: Record<string, unk
 
 /** Publish a new listing, or with `replace`, publish it and remove the old one first. */
 async function publish(work: ListingWork, replace: string | null): Promise<VintedOutcome> {
-  if (!(await api.loggedIn())) return { status: 'failed', message: 'Log in to Vinted in this browser first.' };
+  // First-time seller address dialogs can appear while the draft is being finished.
+  stopAddressFill();
+  stopAddressFill = watchSellerAddress(document, work.seller_address);
+  if (!(await api.loggedIn())) {
+    stopAddressFill();
+    return { status: 'failed', message: 'Log in to Vinted in this browser first.' };
+  }
   const sessionId = uuid();
   const { ids, learned, missing } = await resolveIds(work);
   await step();
@@ -113,6 +121,7 @@ async function publish(work: ListingWork, replace: string | null): Promise<Vinte
 
   try {
     const done = await api.completeDraft(draftId, forCompletion(draft, draftId), sessionId);
+    stopAddressFill();
     return { status: 'listed', external_id: String(done.id), url: done.url ?? `${api.SITE}/items/${done.id}`, learned };
   } catch (err) {
     if (err instanceof api.VintedError && !err.blocked && err.status >= 400 && err.status < 500) {

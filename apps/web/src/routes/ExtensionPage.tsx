@@ -2,6 +2,8 @@
 // Public, so it can be linked from anywhere and opened before signing in.
 // The zips are built with the web app and served from /downloads.
 
+import { MARKETPLACE_IDS } from '@pilego/core';
+import { SellerLoginReminder } from '~/components/SellerLoginReminder';
 import { CheckCircle2, Copy, Download, PlugZap, TriangleAlert } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
@@ -96,6 +98,7 @@ export function ExtensionPage() {
         </p>
       )}
 
+      <div className="mt-4"><SellerLoginReminder markets={MARKETPLACE_IDS} /></div>
       {isPhone() && (
         <p className="mt-4 flex items-start gap-2 kraft rounded-xl p-3 text-sm">
           <TriangleAlert className="mt-0.5 size-5 shrink-0" aria-hidden />

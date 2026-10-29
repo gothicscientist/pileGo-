@@ -281,7 +281,20 @@ export interface SellerVoice {
   avoid_words: string[];
 }
 
+/** Seller's private ship-from/return address. Never part of a public listing. */
+export interface SellerAddress {
+  full_name: string;
+  line1: string;
+  line2: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  country: string;
+  phone: string;
+}
+
 export interface Profile {
+  seller_address?: SellerAddress | null;
   id: string;
   display_name: string | null;
   currency: string;

@@ -10,6 +10,8 @@ import {
 import { Download, LogOut, PlugZap, RefreshCw } from 'lucide-react';
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
+import { SellerAddressSettings } from '~/components/SellerAddressSettings';
+import { SellerLoginReminder } from '~/components/SellerLoginReminder';
 import { Sticker, TierLabel } from '~/components/bits';
 import { useToast } from '~/components/overlay';
 import { Button, ChipInput, ChoiceChips, ErrorNote, Field, Paper, Select, Spinner, TextField } from '~/components/ui';
@@ -71,6 +73,9 @@ export function SettingsPage() {
         <Marketplaces profile={profile} />
         <Ebay />
         <Extension />
+        <Section id="seller-address" title="Ship-from / return address">
+          <SellerAddressSettings profile={profile} />
+        </Section>
         <Selling profile={profile} />
         <Voice profile={profile} />
         <Basics profile={profile} />
@@ -111,7 +116,8 @@ function Marketplaces({ profile }: { profile: FullProfile }) {
       title="Where you sell"
       intro="These are picked by default when you cross-list. How pileGo! reaches each one is shown under its name."
     >
-      <ul className="flex flex-col divide-y divide-dashed divide-line">
+      <SellerLoginReminder markets={profile.marketplaces} />
+      <ul className="mt-4 flex flex-col divide-y divide-dashed divide-line">
         {MARKETPLACE_IDS.map(m => {
           const info = MARKETPLACES[m];
           const rule = feeRule(m, profile.region, profile.fee_overrides);

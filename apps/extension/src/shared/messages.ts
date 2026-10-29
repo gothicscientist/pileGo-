@@ -1,7 +1,7 @@
 // Messages between the extension's parts. The background worker owns the
 // session and the job queue; content scripts only touch their own page.
 
-import type { GeneratedListing, MarketplaceId } from '@pilego/core';
+import type { GeneratedListing, MarketplaceId, SellerAddress } from '@pilego/core';
 
 export interface PhotoBytes {
   data: string;
@@ -29,6 +29,8 @@ export interface ListingWork {
     style_tags: string[];
     era: string | null;
   };
+  /** Sent only to the selected seller tab, never public listing text. */
+  seller_address?: SellerAddress | null;
   photos: PhotoBytes[];
   /** Ids learned earlier for this marketplace (catalog, brand). */
   learned: Record<string, unknown>;
