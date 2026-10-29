@@ -2,30 +2,65 @@ import { MARKETPLACE_IDS } from '@pilego/core';
 import { ArrowRight, Mail } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { useRef, useState, type FormEvent } from 'react';
-import { Sticker } from '~/components/bits';
+import { MarketIcon, Sticker } from '~/components/bits';
 import { CutoutPiece, LooseTag, Polaroid, type Placement } from '~/components/Scrapbook';
 import { Button, ErrorNote, TextField } from '~/components/ui';
 import { ThemeToggle, Wordmark } from '~/app/Shell';
 import { PHOTOS, type CutoutId } from '~/lib/art';
+import { cx } from '~/lib/format';
 import { errorMessage, supabase } from '~/lib/supabase';
 
-// The board: a plain hoodie, a denim jacket, a graphic tee photo and a few
-// basics overlapping like clothes thrown on a bed. Positions are a share of
-// the board, so the same layout scales from a phone to a wide screen.
+// The board: a weekend haul thrown onto a green cutting mat. Heavyweight
+// hoodies, selvedge and a pair of Mexico 66s pile up and spill over the edges,
+// with a polaroid, a price tag and a sold sticker on top. Positions are a share
+// of the board, so the same layout scales from a phone to a wide screen.
 const PIECES: Array<{ id: CutoutId; at: Placement }> = [
-  { id: 'lilacHoodie', at: { x: '24%', y: '2%', w: '38%', r: -4, z: 3, phone: true } },
-  { id: 'selvedgeJacket', at: { x: '58%', y: '1%', w: '40%', r: 7, z: 2, phone: true } },
-  { id: 'bananaHoodie', at: { x: '55%', y: '40%', w: '31%', r: -7, z: 4, phone: true } },
-  { id: 'rawSelvedge', at: { x: '33%', y: '40%', w: '19%', r: 5, z: 2 } },
-  { id: 'pineHoodie', at: { x: '80%', y: '42%', w: '22%', r: 10, z: 3 } },
-  { id: 'mexico66Yellow', at: { x: '30%', y: '78%', w: '30%', r: -9, z: 6, phone: true } },
-  { id: 'cap', at: { x: '63%', y: '74%', w: '15%', r: 12, z: 5 } },
+  { id: 'selvedgeJacket', at: { x: '1%', y: '9%', w: '50%', r: -9, z: 2, phone: true } },
+  { id: 'meshShorts', at: { x: '49%', y: '53%', w: '22%', r: 9, z: 2 } },
+  { id: 'pineHoodie', at: { x: '69%', y: '45%', w: '30%', r: 13, z: 3 } },
+  { id: 'rawSelvedge', at: { x: '29%', y: '37%', w: '21%', r: -17, z: 3, phone: true } },
+  { id: 'lilacHoodie', at: { x: '41%', y: '3%', w: '44%', r: 7, z: 4, phone: true } },
+  { id: 'bananaHoodie', at: { x: '5%', y: '45%', w: '36%', r: -6, z: 5, phone: true } },
+  { id: 'cap', at: { x: '-1%', y: '2%', w: '19%', r: -20, z: 6 } },
+  { id: 'mexico66Yellow', at: { x: '37%', y: '73%', w: '40%', r: -7, z: 8, phone: true } },
 ];
 
 const PRINTS: Array<{ photo: keyof typeof PHOTOS; caption: string; at: Placement }> = [
-  { photo: 'bananaFit', caption: 'Baggy and soft', at: { x: '1%', y: '6%', w: '26%', r: -7, z: 1, phone: true } },
-  { photo: 'selvedgeFit', caption: 'Selvedge, broken in', at: { x: '10%', y: '42%', w: '23%', r: 5, z: 4, phone: true } },
+  { photo: 'cargoFit', caption: 'Saturday haul', at: { x: '79%', y: '4%', w: '21%', r: 8, z: 6 } },
 ];
+
+// A sticker with a scalloped edge, like the ones on a shop window.
+const BURST = Array.from({ length: 36 }, (_, i) => {
+  const a = (i / 36) * Math.PI * 2;
+  const r = i % 2 ? 43 : 50;
+  return `${(50 + r * Math.cos(a)).toFixed(2)},${(50 + r * Math.sin(a)).toFixed(2)}`;
+}).join(' ');
+
+function SoldBurst({ className }: { className?: string }) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.div
+      initial={reduce ? false : { scale: 0, rotate: -40 }}
+      animate={{ scale: 1, rotate: -12 }}
+      transition={{ type: 'spring', stiffness: 260, damping: 14, delay: 0.9 }}
+      className={cx('pointer-events-none absolute size-28 select-none', className)}
+      aria-hidden
+    >
+      <motion.svg
+        viewBox="0 0 100 100"
+        className="absolute inset-0 size-full drop-shadow-[0_10px_14px_rgb(0_0_0/0.28)]"
+        animate={reduce ? undefined : { rotate: 360 }}
+        transition={{ duration: 40, ease: 'linear', repeat: Infinity }}
+      >
+        <polygon points={BURST} fill="var(--tomato)" />
+      </motion.svg>
+      <span className="absolute inset-0 flex flex-col items-center justify-center text-center leading-[0.95] font-black text-white italic">
+        <span className="text-[0.7rem] font-semibold not-italic opacity-90">Sold in</span>
+        <span className="text-[1.6rem]">2 days</span>
+      </span>
+    </motion.div>
+  );
+}
 
 export function SignIn() {
   const [email, setEmail] = useState('');
@@ -67,8 +102,8 @@ export function SignIn() {
               <span className="text-accent italic">All of it.</span>
             </motion.h1>
             <motion.p className="mt-5 max-w-md text-lg leading-relaxed text-ink-2" {...rise(0.2)}>
-              Heavyweight hoodies, broken-in selvedge, the sneakers you never wear. Snap it once and pileGo! writes the listing, prices
-              it and puts it up everywhere you sell. When it sells, it comes down everywhere else.
+              Snap it once and pileGo! writes the listing, prices it and puts it up everywhere you sell. When it sells, it comes down
+              everywhere else.
             </motion.p>
             <motion.div className="mt-5 flex max-w-md flex-wrap gap-1.5" {...rise(0.26)}>
               {MARKETPLACE_IDS.map(id => (
@@ -137,14 +172,37 @@ export function SignIn() {
             className="relative order-1 mx-auto aspect-[1/1] w-full max-w-[34rem] sm:aspect-[5/4] lg:order-2 lg:aspect-auto lg:h-[min(78vh,760px)] lg:max-w-none"
             aria-label="A pile of everyday clothes. Drag them around."
           >
+            <span className="kraft absolute top-[2%] left-[16%] h-[40%] w-[50%] rotate-[5deg] rounded-[6px] shadow-[0_12px_30px_-18px_rgb(0_0_0/0.5)]" aria-hidden />
+            <motion.span
+              className="mat absolute inset-[8%_5%_9%_6%] rounded-[34px]"
+              initial={reduce ? false : { opacity: 0, scale: 0.94, rotate: 2 }}
+              animate={{ opacity: 1, scale: 1, rotate: -2.5 }}
+              transition={{ type: 'spring', stiffness: 120, damping: 18 }}
+              aria-hidden
+            />
             {PRINTS.map((p, i) => (
               <Polaroid key={p.photo} src={PHOTOS[p.photo].src} caption={p.caption} at={p.at} board={board} index={i} />
             ))}
             {PIECES.map((p, i) => (
               <CutoutPiece key={p.id} id={p.id} at={p.at} board={board} index={i} />
             ))}
-            <LooseTag price="$18" note="Your find" className="right-[6%] bottom-[4%] z-10 max-sm:scale-75" />
-            <span className="absolute bottom-[10%] left-[3%] z-10 hidden -rotate-6 rounded-full bg-butter px-3 py-1 text-sm font-bold text-[#22241e] shadow-[0_6px_14px_-8px_rgb(0_0_0/0.5)] lg:block">
+            <LooseTag price="$45" note="Live on 4" className="top-[33%] left-[45%] z-10 max-sm:scale-75" />
+            <SoldBurst className="right-[3%] bottom-[4%] z-10 max-sm:scale-75" />
+            <motion.div
+              initial={reduce ? false : { opacity: 0, y: -10, rotate: -12 }}
+              animate={{ opacity: 1, y: 0, rotate: -4 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 16, delay: 0.75 }}
+              className="pointer-events-none absolute top-[0%] left-[24%] z-10 flex items-center gap-2 rounded-full bg-card py-1.5 pr-3 pl-1.5 text-sm font-semibold text-ink shadow-[0_10px_20px_-10px_rgb(0_0_0/0.45)] max-md:hidden"
+              aria-hidden
+            >
+              <span className="flex -space-x-1">
+                {(['depop', 'vinted', 'ebay', 'grailed'] as const).map(id => (
+                  <MarketIcon key={id} id={id} className="size-5 ring-2 ring-card" />
+                ))}
+              </span>
+              Listed everywhere
+            </motion.div>
+            <span className="absolute bottom-[2%] left-[8%] z-10 hidden -rotate-6 rounded-full bg-butter px-3 py-1 text-sm font-bold text-[#22241e] shadow-[0_6px_14px_-8px_rgb(0_0_0/0.5)] lg:block">
               Go on, drag them
             </span>
           </div>
