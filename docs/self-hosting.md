@@ -75,6 +75,10 @@ On Cloudflare Pages: Create > Pages > Connect to Git, choose your fork, and set:
 
 Pages serves `index.html` for every path, which is what the app's routes need.
 
+The scan page's "Use my phone" QR code points at the address the app is open
+on. If you also open the app at a private address (a preview URL, say), set
+`VITE_PUBLIC_APP_URL` to the public one so phones always land there.
+
 Once you know the app's address, run the deploy script once more with it:
 
 ```sh

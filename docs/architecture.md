@@ -137,5 +137,18 @@ three sources:
   asking prices.
 - The seller's own past sales.
 
+## Photos from a phone
+
+On a computer the scan page offers "Use my phone". It inserts a
+`phone_sessions` row for the item being scanned and shows a QR code for
+`/phone/<id>`. That page needs no sign-in: the random id, good for an hour, is
+the only key. It shrinks each photo and posts it to `phone-capture`, which files
+it under the owner's folder for the current item and adds a `phone_photos` row.
+The computer picks the row up through Realtime (with a 4 second poll as a
+backstop) and drops the photo into its slot. Saving moves the code on to the
+next item; leaving the scan page deletes it. The QR code points at the tab's own
+address, or `VITE_PUBLIC_APP_URL` when that is set, so a phone can only use it
+when the app is on a real address, not `localhost`.
+
 The background cutout runs in the browser with `@imgly/background-removal`,
 so it costs nothing on the server.

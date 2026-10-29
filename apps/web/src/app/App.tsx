@@ -16,6 +16,7 @@ const ItemPage = lazy(() => import('~/routes/ItemPage').then(m => ({ default: m.
 const OutThere = lazy(() => import('~/routes/OutThere').then(m => ({ default: m.OutThere })));
 const Insights = lazy(() => import('~/routes/Insights').then(m => ({ default: m.Insights })));
 const SettingsPage = lazy(() => import('~/routes/Settings').then(m => ({ default: m.SettingsPage })));
+const PhoneCapture = lazy(() => import('~/routes/PhoneCapture').then(m => ({ default: m.PhoneCapture })));
 const NotFound = lazy(() => import('~/routes/NotFound').then(m => ({ default: m.NotFound })));
 
 function Loading() {
@@ -39,6 +40,8 @@ const page = (node: ReactNode) => <Suspense fallback={<Loading />}>{node}</Suspe
 const router = createBrowserRouter([
   { path: '/privacy', element: <Privacy /> },
   { path: '/extension', element: <ExtensionPage /> },
+  // Opened from the scan's QR code on a phone that is not signed in.
+  { path: '/phone/:session', element: page(<PhoneCapture />) },
   { path: '/signin', element: <Navigate to="/" replace /> },
   {
     element: (
