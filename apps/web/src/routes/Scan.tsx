@@ -4,18 +4,20 @@
 // them; the garment is cut out for the pile while the AI works.
 
 import type { PhotoRole, ScanResult } from '@pilego/core';
-import { Camera, ImagePlus, Scissors, Wand2 } from 'lucide-react';
+import { Camera, ImagePlus, Scissors, Smartphone, Wand2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { emptyForm, formFromScan, ItemForm, type FormValue } from '~/components/ItemForm';
 import { useToast } from '~/components/overlay';
+import { PhoneSheet } from '~/components/PhoneSheet';
 import { CoverPreview, ShotGuide, type Shot } from '~/components/ShotGuide';
 import { Button, ErrorNote, Paper, TextField } from '~/components/ui';
 import { useUserId } from '~/lib/auth';
 import { imageFiles, takeHandedOffFiles } from '~/lib/handoff';
+import { onComputer, usePhoneCapture } from '~/lib/phone';
 import { newId, removePhotos } from '~/lib/photos';
-import { scanPhotos, stageCutout, stagePhoto, useCreateItem, useProfile } from '~/lib/queries';
+import { scanPhotos, stageCutout, stagePhoto, useCreateItem, useProfile, type StagedPhoto } from '~/lib/queries';
 import { assignRoles, listWords, missingShots, orderShots, withRole } from '~/lib/shots';
 import { errorMessage } from '~/lib/supabase';
 
@@ -64,6 +66,15 @@ export function Scan() {
   const cameraInput = useRef<HTMLInputElement>(null);
   const slotInput = useRef<HTMLInputElement>(null);
   const pendingRole = useRef<PhotoRole | undefined>(undefined);
+  const [computer] = useState(onComputer);
+  const [phoneOpen, setPhoneOpen] = useState(false);
+  // Photos taken on the phone arrive already uploaded into this item's folder.
+  const phone = usePhoneCapture(itemId, p => addFiles([p.file], p.role === 'auto' ? undefined : p.role, p.staged));
+
+  function openPhone() {
+    setPhoneOpen(true);
+    if (phone.state === 'idle' || phone.state === 'error') void phone.open();
+  }
 
   // Photos dropped on the pile arrive here.
   useEffect(() => {
@@ -87,7 +98,8 @@ export function Scan() {
     [],
   );
 
-  function addFiles(files: File[], firstRole?: PhotoRole) {
+  /** `staged` is for a single photo that is already uploaded (from the phone). */
+  function addFiles(files: File[], firstRole?: PhotoRole, staged?: StagedPhoto) {
     const current = shotsRef.current;
     // A photo picked for a filled slot replaces the role, not the photo: the old one becomes an extra.
     const base = firstRole && firstRole !== 'extra' ? current.map(s => (s.role === firstRole ? { ...s, role: 'extra' as const } : s)) : current;
@@ -97,13 +109,17 @@ export function Scan() {
     const next = picked.map<Shot>((file, i) => ({
       key: newId(),
       file,
-      local: URL.createObjectURL(file),
+      local: staged?.preview ?? URL.createObjectURL(file),
       role: roles[i]!,
-      state: 'uploading',
+      ...(staged ? { staged, state: 'done' as const } : { state: 'uploading' as const }),
     }));
-    if (!next.length) return;
+    if (!next.length) {
+      if (staged) void removePhotos([staged.path]).catch(() => undefined);
+      return;
+    }
     shotsRef.current = [...base, ...next];
     setShots(shotsRef.current);
+    if (staged) return;
     for (const shot of next) {
       stagePhoto(uid, itemId, shot.file)
         .then(staged => setShots(s => s.map(x => (x.key === shot.key ? { ...x, staged, state: 'done' } : x))))
@@ -273,9 +289,15 @@ export function Scan() {
           />
           {shots.length < MAX_PHOTOS && phase !== 'scanning' && (
             <div className="grid grid-cols-2 gap-3">
-              <Button variant="ink" icon={<Camera className="size-5" aria-hidden />} onClick={() => cameraInput.current?.click()}>
-                Take photos
-              </Button>
+              {computer ? (
+                <Button variant="ink" icon={<Smartphone className="size-5" aria-hidden />} onClick={openPhone}>
+                  Use my phone
+                </Button>
+              ) : (
+                <Button variant="ink" icon={<Camera className="size-5" aria-hidden />} onClick={() => cameraInput.current?.click()}>
+                  Take photos
+                </Button>
+              )}
               <Button variant="line" icon={<ImagePlus className="size-5" aria-hidden />} onClick={() => fileInput.current?.click()}>
                 Choose photos
               </Button>
@@ -303,10 +325,20 @@ export function Scan() {
                 }}
               />
               <p className="col-span-2 -mt-1 text-xs text-muted">
+                {computer && 'Scan a code with your phone and the photos you take there show up here. '}
                 Several at once fill the slots in order: front, back, label, then extras. Change what a photo shows from its menu.
               </p>
             </div>
           )}
+          <PhoneSheet
+            open={phoneOpen}
+            onClose={() => setPhoneOpen(false)}
+            session={phone.session}
+            state={phone.state}
+            error={phone.error}
+            received={phone.received}
+            onRenew={() => void phone.open()}
+          />
           <label className="flex items-start gap-3 rounded-lg p-2 text-sm text-ink-2">
             <input
               type="checkbox"

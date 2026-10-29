@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { diffForm, emptyForm, formFromScan } from '~/components/ItemForm';
 import { daysSince, inkOn, plural, seeded } from './format';
 import { nextUp } from './nextup';
+import { phoneUrl, unreachableFromPhone } from './phone';
 import { assignRoles, listWords, missingShots, orderShots, withRole } from './shots';
 
 const base: Item = {
@@ -93,5 +94,19 @@ describe('next up', () => {
     expect(list).toContain('Ship Sold boots');
     expect(list).toContain('Price Draft tee');
     expect(list).toContain('List Ready jeans');
+  });
+});
+
+describe('phone capture links', () => {
+  it('points at the capture page on this address', () => {
+    expect(phoneUrl('abc', 'https://pilego.app/')).toBe('https://pilego.app/phone/abc');
+  });
+
+  it('knows a phone cannot open this computer’s loopback address', () => {
+    expect(unreachableFromPhone('http://localhost:5173/phone/x')).toBe(true);
+    expect(unreachableFromPhone('http://127.0.0.1:4173/phone/x')).toBe(true);
+    expect(unreachableFromPhone('http://[::1]:5173/phone/x')).toBe(true);
+    expect(unreachableFromPhone('http://192.168.1.20:5173/phone/x')).toBe(false);
+    expect(unreachableFromPhone('https://pilego.app/phone/x')).toBe(false);
   });
 });

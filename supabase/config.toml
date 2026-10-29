@@ -49,3 +49,7 @@ verify_jwt = false
 
 [functions.ebay-account-deletion]
 verify_jwt = false
+
+# The phone holds a capture code, not a session.
+[functions.phone-capture]
+verify_jwt = false

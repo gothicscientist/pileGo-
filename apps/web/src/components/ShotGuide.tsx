@@ -226,7 +226,7 @@ function ShotTile({
 }
 
 /** Tiny line drawings of each shot, so the slots read at a glance. */
-function ShotIllustration({ role }: { role: KeyRole }) {
+export function ShotIllustration({ role }: { role: KeyRole }) {
   const props = {
     className: 'size-10 text-ink-2',
     viewBox: '0 0 48 48',

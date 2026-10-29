@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mockSupabase, SUPABASE } from './fixtures';
+import { mockSupabase, SUPABASE, UID } from './fixtures';
 
 const shots = process.env.SCREENSHOTS;
 
@@ -210,4 +210,110 @@ test('scan sends photo roles and marks measurement estimates', async ({ page }, 
   await expect(page.getByLabel(/Length/)).toHaveValue('');
   await expect(pit).toHaveValue('21');
   await expect(page.getByTestId('estimate-note')).toHaveCount(0);
+});
+
+test('a computer can hand the scan photos to a phone with a QR code', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'The phone button is for computers.');
+  await mockSupabase(page);
+  await page.addInitScript(() => window.localStorage.setItem('pilego-cutouts', 'off'));
+  const jpeg = Buffer.from(
+    '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==',
+    'base64',
+  );
+  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
+  let session: { id: string; item_id: string } | null = null;
+  let polls = 0;
+  await page.route(`${SUPABASE}/rest/v1/phone_sessions**`, async route => {
+    const req = route.request();
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    if (req.method() === 'POST') {
+      session = req.postDataJSON();
+      return route.fulfill({ status: 201, contentType: 'application/json', headers: cors, body: JSON.stringify({ expires_at: new Date(Date.now() + 3600_000).toISOString() }) });
+    }
+    if (req.method() === 'GET') {
+      return route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify({ opened_at: polls > 0 ? new Date().toISOString() : null, expires_at: new Date(Date.now() + 3600_000).toISOString() }) });
+    }
+    return route.fulfill({ status: 204, headers: cors });
+  });
+  // The phone sends the front, then the label.
+  await page.route(`${SUPABASE}/rest/v1/phone_photos**`, async route => {
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    polls += 1;
+    const rows = [
+      { id: '00000000-0000-4000-8000-0000000000f1', item_id: session!.item_id, path: `${UID}/${session!.item_id}/f1.jpg`, role: 'front', width: 1, height: 1 },
+      { id: '00000000-0000-4000-8000-0000000000f2', item_id: session!.item_id, path: `${UID}/${session!.item_id}/f2.jpg`, role: 'label', width: 1, height: 1 },
+    ].slice(0, Math.max(0, polls - 1));
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(rows) });
+  });
+  await page.route(`${SUPABASE}/storage/v1/object/photos/**`, route =>
+    route.request().method() === 'GET' ? route.fulfill({ status: 200, contentType: 'image/jpeg', body: jpeg, headers: cors }) : route.fallback(),
+  );
+
+  await page.goto('/scan');
+  await expect(page.getByRole('button', { name: 'Take photos' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Use my phone' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Take the photos on your phone' });
+  await expect(sheet.getByRole('img', { name: 'QR code for the phone camera' })).toBeVisible();
+  // The test server is on localhost, which a phone cannot open.
+  await expect(sheet.getByTestId('phone-local')).toContainText('localhost');
+  await expect(sheet.getByTestId('phone-status')).toContainText('Phone connected', { timeout: 10_000 });
+  await snap(page, 'scan-phone', info.project.name);
+  await expect(sheet.getByTestId('phone-received')).toHaveText('2 photos from your phone.', { timeout: 15_000 });
+  await sheet.getByRole('button', { name: 'Done' }).click();
+  await expect(page.getByTestId('shot-count')).toHaveText('2 of 3');
+  await expect(page.getByTestId('missing-shots')).toContainText('No back photo yet');
+  expect(session!.id).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+test('the phone page sends each photo to the computer', async ({ page }, info) => {
+  test.skip(info.project.name !== 'phone', 'The capture page is for phones.');
+  await mockSupabase(page, { signedIn: false });
+  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
+  const roles: string[] = [];
+  await page.route(`${SUPABASE}/functions/v1/phone-capture`, async route => {
+    const req = route.request();
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    const type = req.headers()['content-type'] ?? '';
+    if (type.startsWith('multipart/form-data')) {
+      const body = req.postDataBuffer()!.toString('latin1');
+      expect(body).toContain('11111111-2222-4333-8444-555555555555');
+      roles.push(/name="role"\r\n\r\n(\w+)/.exec(body)![1]!);
+      return route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify({ id: `p${roles.length}`, role: roles.at(-1) }) });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify({ item_id: 'item-1', expires_at: new Date(Date.now() + 3600_000).toISOString(), count: 0 }) });
+  });
+
+  await page.goto('/phone/11111111-2222-4333-8444-555555555555');
+  await expect(page.getByRole('heading', { name: 'Snap it' })).toBeVisible();
+  const jpeg = await page.screenshot({ type: 'jpeg', clip: { x: 0, y: 0, width: 160, height: 200 } });
+  await snap(page, 'phone-capture', info.project.name);
+
+  let chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Take the front photo', exact: true }).click();
+  await (await chooser).setFiles({ name: 'front.jpg', mimeType: 'image/jpeg', buffer: jpeg });
+  await expect(page.getByTestId('phone-sent')).toContainText('1 sent');
+  // The big button moves on to the next slot.
+  chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Take the back photo', exact: true }).click();
+  await (await chooser).setFiles({ name: 'back.jpg', mimeType: 'image/jpeg', buffer: jpeg });
+  await expect(page.getByTestId('phone-sent')).toContainText('2 sent');
+  expect(roles).toEqual(['front', 'back']);
+  await expect(page.getByRole('button', { name: 'Retake the front photo' })).toBeVisible();
+  await snap(page, 'phone-capture-sent', info.project.name);
+});
+
+test('a closed phone code says so', async ({ page }, info) => {
+  test.skip(info.project.name !== 'phone', 'The capture page is for phones.');
+  await mockSupabase(page, { signedIn: false });
+  await page.route(`${SUPABASE}/functions/v1/phone-capture`, route =>
+    route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      headers: { 'access-control-allow-origin': '*' },
+      body: JSON.stringify({ error: 'This code was closed on your computer. Make a new one from the scan page.' }),
+    }),
+  );
+  await page.goto('/phone/11111111-2222-4333-8444-555555555555');
+  await expect(page.getByRole('heading', { name: 'This code no longer works' })).toBeVisible();
+  await expect(page.getByText('This code was closed on your computer')).toBeVisible();
 });
