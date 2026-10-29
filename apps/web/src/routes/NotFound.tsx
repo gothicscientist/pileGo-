@@ -1,15 +1,20 @@
 import { Link } from 'react-router';
-import { Garment } from '~/components/Garments';
+import { CutoutPiece, LooseTag } from '~/components/Scrapbook';
 
 export function NotFound() {
   return (
-    <div className="mx-auto flex max-w-lg flex-col items-start gap-4 px-5 py-16">
-      <Garment kind="tee" fill="var(--sticker)" className="w-28 -rotate-12 cutout-shadow" />
-      <h1 className="font-display text-4xl font-extrabold">Nothing on this hanger.</h1>
-      <p className="text-ink-2">The page or item may have been deleted.</p>
-      <Link to="/closet" className="btn btn-ink">
-        Back to your closet
-      </Link>
+    <div className="mx-auto flex max-w-2xl flex-col items-start gap-4 px-5 py-16 sm:flex-row sm:items-center sm:gap-10">
+      <div className="relative h-52 w-44 shrink-0">
+        <CutoutPiece id="whiteTee" at={{ x: '4%', y: '0%', w: '84%', r: -10, phone: true }} />
+        <LooseTag price="?" note="Not here" className="right-0 bottom-0 z-10 scale-75" />
+      </div>
+      <div className="flex flex-col items-start gap-4">
+        <h1 className="font-display text-4xl">Nothing on this hanger.</h1>
+        <p className="text-ink-2">The page or item may have been deleted.</p>
+        <Link to="/closet" className="btn btn-ink">
+          Back to your closet
+        </Link>
+      </div>
     </div>
   );
 }

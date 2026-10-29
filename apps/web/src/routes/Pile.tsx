@@ -4,6 +4,7 @@
 import type { Item } from '@pilego/core';
 import { ImagePlus, ScanLine, Shuffle } from 'lucide-react';
 import {
+  AnimatePresence,
   motion,
   useMotionValue,
   useReducedMotion,
@@ -13,7 +14,8 @@ import {
 } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { PhotoImg, PriceTag } from '~/components/bits';
+import { HangTag, PhotoImg } from '~/components/bits';
+import { CutoutPiece, LooseTag } from '~/components/Scrapbook';
 import { Garment, GARMENT_KINDS } from '~/components/Garments';
 import { Spinner } from '~/components/ui';
 import { cx, daysSince, money, plural, seeded } from '~/lib/format';
@@ -47,21 +49,31 @@ function pieceWidth(regionWidth: number, cutout: boolean): number {
   return Math.round(cutout ? base * 1.12 : base);
 }
 
-/** Jittered grid so a fresh pile looks thrown, not stacked. */
-function scatter(items: Item[], w: number, salt: number): Record<string, Spot> {
-  const n = Math.max(1, items.length);
-  const piece = pieceWidth(w, false);
-  const cols = Math.max(2, Math.min(n, Math.floor(w / (piece * 0.92))));
+function layout(n: number, w: number): { cols: number; rows: number; height: number } {
+  const piece = pieceWidth(w, true);
+  const cols = Math.max(2, Math.min(n, Math.floor(w / (piece * 0.98))));
   const rows = Math.max(1, Math.ceil(n / cols));
+  // Room for each row of pieces plus their tags, so a big pile scrolls instead of stacking up.
+  return { cols, rows, height: Math.round(rows * piece * 1.12 + piece * 0.35) };
+}
+
+/** Jittered grid so a fresh pile looks thrown, not stacked. */
+function scatter(items: Item[], w: number, h: number, salt: number): Record<string, Spot> {
+  const { cols, rows } = layout(items.length, w);
+  const piece = pieceWidth(w, true);
+  const usableX = Math.max(0.2, 1 - piece / w);
+  const usableY = Math.max(0.2, 1 - (piece * 1.15) / h);
   const out: Record<string, Spot> = {};
   items.forEach((item, i) => {
     const col = i % cols;
+    // Every other row shifts half a step, like clothes thrown in waves.
     const row = Math.floor(i / cols);
-    const jx = seeded(item.id, 11 + salt);
-    const jy = seeded(item.id, 23 + salt);
+    const jx = seeded(item.id, 11 + salt) - 0.5;
+    const jy = seeded(item.id, 23 + salt) - 0.5;
+    const shift = row % 2 ? 0.35 : 0;
     out[item.id] = {
-      x: ((col + 0.08 + jx * 0.6) / cols) * 0.94,
-      y: ((row + 0.05 + jy * 0.55) / rows) * 0.86,
+      x: Math.min(1, Math.max(0, (col + shift + jx * 0.45) / Math.max(1, cols - 1 + (cols > 1 ? 0.35 : 0)))) * usableX,
+      y: Math.min(1, Math.max(0, (row + jy * 0.4) / Math.max(1, rows - 1 + 0.2))) * usableY,
     };
   });
   return out;
@@ -114,7 +126,7 @@ export function Pile() {
 
   return (
     <div
-      className="floor relative min-h-[calc(100dvh-3.5rem)] md:min-h-dvh"
+      className="floor grain relative min-h-[calc(100dvh-3.5rem)] md:min-h-dvh"
       onDragOver={e => {
         if (e.dataTransfer.types.includes('Files')) {
           e.preventDefault();
@@ -126,14 +138,14 @@ export function Pile() {
       }}
       onDrop={onDrop}
     >
-      <div className="mx-auto grid min-h-[inherit] max-w-[1500px] gap-6 px-4 py-5 sm:px-6 lg:grid-cols-[1fr_20rem] lg:py-8">
+      <div className="mx-auto grid min-h-[inherit] max-w-[1500px] gap-6 px-4 py-5 sm:px-6 lg:grid-cols-[1fr_19rem] lg:gap-8 lg:py-8">
         <section aria-labelledby="pile-title" className="flex min-h-[70dvh] flex-col">
-          <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line pb-4">
             <div>
-              <h1 id="pile-title" className="font-display text-[clamp(3rem,9vw,7rem)] leading-[0.8] font-extrabold">
+              <h1 id="pile-title" className="font-display text-[clamp(2.8rem,7vw,5.5rem)] leading-[0.9]">
                 The pile
               </h1>
-              <p className="mt-2 text-floor-ink/80">
+              <p className="mt-2 max-w-xl text-ink-2">
                 {isLoading
                   ? 'Gathering your clothes'
                   : stats.inPile
@@ -145,7 +157,7 @@ export function Pile() {
 
           {isLoading ? (
             <div className="flex flex-1 items-center justify-center">
-              <Spinner className="text-floor-ink" />
+              <Spinner />
             </div>
           ) : pieces.length ? (
             <PileFloor pieces={pieces} currency={currency} />
@@ -154,16 +166,23 @@ export function Pile() {
           )}
         </section>
 
-        <aside aria-label="Summary" className="lg:pt-24">
+        <aside aria-label="Summary" className="lg:pt-6">
           <Receipt stats={stats} currency={currency} todo={todo} />
         </aside>
       </div>
 
-      {dropping && (
-        <div className="pointer-events-none absolute inset-3 z-20 flex items-center justify-center rounded-3xl border-4 border-dashed border-sticker bg-floor-deep/60">
-          <p className="font-display text-4xl font-extrabold">Drop to scan</p>
-        </div>
-      )}
+      <AnimatePresence>
+        {dropping && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            className="pointer-events-none absolute inset-3 z-20 flex items-center justify-center rounded-[28px] border-2 border-dashed border-accent bg-paper/80 backdrop-blur-sm"
+          >
+            <p className="font-display text-4xl text-accent">Drop to scan</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -186,7 +205,8 @@ function PileFloor({ pieces, currency }: { pieces: Item[]; currency: string }) {
     return () => ro.disconnect();
   }, []);
 
-  const fallback = useMemo(() => (size ? scatter(pieces, size.w, salt) : {}), [pieces, size, salt]);
+  const fallback = useMemo(() => (size ? scatter(pieces, size.w, size.h, salt) : {}), [pieces, size, salt]);
+  const minHeight = size ? layout(pieces.length, size.w).height : undefined;
 
   // Parallax: the floor tilts a little toward the pointer. Deeper pieces move more.
   const px = useMotionValue(0);
@@ -219,14 +239,10 @@ function PileFloor({ pieces, currency }: { pieces: Item[]; currency: string }) {
   };
 
   return (
-    <div className="relative mt-4 flex flex-1 flex-col">
+    <div className="relative mt-3 flex flex-1 flex-col">
       <div className="mb-2 flex justify-end">
-        <button
-          type="button"
-          onClick={tidy}
-          className="inline-flex items-center gap-1.5 rounded-full bg-floor-deep/70 px-3 py-1.5 text-sm font-medium hover:bg-floor-deep"
-        >
-          <Shuffle className="size-4" aria-hidden />
+        <button type="button" onClick={tidy} className="btn btn-line btn-sm group">
+          <Shuffle className="size-4 transition-transform duration-500 group-hover:rotate-180" aria-hidden />
           Throw again
         </button>
       </div>
@@ -238,6 +254,7 @@ function PileFloor({ pieces, currency }: { pieces: Item[]; currency: string }) {
           py.set(0);
         }}
         className="relative min-h-[60dvh] flex-1"
+        style={{ minHeight }}
       >
         {size &&
           pieces.map((item, i) => (
@@ -286,10 +303,17 @@ function Piece({
   const navigate = useNavigate();
   const cover = item.photos?.[0];
   const cutout = Boolean(cover?.cutout_path);
-  const width = pieceWidth(size.w, cutout);
-  const tilt = (seeded(item.id, 3) - 0.5) * (cutout ? 26 : 16);
+  // Cutouts are trimmed to the garment, so a pair of jeans is tall and a cap is wide.
+  // Sizing by area keeps a cap from shrinking to nothing and jeans from towering.
+  const [ratio, setRatio] = useState<number | null>(null);
+  const base = pieceWidth(size.w, cutout);
+  // Caps, bags and trainers are small things next to a hoodie, so they sit smaller on the floor.
+  const small = ['shoes', 'bags', 'accessories'].includes(item.category ?? '') ? 0.72 : 1;
+  const width = cutout && ratio ? Math.round(base * small * Math.min(1.35, Math.max(0.62, Math.sqrt(ratio / 0.78)))) : base;
+  const tilt = (seeded(item.id, 3) - 0.5) * (cutout ? 22 : 14);
   const depth = 0.35 + seeded(item.id, 5) * 0.65;
   const dragged = useRef(false);
+  const [nudged, setNudged] = useState(0);
   const reduce = useReducedMotion();
 
   const x = useMotionValue(spot.x * size.w);
@@ -302,7 +326,9 @@ function Piece({
   const ox = useTransform(parallax[0], v => v * depth * -12);
   const oy = useTransform(parallax[1], v => v * depth * -9);
   const sold = item.status === 'sold';
+  const live = (item.listings ?? []).filter(l => l.status === 'listed').length;
   const label = `${item.title || 'Untitled item'}, ${money(item.price, item.currency || currency)}, ${item.status}`;
+  const tagSide = seeded(item.id, 7) > 0.5;
 
   return (
     <motion.div className="pointer-events-none absolute inset-0" style={{ x: ox, y: oy, zIndex: z }}>
@@ -318,6 +344,7 @@ function Piece({
           onRaise(item.id);
         }}
         onDragTransitionEnd={() => {
+          setNudged(n => n + 1);
           onPlace(item.id, {
             x: Math.min(0.98, Math.max(0, x.get() / size.w)),
             y: Math.min(0.98, Math.max(0, y.get() / size.h)),
@@ -334,22 +361,29 @@ function Piece({
         onPointerDown={() => {
           dragged.current = false;
         }}
-        initial={reduce ? false : { opacity: 0, scale: 0.6, rotate: tilt - 30 }}
-        animate={{ opacity: 1, scale: 1, rotate: tilt }}
-        whileHover={{ scale: 1.04, rotate: tilt * 0.6 }}
+        initial={reduce ? false : { opacity: 0, scale: 0.7, rotate: tilt - 24, y: -30 }}
+        animate={{ opacity: 1, scale: 1, rotate: tilt, y: 0 }}
+        whileHover={{ scale: 1.04, rotate: tilt * 0.5 }}
+        whileTap={{ scale: 1.07 }}
         whileDrag={{ scale: 1.1, rotate: tilt + 5, cursor: 'grabbing' }}
-        transition={{ type: 'spring', stiffness: 260, damping: 18, delay: reduce ? 0 : Math.min(index, 18) * 0.035 }}
-        className="pointer-events-auto absolute top-0 left-0 block cursor-grab touch-none select-none"
+        transition={{ type: 'spring', stiffness: 240, damping: 17, delay: reduce ? 0 : Math.min(index, 18) * 0.04 }}
+        className="swing-on-hover pointer-events-auto absolute top-0 left-0 block cursor-grab touch-none select-none"
         style={{ x, y, width }}
         draggable={false}
       >
         {cutout ? (
-          <PhotoImg photo={cover} cutout className="h-auto w-full cutout-shadow" alt="" />
+          <PhotoImg
+            photo={cover}
+            cutout
+            className={cx('h-auto w-full cutout-shadow', sold && 'opacity-80 saturate-50')}
+            alt=""
+            onLoad={e => setRatio(e.currentTarget.naturalWidth / Math.max(1, e.currentTarget.naturalHeight))}
+          />
         ) : (
-          <div className="rounded-[3px] bg-[#fbfbf7] p-1.5 pb-6 lift-lg">
+          <div className="polaroid relative">
             <PhotoImg
               photo={cover}
-              className="aspect-[4/5] w-full rounded-[2px] object-cover"
+              className="aspect-[4/5] w-full rounded-[1px] object-cover"
               alt=""
               fallback={
                 <Garment
@@ -359,25 +393,28 @@ function Piece({
                 />
               }
             />
-            <span className="absolute right-2 bottom-1.5 left-2 truncate text-left text-[0.7rem] font-medium text-[#4c4d63]">
-              {item.brand || item.title || 'Untitled'}
+            <span className="absolute right-2 bottom-2 left-2.5 truncate text-left text-[0.7rem] font-medium tracking-tight text-[#53575a]">
+              {item.title || item.brand || 'Untitled'}
             </span>
             <span className="tape absolute -top-2.5 left-1/2 h-5 w-14 -translate-x-1/2 rotate-[-4deg]" aria-hidden />
           </div>
         )}
-        <PriceTag
-          className={cx('absolute -right-3 bottom-6', item.price == null && '!bg-sticker')}
-          style={{ transform: `rotate(${-tilt * 0.8 + 8}deg)` }}
+        <span
+          key={nudged}
+          className={cx('absolute top-[6%] origin-top', tagSide ? '-right-3' : '-left-3', nudged > 0 && 'swing-now')}
+          style={{ rotate: `${-tilt * 0.6 + (tagSide ? 6 : -6)}deg` }}
         >
-          {item.price == null ? 'price?' : money(item.price, item.currency || currency)}
-        </PriceTag>
-        {item.status === 'listed' && (
-          <span className="absolute -top-1 -left-1 rounded-full bg-mint px-1.5 py-0.5 text-[0.65rem] font-bold text-[#16172b] shadow">
-            {(item.listings ?? []).filter(l => l.status === 'listed').length} live
+          <span className="swing block origin-top">
+            <HangTag
+              price={item.price == null ? 'price?' : money(item.price, item.currency || currency)}
+              note={sold ? 'sold' : live ? `${live} live` : item.status === 'draft' ? 'draft' : 'ready'}
+              empty={item.price == null}
+              className="relative"
+            />
           </span>
-        )}
+        </span>
         {sold && (
-          <span className="stamp-in absolute inset-x-0 top-1/3 mx-auto w-fit rounded-md border-4 border-tag px-2 font-display text-2xl font-extrabold text-tag">
+          <span className="stamp-in absolute inset-x-0 top-1/3 mx-auto w-fit rounded-md border-[3px] border-tomato bg-paper/70 px-2 py-0.5 text-xl font-black tracking-[0.06em] text-tomato backdrop-blur-[1px]">
             SOLD
           </span>
         )}
@@ -387,26 +424,32 @@ function Piece({
 }
 
 function EmptyFloor() {
+  const board = useRef<HTMLDivElement>(null);
   return (
-    <div className="relative mt-6 flex min-h-[55dvh] flex-1 flex-col items-center justify-center gap-5 rounded-3xl border-2 border-dashed border-floor-ink/35 p-6 text-center">
-      <div className="flex items-end gap-2 opacity-90" aria-hidden>
-        <Garment kind="jacket" fill="var(--sticker)" className="w-24 -rotate-12 cutout-shadow" />
-        <Garment kind="tee" fill="var(--tag)" className="w-20 rotate-6 cutout-shadow" />
-        <Garment kind="jeans" fill="var(--mint)" className="w-14 rotate-[14deg] cutout-shadow" />
+    <div className="relative mt-6 grid flex-1 items-center gap-8 lg:grid-cols-[1fr_1.1fr]">
+      <div className="flex flex-col items-start gap-4">
+        <h2 className="font-display text-[clamp(1.9rem,3.2vw,2.6rem)] leading-[1.04]">Start with one thing from the pile</h2>
+        <p className="max-w-md text-ink-2">
+          A plain hoodie counts. Lay it flat in good light and take three photos: the front, the back and the label. Or drop photos
+          anywhere on this page.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <Link to="/scan" className="btn btn-tag text-base">
+            <ScanLine className="size-5" aria-hidden />
+            Scan an item
+          </Link>
+          <Link to="/settings#import" className="btn btn-line">
+            <ImagePlus className="size-5" aria-hidden />
+            Import existing listings
+          </Link>
+        </div>
       </div>
-      <h2 className="font-display text-3xl font-extrabold">Start with one thing from the pile</h2>
-      <p className="max-w-md text-floor-ink/80">
-        Lay it flat in good light and take two or three photos, front, back and the label. Or drop photos anywhere on this floor.
-      </p>
-      <div className="flex flex-wrap justify-center gap-3">
-        <Link to="/scan" className="btn btn-tag text-base">
-          <ScanLine className="size-5" aria-hidden />
-          Scan an item
-        </Link>
-        <Link to="/settings#import" className="btn bg-floor-deep text-floor-ink hover:bg-floor-deep/80">
-          <ImagePlus className="size-5" aria-hidden />
-          Import existing listings
-        </Link>
+      <div ref={board} className="relative aspect-[5/4] w-full rounded-[28px] border border-dashed border-line" aria-hidden>
+        <CutoutPiece id="lilacHoodie" at={{ x: '6%', y: '6%', w: '38%', r: -6, z: 2, phone: true }} board={board} />
+        <CutoutPiece id="rawSelvedge" at={{ x: '42%', y: '10%', w: '22%', r: 7, z: 1, phone: true }} board={board} index={1} />
+        <CutoutPiece id="selvedgeJacket" at={{ x: '60%', y: '4%', w: '36%', r: 9, z: 3, phone: true }} board={board} index={2} />
+        <CutoutPiece id="mexico66Yellow" at={{ x: '22%', y: '68%', w: '28%', r: -10, z: 4, phone: true }} board={board} index={3} />
+        <LooseTag price="$18" note="Your find" className="right-[8%] bottom-[8%] z-10 max-sm:scale-75" />
       </div>
     </div>
   );
@@ -432,49 +475,56 @@ function Receipt({
   return (
     <motion.div
       initial={{ y: -16, opacity: 0, rotate: 0 }}
-      animate={{ y: 0, opacity: 1, rotate: 1.4 }}
+      animate={{ y: 0, opacity: 1, rotate: 1.2 }}
+      whileHover={{ rotate: 0, y: -3 }}
       transition={{ type: 'spring', stiffness: 160, damping: 16, delay: 0.2 }}
-      className="receipt-edge grain mx-auto w-full max-w-sm rounded-t-lg bg-paper px-5 pt-5 pb-9 text-ink lift-lg"
+      className="relative mx-auto w-full max-w-sm"
     >
-      <p className="text-center font-display text-lg font-bold">pileGo</p>
-      <p className="text-center text-xs text-muted">
-        {new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
-      </p>
-      <dl className="mt-4 flex flex-col gap-1.5 border-y border-dashed border-line py-3 text-sm">
-        {lines.map(([k, v]) => (
-          <div key={k} className="flex items-baseline gap-2">
-            <dt className="text-ink-2">{k}</dt>
-            <span className="flex-1 border-b border-dotted border-line" aria-hidden />
-            <dd className="font-semibold tabular">{v}</dd>
-          </div>
-        ))}
-      </dl>
-      <div className="flex items-baseline justify-between py-3">
-        <span className="font-display text-lg font-bold">Taken this month</span>
-        <span className="font-display text-2xl font-extrabold tabular">{money(stats.takenMonth, currency)}</span>
-      </div>
-      <div className="border-t border-dashed border-line pt-3">
-        <p className="hand text-xl text-floor">Next up</p>
-        {todo.length ? (
-          <ul className="mt-1 flex flex-col">
-            {todo.map(t => (
-              <li key={t.key}>
-                <Link
-                  to={t.to}
-                  className={cx(
-                    'flex items-start gap-2 rounded-md py-1.5 text-sm hover:bg-paper-2',
-                    t.tone === 'urgent' ? 'font-semibold text-danger' : 'text-ink',
-                  )}
-                >
-                  <span aria-hidden className="mt-1.5 size-1.5 shrink-0 rounded-full bg-current" />
-                  {t.text}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-1 text-sm text-ink-2">All caught up. Scan something new.</p>
-        )}
+      <span className="tape absolute -top-3 left-1/2 z-10 h-6 w-24 -translate-x-1/2 rotate-2" aria-hidden />
+      <div className="receipt-edge grain rounded-t-[18px] bg-card px-5 pt-6 pb-9 text-ink lift-lg">
+        <div className="flex items-baseline justify-between">
+          <p className="label-caps">Today</p>
+          <p className="text-xs text-muted">{new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+        </div>
+        <dl className="mt-4 flex flex-col gap-2 border-y border-dashed border-line py-3.5 text-sm">
+          {lines.map(([k, v]) => (
+            <div key={k} className="flex items-baseline gap-2">
+              <dt className="text-ink-2">{k}</dt>
+              <span className="flex-1 border-b border-dotted border-line" aria-hidden />
+              <dd className="font-semibold tabular">{v}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="flex items-baseline justify-between py-3.5">
+          <span className="text-base font-semibold tracking-tight">Taken this month</span>
+          <span className="font-display text-3xl text-accent tabular">{money(stats.takenMonth, currency)}</span>
+        </div>
+        <div className="border-t border-dashed border-line pt-3.5">
+          <p className="label-caps">Next up</p>
+          {todo.length ? (
+            <ul className="mt-2 flex flex-col">
+              {todo.map((t, i) => (
+                <motion.li key={t.key} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.45 + i * 0.06 }}>
+                  <Link
+                    to={t.to}
+                    className={cx(
+                      'group flex items-start gap-2.5 rounded-xl px-1.5 py-1.5 text-sm transition hover:bg-paper-2',
+                      t.tone === 'urgent' ? 'font-semibold text-danger' : 'text-ink',
+                    )}
+                  >
+                    <span
+                      aria-hidden
+                      className={cx('mt-[0.4rem] size-1.5 shrink-0 rounded-full transition-transform group-hover:scale-150', t.tone === 'urgent' ? 'bg-danger' : 'bg-accent')}
+                    />
+                    {t.text}
+                  </Link>
+                </motion.li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-sm text-ink-2">All caught up. Scan something new.</p>
+          )}
+        </div>
       </div>
     </motion.div>
   );

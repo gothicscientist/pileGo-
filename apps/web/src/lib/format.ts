@@ -48,7 +48,7 @@ export function inkOn(hex: string): string {
   const [r, g, b] = [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
   const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
   const L = 0.2126 * lin(r!) + 0.7152 * lin(g!) + 0.0722 * lin(b!);
-  return L > 0.42 ? '#16172B' : '#FFFFFF';
+  return L > 0.42 ? '#2d3033' : '#FFFFFF';
 }
 
 /** Stable pseudo-random number in [0, 1) from a string, for scatter and tilt. */

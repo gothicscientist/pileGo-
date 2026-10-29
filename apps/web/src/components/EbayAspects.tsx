@@ -43,7 +43,7 @@ export function EbayAspects({ listing }: { listing: Listing }) {
 
   return (
     <form
-      className="mt-3 flex flex-col gap-3 rounded-lg bg-paper-2 p-3"
+      className="mt-3 flex flex-col gap-3 rounded-xl bg-paper-2 p-3"
       onSubmit={e => {
         e.preventDefault();
         if (ready) void submit();

@@ -38,11 +38,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'pileGo',
-        short_name: 'pileGo',
+        name: 'pileGo!',
+        short_name: 'pileGo!',
         description: 'Scan, list and cross-list your secondhand clothes.',
-        theme_color: '#2B3FE8',
-        background_color: '#F6F6F1',
+        theme_color: '#F4F0E6',
+        background_color: '#F4F0E6',
         display: 'standalone',
         start_url: '/',
         icons: [

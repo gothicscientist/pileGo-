@@ -4,7 +4,7 @@ import { MARKETPLACES, type Item, type Listing } from '@pilego/core';
 import { ExternalLink, RefreshCw } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { ListingStatusText, PhotoImg, Sticker } from '~/components/bits';
+import { ListingStatusText, PhotoImg, PriceTag, Sticker } from '~/components/bits';
 import { useToast } from '~/components/overlay';
 import { Button, Empty, Paper, SectionTitle, Spinner } from '~/components/ui';
 import { askExtensionToSync, useExtension } from '~/lib/extension';
@@ -88,10 +88,10 @@ export function OutThere() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
-      <header className="flex flex-wrap items-end justify-between gap-4">
+      <header className="flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
         <div>
-          <h1 className="font-display text-5xl leading-[0.9] font-extrabold sm:text-6xl">Out there</h1>
-          <p className="mt-2 text-ink-2">
+          <h1 className="font-display text-[clamp(2.6rem,6vw,4.6rem)] leading-[0.92]">Out there</h1>
+          <p className="mt-3 text-ink-2">
             {plural(live.length, 'live listing')} across {new Set(live.map(r => r.listing.marketplace)).size} marketplaces.
           </p>
         </div>
@@ -134,7 +134,7 @@ export function OutThere() {
               </ul>
               {moving.some(j => j.runner === 'extension') && !ext.installed && (
                 <p className="mt-3 text-sm text-muted">
-                  Some of these run in the browser extension. Open pileGo in a browser that has it, or{' '}
+                  Some of these run in the browser extension. Open pileGo! in a browser that has it, or{' '}
                   <Link to={extensionSetupUrl('/out')} className="underline">
                     install it
                   </Link>
@@ -165,7 +165,7 @@ export function OutThere() {
                 return (
                   <li key={listing.id}>
                     <Paper as="div" className="flex items-center gap-3 p-2.5 pr-4">
-                      <PhotoImg photo={item.photos?.[0]} className="size-12 shrink-0 rounded-lg object-cover" />
+                      <PhotoImg photo={item.photos?.[0]} className="size-12 shrink-0 rounded-xl object-cover" />
                       <div className="min-w-0 flex-1">
                         <Link to={`/item/${item.id}?tab=listings`} className="block truncate font-semibold hover:underline">
                           {item.title}
@@ -173,10 +173,10 @@ export function OutThere() {
                         <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
                           <Sticker id={listing.marketplace} size="sm" tilt={false} />
                           <ListingStatusText status={listing.status} className="!text-xs" />
-                          <span className={cx('tabular', old && 'font-bold text-danger')}>{days === 0 ? 'today' : `${days} days`}</span>
+                          <span className={cx('tabular', old && 'font-semibold text-danger')}>{days === 0 ? 'today' : `${days} days`}</span>
                         </div>
                       </div>
-                      <span className="font-display text-lg font-bold tabular">{money(listing.price, item.currency)}</span>
+                      <PriceTag empty={listing.price == null}>{money(listing.price, item.currency)}</PriceTag>
                       {listing.external_url && (
                         <a
                           href={listing.external_url}
@@ -207,7 +207,7 @@ export function OutThere() {
               {sold.map(item => (
                 <li key={item.id}>
                   <Paper as="div" className="flex items-center gap-3 p-3">
-                    <PhotoImg photo={item.photos?.[0]} className="size-14 shrink-0 rounded-lg object-cover" />
+                    <PhotoImg photo={item.photos?.[0]} className="size-14 shrink-0 rounded-xl object-cover" />
                     <div className="min-w-0 flex-1">
                       <Link to={`/item/${item.id}`} className="block truncate font-semibold hover:underline">
                         {item.title}
