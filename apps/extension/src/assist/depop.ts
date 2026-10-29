@@ -189,6 +189,15 @@ async function photos(files: File[]): Promise<number> {
   return 0;
 }
 
+/** The international shipping price box that worldwide shipping brings up. */
+function internationalPrice(): HTMLInputElement | null {
+  return (
+    [...document.querySelectorAll<HTMLInputElement>('input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"])')].find(
+      i => /international/i.test(`${i.id} ${i.name}`) && shown(i),
+    ) ?? null
+  );
+}
+
 function errors(): string[] {
   const out = new Set<string>();
   for (const el of document.querySelectorAll<HTMLElement>('[aria-invalid="true"]')) {
@@ -224,7 +233,8 @@ export const fillDepop: Driver = async (work: ListingWork, files: File[], ctx: D
   ctx.check();
   ctx.step('Writing the description…');
   const description = byId('description') as HTMLTextAreaElement;
-  setValue(description, listing.description.slice(0, 1000));
+  // By characters, not UTF-16 units: half an emoji at the cut is text Depop's server cannot store.
+  setValue(description, [...listing.description].slice(0, 1000).join(''));
   tally.ok('description', description.value);
 
   ctx.check();
@@ -259,13 +269,15 @@ export const fillDepop: Driver = async (work: ListingWork, files: File[], ctx: D
   if (price && listing.price != null) setValue(price, String(listing.price));
   tally.ok('price', price && Number(price.value) > 0);
 
-  // Worldwide first: switching it on redraws the shipping part and resets the package size.
+  // Worldwide shipping stays as the seller left it. Depop's prepaid labels are
+  // domestic only, so worldwide needs its own international price; switched on
+  // without one, every Post came back as a 500. pileGo has no price to give it,
+  // so a worldwide switch that is on with the price left empty goes off.
   const worldwide = document.querySelector<HTMLInputElement>('input[name="isInternationalShippingEnabled"]');
-  if (worldwide && !worldwide.checked) {
+  if (worldwide?.checked && internationalPrice()?.value.trim() === '') {
     press(worldwide);
     await sleep(700);
   }
-  tally.ok('worldwide shipping', document.querySelector<HTMLInputElement>('input[name="isInternationalShippingEnabled"]')?.checked);
   // Depop suggests a package size from the category's typical weight and warns
   // when it is overridden, so its own suggestion stays.
   const suggested = (byId('shippingMethods-input') as HTMLInputElement | null)?.value.trim();
@@ -295,7 +307,10 @@ export const fillDepop: Driver = async (work: ListingWork, files: File[], ctx: D
   if (!post) return tally.result(false, 'Could not find Depop’s Post button.');
   if (!(await ctx.beforePost())) return tally.result(false);
   ctx.step('Posting on Depop…');
-  // Depop's server now and then answers Post with a 500; the form stays filled, so press it again.
+  // A 500 that a second press does not clear comes from what the form sends,
+  // and sending it again cannot fix that; a Post that failed can also have gone
+  // through. So Post is pressed at most twice, then the form goes to the seller
+  // instead of a fresh form or a later retry.
   for (let attempt = 1; ; attempt += 1) {
     const before = new Set<Element>(serverAlertEls());
     press(post);
@@ -314,12 +329,14 @@ export const fillDepop: Driver = async (work: ListingWork, files: File[], ctx: D
     if (outcome === 'posted') return tally.result(true);
     if (outcome !== 'server') break;
     const again = [...document.querySelectorAll<HTMLButtonElement>('button[type="submit"]')].find(b => text(b) === 'Post' && shown(b));
-    if (attempt >= 3 || !again) {
-      tally.retry = true;
-      return tally.result(false, `Depop’s server had a problem (${said}).`);
+    if (attempt >= 2 || !again) {
+      return tally.result(
+        false,
+        `Depop’s server refused the post (${said}). It may have gone up anyway, so check your Depop listings before posting again.`,
+      );
     }
-    ctx.step(`Depop’s server had a problem. Trying again in ${5 * attempt} seconds…`);
-    await sleep(5000 * attempt);
+    ctx.step('Depop’s server had a problem. Trying once more in 5 seconds…');
+    await sleep(5000);
     ctx.check();
     ctx.step('Posting on Depop…');
     post = again;

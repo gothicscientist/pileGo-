@@ -62,8 +62,11 @@ tab opens in front, because browsers throttle pages in background tabs.
   8, checked and sent again if the page was still loading), description,
   category under the right MEN / WOMEN / KIDS heading, material, brand,
   condition, up to two colours (removing the colours Depop guesses from the
-  photos), size, source, age, up to three styles, price, worldwide shipping
-  and package size. Then Post.
+  photos), size, source, age, up to three styles, price and package size.
+  Then Post. Worldwide shipping stays as you set it. Depop's prepaid labels
+  are domestic only, so worldwide needs its own international price, and
+  turning it on without one made every Post fail with a 500. If worldwide is
+  on with the international price empty, pileGo turns it off.
 - **Poshmark** (`apps/extension/src/assist/poshmark.ts`): photos and the
   cover-shot editor's Apply, title, description, department, category and
   subcategory, size (a custom size when it is not on the list), condition,
@@ -83,12 +86,15 @@ Once pileGo has pressed post, landing on your closet or the feed counts too
 (pileGo looks for the new listing's link there), and so does Poshmark saying
 the listing is live while still on the editor's address.
 
-When the site's server fails (a 500 page, or a "status code 500" toast after
-Post), pileGo presses post again up to three times. If that does not work, it
-loads a fresh form and fills it again, up to three forms. After that it closes
-the tab and tries again by itself in 10 minutes, up to four times, before
-handing the listing to you. A Post that fails with a 500 can still sometimes
-have gone through, so check for a double after a run like that.
+When the sell page itself loads as a 500 error, pileGo loads a fresh form and
+fills it again, up to three forms. After that it closes the tab and tries
+again by itself in 10 minutes, up to four times, before handing the listing
+to you. When Depop answers Post with a 500 (a "status code 500" toast),
+pileGo presses it once more. If that fails too, the form goes to you: the
+same form would get the same answer, and a Post that fails with a 500 can
+still have gone through, so check your Depop listings before posting again.
+Poshmark still presses List again up to three times, then fills fresh forms
+as above; check for a double after a run like that.
 
 No tab holds up the queue. A sell form gets 10 minutes to answer and a Vinted
 request gets 5. Vinted jobs run before the sell forms. Each run of the queue
