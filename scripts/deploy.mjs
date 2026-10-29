@@ -10,9 +10,10 @@
 //   PILEGO_APP_URL        where the web app lives, e.g. https://pilego.pages.dev
 //   EBAY_CLIENT_ID, EBAY_CLIENT_SECRET, EBAY_RU_NAME, EBAY_ENV (production|sandbox),
 //   EBAY_VERIFICATION_TOKEN (for eBay's account-deletion notices)
+//   RESEND_API_KEY or SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS   sign-in emails (see email())
 //
 // Flags:
-//   --only=migrations,vault,secrets,auth,functions   run some steps
+//   --only=migrations,vault,secrets,auth,email,functions   run some steps
 //   --dry-run                                        print what would happen
 //
 // At the end it prints the two values the web app is built with. Both are
@@ -146,6 +147,54 @@ async function auth() {
   console.log(`  site URL ${appUrl}`);
 }
 
+// Supabase's built-in mailer sends 2 emails an hour for the whole project, so
+// sign-in breaks after a couple of tries. With a mail provider set, sign-in
+// emails go through it and the hourly limit is raised.
+//   RESEND_API_KEY                                         Resend (domain verified at resend.com)
+//   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS             any other provider
+//   SMTP_FROM (default signin@pilego.app), AUTH_EMAILS_PER_HOUR (default 60)
+function smtpSettings() {
+  const env = process.env;
+  const resend = env.RESEND_API_KEY;
+  const host = env.SMTP_HOST ?? (resend ? 'smtp.resend.com' : undefined);
+  const pass = env.SMTP_PASS ?? resend;
+  if (!host || !pass) return null;
+  return {
+    smtp_host: host,
+    smtp_port: String(env.SMTP_PORT ?? '465'),
+    smtp_user: env.SMTP_USER ?? (resend ? 'resend' : ''),
+    smtp_pass: pass,
+    smtp_admin_email: env.SMTP_FROM ?? 'signin@pilego.app',
+    smtp_sender_name: 'pileGo!',
+    rate_limit_email_sent: Number(env.AUTH_EMAILS_PER_HOUR ?? 60),
+  };
+}
+
+const emailPage = (heading, lead, button) => `<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:440px;margin:0 auto;padding:24px;color:#1d1b16">
+<h2 style="margin:0 0 12px">${heading}</h2>
+<p style="margin:0 0 20px;line-height:1.5">${lead}</p>
+<p style="margin:0 0 24px"><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#56703F;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:999px">${button}</a></p>
+<p style="margin:0;color:#6b665b;font-size:13px;line-height:1.5">The link works once and expires in an hour. If you did not ask for this, ignore this email.</p>
+</div>`;
+
+async function email() {
+  console.log('Sign-in emails');
+  const smtp = smtpSettings();
+  if (!smtp) {
+    // Supabase also refuses template changes on its built-in mailer.
+    console.log("  no RESEND_API_KEY or SMTP_* set, skipped: Supabase's built-in mailer allows only 2 sign-in emails an hour");
+    return;
+  }
+  await api('PATCH', `/projects/${ref}/config/auth`, {
+    ...smtp,
+    mailer_subjects_magic_link: 'Your pileGo! sign-in link',
+    mailer_templates_magic_link_content: emailPage('Sign in to pileGo!', 'Tap the button to sign in.', 'Sign in'),
+    mailer_subjects_confirmation: 'Welcome to pileGo!',
+    mailer_templates_confirmation_content: emailPage('Welcome to pileGo!', 'Tap the button to finish signing up.', 'Sign in'),
+  });
+  console.log(`  sending through ${smtp.smtp_host} as ${smtp.smtp_admin_email}, up to ${smtp.rate_limit_email_sent} an hour`);
+}
+
 function functions() {
   console.log('Edge functions');
   const dir = join(root, 'supabase', 'functions');
@@ -171,6 +220,7 @@ try {
   if (want('vault')) await vault(keys);
   if (want('secrets')) await secrets();
   if (want('auth')) await auth();
+  if (want('email')) await email();
   if (want('functions')) functions();
 
   if (keys.anon) {

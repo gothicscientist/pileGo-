@@ -57,9 +57,23 @@ it would do without changing anything, pass `--dry-run`.
 ### Sign-in emails
 
 pileGo signs people in with a magic link. Supabase's built-in email sender
-manages only a few emails an hour, which is enough to try pileGo. For more
-people, add your own SMTP server under Authentication > Emails > SMTP Settings.
-Resend and Brevo both have free plans.
+sends 2 emails an hour for the whole project (sign-in then fails with "email
+rate limit exceeded") and only to your Supabase team's addresses, so it is for
+trying pileGo out. For real sellers, send through your own provider. With
+[Resend](https://resend.com) (free for 3,000 emails a month):
+
+1. Add your domain at resend.com > Domains and add the DNS records it shows
+   (on Cloudflare, Resend can add them for you).
+2. Create an API key with "Sending access".
+3. Run the email step with it:
+
+```sh
+RESEND_API_KEY=re_… SMTP_FROM=signin@your-domain node scripts/deploy.mjs --only=email
+```
+
+That points Supabase's sign-in emails at Resend, raises the limit to 60 an
+hour (`AUTH_EMAILS_PER_HOUR`) and installs pileGo's email templates. Any other
+provider works with `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER` and `SMTP_PASS`.
 
 ## 4. Put the web app online
 

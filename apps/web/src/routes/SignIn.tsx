@@ -1,32 +1,86 @@
 import { MARKETPLACE_IDS } from '@pilego/core';
 import { ArrowRight, Mail } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Sticker } from '~/components/bits';
 import { HeroPlayground } from '~/components/HeroPlayground';
 import { Button, ErrorNote, TextField } from '~/components/ui';
 import { ThemeToggle, Wordmark } from '~/app/Shell';
 import { errorMessage, supabase } from '~/lib/supabase';
 
+/** Seconds before another link can be asked for, so a second tap does not burn the hourly email limit. */
+const RESEND_AFTER = 60;
+
+interface SignInProblem {
+  message: string;
+  /** The email may already be in the inbox from an earlier try. */
+  checkInbox?: boolean;
+  wait?: number;
+}
+
+/** Supabase's auth errors, in words a seller can act on. */
+export function signInProblem(err: unknown): SignInProblem {
+  const e = err as { code?: string; status?: number; message?: string };
+  const text = e?.message ?? errorMessage(err);
+  const seconds = /after (\d+) seconds?/i.exec(text);
+  if (seconds) {
+    const wait = Number(seconds[1]);
+    return { message: `A link was just sent. You can ask for another in ${wait} seconds.`, checkInbox: true, wait };
+  }
+  if (e?.code === 'over_email_send_rate_limit' || /email rate limit/i.test(text)) {
+    return {
+      message: 'pileGo! has sent too many sign-in emails in the last hour. If an earlier link arrived, it still works. Otherwise, try again in an hour.',
+      checkInbox: true,
+    };
+  }
+  if (e?.status === 429 || /rate limit|too many/i.test(text)) {
+    return { message: 'Too many tries from here. Wait a minute, then try again.' };
+  }
+  if (e?.code === 'email_address_invalid' || /invalid.*email|email.*invalid/i.test(text)) {
+    return { message: 'That email address does not look right. Check it and try again.' };
+  }
+  if (/fetch|network/i.test(text)) return { message: 'Could not reach pileGo!. Check your connection and try again.' };
+  return { message: text };
+}
+
 export function SignIn() {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [problem, setProblem] = useState<SignInProblem | null>(null);
+  const [cooldown, setCooldown] = useState(0);
   const floor = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion();
 
-  async function submit(e: FormEvent) {
-    e.preventDefault();
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = window.setTimeout(() => setCooldown(c => c - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [cooldown]);
+
+  async function send(address: string) {
     setBusy(true);
-    setError(null);
+    setProblem(null);
     const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
+      email: address,
       options: { emailRedirectTo: window.location.origin },
     });
     setBusy(false);
-    if (error) setError(errorMessage(error));
-    else setSent(email.trim());
+    if (error) {
+      const p = signInProblem(error);
+      setProblem(p);
+      if (p.wait) setCooldown(p.wait);
+      return false;
+    }
+    setCooldown(RESEND_AFTER);
+    return true;
+  }
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (busy || cooldown > 0) return;
+    const address = email.trim();
+    if (await send(address)) setSent(address);
   }
 
   const rise = (delay: number) =>
@@ -70,11 +124,24 @@ export function SignIn() {
                     <Mail className="size-8 text-accent" aria-hidden />
                     <h2 className="font-display text-2xl">Check your email</h2>
                     <p className="text-ink-2">
-                      We sent a sign-in link to <strong className="text-ink">{sent}</strong>. Open it on this device and you are in.
+                      We sent a sign-in link to <strong className="text-ink">{sent}</strong>. Open it on this device and you are in. It can
+                      take a minute, and sometimes lands in spam.
                     </p>
-                    <Button variant="ghost" className="self-start" onClick={() => setSent(null)}>
-                      Use a different email
-                    </Button>
+                    <ErrorNote error={problem?.message} />
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="line" busy={busy} disabled={cooldown > 0} onClick={() => void send(sent)}>
+                        {cooldown > 0 ? `Send again in ${cooldown}s` : 'Send it again'}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          setSent(null);
+                          setProblem(null);
+                        }}
+                      >
+                        Use a different email
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <form onSubmit={submit} className="flex flex-col gap-4">
@@ -91,9 +158,25 @@ export function SignIn() {
                       onChange={e => setEmail(e.target.value)}
                       placeholder="you@example.com"
                     />
-                    <ErrorNote error={error} />
-                    <Button type="submit" variant="tag" busy={busy} className="w-full text-base">
-                      Email me a sign-in link
+                    {problem && (
+                      <div role="alert" className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">
+                        {problem.message}
+                        {problem.checkInbox && email.trim() && (
+                          <button
+                            type="button"
+                            className="mt-1 block font-semibold underline underline-offset-2"
+                            onClick={() => {
+                              setSent(email.trim());
+                              setProblem(null);
+                            }}
+                          >
+                            I already have a link
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    <Button type="submit" variant="tag" busy={busy} disabled={cooldown > 0} className="w-full text-base">
+                      {cooldown > 0 ? `Try again in ${cooldown}s` : 'Email me a sign-in link'}
                       <ArrowRight className="size-4" aria-hidden />
                     </Button>
                     <p className="text-xs leading-relaxed text-muted">

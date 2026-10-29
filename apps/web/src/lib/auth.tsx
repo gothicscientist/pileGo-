@@ -41,3 +41,13 @@ export function useUserId(): string {
   if (!session) throw new Error('useUserId needs a signed-in user');
   return session.user.id;
 }
+
+/** Accounts that have finished the first-run quiz carry this on their auth profile. */
+export function isOnboarded(session: Session | null): boolean {
+  return Boolean(session?.user.user_metadata?.onboarded);
+}
+
+export async function markOnboarded(): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ data: { onboarded: true } });
+  if (error) throw error;
+}
