@@ -8,10 +8,10 @@ import { ext, fromBase64, send, sleep } from '../shared/browser.ts';
 import type { AssistProgress, AssistReport, AssistRequest, FillResult, ListingWork } from '../shared/messages.ts';
 import { readComps } from './comps.ts';
 import { fillDepop } from './depop.ts';
-import { waitFor } from './dom.ts';
+import { norm, pageError, text, waitFor } from './dom.ts';
 import { Stopped, type Driver, type DriverContext } from './driver.ts';
 import { fillPoshmark } from './poshmark.ts';
-import { addPhotos, findField, findPhotoInput, setValue, siteFor, SITES, type FieldKey } from './sites.ts';
+import { addPhotos, findField, findPhotoInput, postedListing, setValue, siteFor, SITES, type FieldKey } from './sites.ts';
 
 function files(work: ListingWork): File[] {
   const max = MARKETPLACES[work.marketplace].photos_max;
@@ -236,7 +236,16 @@ async function runDriver(work: ListingWork, driver: Driver): Promise<FillResult>
 
   if (result.posted) {
     closePanel();
-    report({ type: 'assist:posted', job_id: work.job_id, url: location.href });
+    // Some sites land on the closet or feed instead of the new listing: find it there.
+    const url = postedListing(work.marketplace, location.href)
+      ? location.href
+      : ((await waitFor(() => findListing(work.marketplace, work.listing.title || work.listing.description), 5000)) ?? location.href);
+    report({ type: 'assist:posted', job_id: work.job_id, url });
+    return result;
+  }
+  if (result.retry && !stopped) {
+    // The site's server failed, not the form: the background tries a fresh form.
+    progressPanel(work, `${result.error ?? `${name}’s server had a problem.`} pileGo will try again.`);
     return result;
   }
   if (stopped) {
@@ -263,6 +272,27 @@ async function runDriver(work: ListingWork, driver: Driver): Promise<FillResult>
     onNo: () => report({ type: 'assist:gave-up', job_id: work.job_id, message: `You stopped the ${name} form.` }),
   });
   return result;
+}
+
+/** The new listing's link on a closet or feed page, matched by its title. */
+function findListing(market: MarketplaceId, title: string): string | null {
+  const site = SITES[market];
+  const want = norm(title).slice(0, 40).trim();
+  if (!site || want.length < 4) return null;
+  for (const a of document.querySelectorAll<HTMLAnchorElement>('a[href]')) {
+    const hit = postedListing(market, a.href);
+    if (!hit) continue;
+    let path = '';
+    try {
+      path = new URL(a.href).pathname;
+    } catch {
+      continue;
+    }
+    // The card's text, its photo's alt text, or the slug in the address all carry the title.
+    const words = norm(`${text(a)} ${a.title} ${a.querySelector('img')?.alt ?? ''} ${path}`);
+    if (` ${words} `.includes(` ${want}`)) return hit.url;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -339,8 +369,12 @@ function startRemoval(work: ListingWork, reason: string) {
 ext.runtime.onMessage.addListener((msg: AssistRequest, _sender, reply) => {
   if (!msg || typeof msg.type !== 'string' || !msg.type.startsWith('assist:')) return false;
   if (msg.type === 'assist:ping') {
-    reply({ ok: true, url: location.href });
+    reply({ ok: true, url: location.href, error: pageError() });
     return false;
+  }
+  if (msg.type === 'assist:find') {
+    waitFor(() => findListing(msg.marketplace, msg.title), 8000).then(url => reply({ url }));
+    return true;
   }
   if (msg.type === 'assist:remove') {
     startRemoval(msg.work, msg.reason);

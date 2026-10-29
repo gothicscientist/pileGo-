@@ -79,6 +79,21 @@ posted: the listing is marked as needing you, the tab stays open with the
 panel, and pressing "I've posted it" or posting from the tab settles it.
 
 When the tab lands on the new listing, pileGo records it as live with its link.
+Once pileGo has pressed post, landing on your closet or the feed counts too
+(pileGo looks for the new listing's link there), and so does Poshmark saying
+the listing is live while still on the editor's address.
+
+When the site's server fails (a 500 page, or a "status code 500" toast after
+Post), pileGo presses post again up to three times. If that does not work, it
+loads a fresh form and fills it again, up to three forms. After that it closes
+the tab and tries again by itself in 10 minutes, up to four times, before
+handing the listing to you. A Post that fails with a 500 can still sometimes
+have gone through, so check for a double after a run like that.
+
+No tab holds up the queue. A sell form gets 10 minutes to answer and a Vinted
+request gets 5. Vinted jobs run before the sell forms. Each run of the queue
+also settles listings whose tab was closed, or that nothing has heard from
+since the fill should have ended, so nothing sits on "Listing…" for good.
 
 ## Mercari, Grailed: Assisted
 

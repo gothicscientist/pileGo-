@@ -16,6 +16,11 @@ export interface SiteAdapter {
   sellPage: RegExp;
   /** Where the site sends you after a listing goes up; the capture is the listing id. */
   posted: RegExp;
+  /**
+   * Other pages the site may send you to once pileGo has pressed its post
+   * button, such as the seller's closet. Only counts after a press.
+   */
+  afterPost?: RegExp;
   selectors: Partial<Record<FieldKey, string[]>>;
   /** The form only appears after photos are added. */
   photosFirst?: boolean;
@@ -28,6 +33,7 @@ export const SITES: Partial<Record<MarketplaceId, SiteAdapter>> = {
     id: 'depop',
     sellPage: /depop\.com\/products\/create/,
     posted: /depop\.com\/products\/(?!create|edit)([a-z0-9-]+)\/?(?:\?|$)/i,
+    afterPost: /depop\.com\/(?!products\/create|login|signup)/,
     selectors: {
       description: ['textarea[name="description"]', '#description', 'textarea[data-testid*="description" i]'],
       price: ['input[name="priceAmount"]', 'input[name="price"]', 'input[data-testid*="price" i]'],
@@ -39,6 +45,7 @@ export const SITES: Partial<Record<MarketplaceId, SiteAdapter>> = {
     id: 'poshmark',
     sellPage: /poshmark\.(com|ca)\/create-listing/,
     posted: /poshmark\.(?:com|ca)\/listing\/([^/?#]+)/,
+    afterPost: /poshmark\.(?:com|ca)\/(?!create-listing|login|signup)/,
     selectors: {
       title: ['input[data-vv-name="title"]', 'input[placeholder*="What are you selling" i]'],
       description: ['textarea[data-vv-name="description"]'],
@@ -93,6 +100,16 @@ export function postedListing(market: MarketplaceId, url: string): { id: string 
   if (!hit) return null;
   const id = hit.slice(1).find(Boolean) ?? null;
   return { id, url: id ? url.split(/[?#]/)[0]! : url };
+}
+
+/**
+ * pileGo pressed the post button and the tab has moved on from the form: to
+ * the new listing, or to wherever the site sends you after posting.
+ */
+export function leftForm(market: MarketplaceId, url: string): boolean {
+  const site = SITES[market];
+  if (!site || site.sellPage.test(url)) return false;
+  return site.posted.test(url) || Boolean(site.afterPost?.test(url));
 }
 
 /** Words that name each field in labels, placeholders and attributes. */

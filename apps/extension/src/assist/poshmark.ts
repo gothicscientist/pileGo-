@@ -12,7 +12,7 @@
 import { sleep } from '../shared/browser.ts';
 import type { ListingWork } from '../shared/messages.ts';
 import { conditionWords, poshmarkCategory, poshmarkColours, poshmarkTags, sizeWants } from './choices.ts';
-import { giveFiles, norm, pickOption, press, pressKey, setValue, shown, text, typeText, waitFor } from './dom.ts';
+import { giveFiles, norm, pageError, pickOption, press, pressKey, newServerAlert, serverAlertEls, serverAlerts, setValue, shown, text, typeText, waitFor } from './dom.ts';
 import { Tally, type Driver, type DriverContext } from './driver.ts';
 
 const MAX_PHOTOS = 16;
@@ -268,6 +268,16 @@ async function price(work: ListingWork, originalOverride?: number): Promise<bool
   return Number(field.value) > 0;
 }
 
+/** Poshmark's own word that the listing is up, for when it stays on the editor's address. */
+function listedShown(): boolean {
+  const modal = visibleModal();
+  const words = /listing is (now )?live|successfully listed|has been listed|is now listed|now live|congrat/i;
+  if (modal && words.test(text(modal))) return true;
+  return [...document.querySelectorAll<HTMLElement>('[role="alert"], [role="status"], [class*="toast" i], [class*="snackbar" i]')].some(
+    el => shown(el) && words.test(text(el)),
+  );
+}
+
 function visibleErrors(): string[] {
   const out = new Set<string>();
   for (const el of document.querySelectorAll<HTMLElement>('.form__error-message')) {
@@ -282,7 +292,15 @@ export const fillPoshmark: Driver = async (work: ListingWork, files: File[], ctx
   const { item, listing } = work;
 
   ctx.step('Waiting for Poshmark’s form…');
-  const ready = await waitFor(() => document.querySelector('input[data-vv-name="title"]') && document.querySelector('.listing-editor__category-container'), 60_000);
+  const ready = await waitFor(
+    () => (document.querySelector('input[data-vv-name="title"]') && document.querySelector('.listing-editor__category-container')) || pageError(),
+    60_000,
+  );
+  const broken = pageError();
+  if (broken) {
+    tally.retry = true;
+    return tally.result(false, `Poshmark’s server had a problem (${broken}).`);
+  }
   if (!ready) {
     // Say what the tab shows instead, so a login page or a pop-up is easy to spot.
     const shows = text(document.querySelector('main') ?? document.body).replace(/\s+/g, ' ').slice(0, 120);
@@ -325,7 +343,11 @@ export const fillPoshmark: Driver = async (work: ListingWork, files: File[], ctx
   tally.ok('price', await price(work));
 
   const blocking = ['photos', 'title', 'description', 'category', 'price'].filter(n => tally.missing.includes(n));
-  if (blocking.length) return tally.result(false);
+  if (blocking.length) {
+    const said = serverAlerts()[0];
+    if (said) tally.retry = true;
+    return tally.result(false, said ? `Poshmark’s server had a problem (${said}).` : undefined);
+  }
 
   ctx.check();
   ctx.step('Checking the listing…');
@@ -349,16 +371,37 @@ export const fillPoshmark: Driver = async (work: ListingWork, files: File[], ctx
 
   if (!(await ctx.beforePost())) return tally.result(false);
   ctx.step('Listing on Poshmark…');
-  press(list);
-
-  const outcome = await waitFor(() => {
-    if (!/\/create-listing/.test(location.pathname)) return 'posted';
-    // Poshmark sometimes asks to confirm or shows a tip after listing.
-    const ok = modalButton(/^(ok|got it!?|done|continue)$/i);
-    if (ok) press(ok);
-    return null;
-  }, 60_000, 700);
-  if (outcome) return tally.result(true);
+  // Poshmark uploads the photos once List is pressed, which can take a minute or two.
+  for (let attempt = 1; ; attempt += 1) {
+    const before = new Set<Element>(serverAlertEls());
+    press(list);
+    let said: string | null = null;
+    const outcome = await waitFor(
+      () => {
+        if (!/\/create-listing/.test(location.pathname) || listedShown()) return 'posted';
+        said = newServerAlert(before) ?? pageError();
+        if (said) return 'server';
+        // Poshmark sometimes asks to confirm or shows a tip after listing.
+        const ok = modalButton(/^(ok|got it!?|done|continue)$/i);
+        if (ok) press(ok);
+        return null;
+      },
+      180_000,
+      700,
+    );
+    if (outcome === 'posted') return tally.result(true);
+    if (outcome !== 'server') break;
+    const again = [...document.querySelectorAll<HTMLButtonElement>('button[data-et-name="list"]')].find(shown);
+    if (attempt >= 3 || !again) {
+      tally.retry = true;
+      return tally.result(false, `Poshmark’s server had a problem (${said}).`);
+    }
+    ctx.step(`Poshmark’s server had a problem. Trying again in ${5 * attempt} seconds…`);
+    await sleep(5000 * attempt);
+    ctx.check();
+    ctx.step('Listing on Poshmark…');
+    list = again;
+  }
   const why = visibleErrors();
   return tally.result(false, why.length ? `Poshmark wants: ${why.slice(0, 4).join('; ')}.` : 'Poshmark did not confirm the listing.');
 };

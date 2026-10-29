@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { findField, postedListing, setValue, SITES, siteFor } from '../src/assist/sites.ts';
+import { isServerError, pageError, serverAlerts } from '../src/assist/dom.ts';
+import { findField, leftForm, postedListing, setValue, SITES, siteFor } from '../src/assist/sites.ts';
 
 function page(html: string) {
   document.body.innerHTML = html;
@@ -73,5 +74,45 @@ describe('pages', () => {
     expect(postedListing('mercari', 'https://www.mercari.com/us/item/m12345678/')?.id).toBe('m12345678');
     expect(postedListing('grailed', 'https://www.grailed.com/listings/5551234-levis')?.id).toBe('5551234');
     expect(postedListing('facebook', 'https://www.facebook.com/marketplace/you/selling')?.url).toBe('https://www.facebook.com/marketplace/you/selling');
+  });
+});
+
+describe('after pressing post', () => {
+  it('counts the closet or feed as moved on, but not the form or the login page', () => {
+    expect(leftForm('poshmark', 'https://poshmark.com/listing/Levis-Jacket-65a1b2')).toBe(true);
+    expect(leftForm('poshmark', 'https://poshmark.com/closet/sam')).toBe(true);
+    expect(leftForm('poshmark', 'https://poshmark.com/')).toBe(true);
+    expect(leftForm('poshmark', 'https://poshmark.com/create-listing?draft=1')).toBe(false);
+    expect(leftForm('poshmark', 'https://poshmark.com/login')).toBe(false);
+    expect(leftForm('depop', 'https://www.depop.com/sam/')).toBe(true);
+    expect(leftForm('depop', 'https://www.depop.com/products/create/')).toBe(false);
+    expect(leftForm('mercari', 'https://www.mercari.com/mypage/')).toBe(false);
+  });
+});
+
+describe('server errors', () => {
+  it('tells a server failure from a form complaint', () => {
+    expect(isServerError('Request failed with status code 500')).toBe(true);
+    expect(isServerError('Something went wrong, please try again')).toBe(true);
+    expect(isServerError('502 Bad Gateway')).toBe(true);
+    expect(isServerError('Error 500')).toBe(true);
+    expect(isServerError('Over 500 sold this week')).toBe(false);
+    expect(isServerError('Add at least one photo')).toBe(false);
+    expect(isServerError('Price must be at least $5')).toBe(false);
+  });
+
+  it('spots a 500 page by its heading', () => {
+    expect(pageError(page('<h1>500 - Internal Server Error</h1>'))).toBe('500 - Internal Server Error');
+    expect(pageError(page('<h1>Sell an item</h1><form></form>'))).toBeNull();
+  });
+
+  it('reads server errors from toasts and alerts only', () => {
+    const doc = page(`
+      <div role="alert">Request failed with status code 500</div>
+      <div class="error">Please add a size</div>
+      <p>Our 500 favourite brands</p>`);
+    // jsdom lays nothing out, so give the alert a box.
+    for (const el of doc.querySelectorAll<HTMLElement>('[role="alert"], .error')) el.getClientRects = () => [{}] as unknown as DOMRectList;
+    expect(serverAlerts(doc)).toEqual(['Request failed with status code 500']);
   });
 });

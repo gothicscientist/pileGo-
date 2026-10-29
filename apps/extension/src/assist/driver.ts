@@ -24,12 +24,14 @@ export class Tally {
   filled: string[] = [];
   missing: string[] = [];
   photos = 0;
+  /** The site's server failed, not the form. */
+  retry = false;
   ok(name: string, done: boolean | number | string | string[] | null | undefined) {
     const yes = Array.isArray(done) ? done.length > 0 : Boolean(done);
     (yes ? this.filled : this.missing).push(name);
     return yes;
   }
   result(posted: boolean, error?: string): FillResult {
-    return { ok: !error, filled: this.filled, missing: this.missing, photos: this.photos, posted, ...(error ? { error } : {}) };
+    return { ok: !error, filled: this.filled, missing: this.missing, photos: this.photos, posted, ...(error ? { error } : {}), ...(this.retry ? { retry: true } : {}) };
   }
 }

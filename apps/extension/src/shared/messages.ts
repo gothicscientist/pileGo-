@@ -69,6 +69,8 @@ export type AssistRequest =
   | { type: 'assist:fill'; work: ListingWork }
   | { type: 'assist:remove'; work: ListingWork; reason: string }
   | { type: 'assist:comps'; market: 'mercari' | 'depop' }
+  /** After posting landed somewhere other than the new listing: find its link on the page. */
+  | { type: 'assist:find'; marketplace: MarketplaceId; title: string }
   | { type: 'assist:ping' };
 
 export type AssistReport =
@@ -87,6 +89,8 @@ export interface FillResult {
   /** pileGo pressed the site's own post button. */
   posted: boolean;
   error?: string;
+  /** The site's server failed (a 500 page or toast): a fresh form may well work. */
+  retry?: boolean;
 }
 
 /** Keeps the background worker awake and the seller informed while a form fills. */
