@@ -4,7 +4,7 @@
 // them; the garment is cut out for the pile while the AI works.
 
 import type { PhotoRole, ScanResult } from '@pilego/core';
-import { Camera, ImagePlus, Scissors, Smartphone, Wand2 } from 'lucide-react';
+import { Camera, Check, ImagePlus, Scissors, Smartphone, Wand2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { useNavigate } from 'react-router';
@@ -14,6 +14,7 @@ import { PhoneSheet } from '~/components/PhoneSheet';
 import { CoverPreview, ShotGuide, type Shot } from '~/components/ShotGuide';
 import { Button, ErrorNote, Paper, TextField } from '~/components/ui';
 import { useUserId } from '~/lib/auth';
+import { cx } from '~/lib/format';
 import { imageFiles, takeHandedOffFiles } from '~/lib/handoff';
 import { onComputer, usePhoneCapture } from '~/lib/phone';
 import { newId, removePhotos } from '~/lib/photos';
@@ -248,12 +249,13 @@ export function Scan() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-10">
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <header className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
         <div>
-          <h1 className="font-display text-5xl leading-[0.9] font-extrabold sm:text-6xl">
+          <p className="label-caps">{phase === 'review' ? '03 / Almost on the rail' : '03 / Photograph it once'}</p>
+          <h1 className="font-display mt-2 text-[clamp(2.6rem,6vw,4.6rem)] leading-[0.92]">
             {phase === 'review' ? 'Check it over' : 'Scan an item'}
           </h1>
-          <p className="mt-2 max-w-xl text-ink-2">
+          <p className="mt-3 max-w-xl text-ink-2">
             {phase === 'review'
               ? 'The AI filled this in from your photos. Fix anything it got wrong, then save.'
               : 'Lay it flat in daylight and take three photos: the front, the back and the clothing label. Add close-ups of any flaws.'}
@@ -339,10 +341,10 @@ export function Scan() {
             received={phone.received}
             onRenew={() => void phone.open()}
           />
-          <label className="flex items-start gap-3 rounded-lg p-2 text-sm text-ink-2">
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-card p-3.5 text-sm text-ink-2 shadow-[inset_0_0_0_1px_var(--line)] transition hover:shadow-[inset_0_0_0_1px_var(--ink-2)]">
             <input
               type="checkbox"
-              className="mt-0.5 size-4 accent-[var(--tag)]"
+              className="mt-0.5 size-4 accent-[var(--accent)]"
               checked={cutouts}
               onChange={e => {
                 setCutouts(e.target.checked);
@@ -378,7 +380,7 @@ export function Scan() {
                     placeholder="Label says M but fits like L. Bought new in 2021."
                   />
                   {ready.length > 0 && missing.length > 0 && (
-                    <p className="rounded-lg bg-sticker/50 px-3 py-2 text-sm text-[#16172b]" role="note" data-testid="missing-shots">
+                    <p className="kraft rounded-xl px-3.5 py-2.5 text-sm" role="note" data-testid="missing-shots">
                       <strong>No {listWords(missing.map(k => k.label.toLowerCase()))} photo yet.</strong>{' '}
                       {missing.some(k => k.role === 'label')
                         ? 'The label tells the AI the brand, size and fabric, and the size lets it estimate measurements.'
@@ -411,13 +413,13 @@ export function Scan() {
               <motion.div key="review" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                 <Paper className="p-5 sm:p-6">
                   {scan && scan.confidence < 0.5 && (
-                    <p className="mb-5 rounded-lg bg-sticker/60 px-3 py-2 text-sm text-[#16172b]">
+                    <p className="kraft mb-5 rounded-xl px-3.5 py-2.5 text-sm">
                       The AI was unsure about this one{scan.notes ? `: ${scan.notes}` : '.'} A photo of the label usually helps.
                     </p>
                   )}
                   <ItemForm value={form} onChange={setForm} currency={currency} unit={unit} scan={scan} />
                 </Paper>
-                <div className="sticky bottom-20 z-10 mt-4 flex flex-wrap items-center gap-3 rounded-xl bg-paper/95 p-3 backdrop-blur md:bottom-4">
+                <div className="sticky bottom-24 z-10 mt-4 flex flex-wrap items-center gap-3 rounded-[20px] bg-paper/90 p-3 backdrop-blur-md md:bottom-4">
                   <ErrorNote error={error} className="w-full" />
                   <Button variant="tag" className="text-base" busy={create.isPending} onClick={() => save(true)}>
                     Save and cross-list
@@ -453,19 +455,33 @@ function ScanningNotes() {
     return () => window.clearInterval(t);
   }, []);
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="py-4" role="status" aria-live="polite">
-      <ul className="flex flex-col gap-2">
-        {NOTES.slice(0, n).map((note, i) => (
-          <motion.li
-            key={note}
-            initial={{ opacity: 0, x: -14, rotate: -2 }}
-            animate={{ opacity: i === n - 1 ? 1 : 0.45, x: 0, rotate: (i % 2 ? 1 : -1) * 0.8 }}
-            className="hand text-[clamp(1.8rem,4vw,2.6rem)] leading-tight text-floor"
-          >
-            {note}
-            {i === n - 1 ? '…' : ''}
-          </motion.li>
-        ))}
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="py-2" role="status" aria-live="polite">
+      <p className="label-caps mb-4 text-muted">Reading your photos</p>
+      <ul className="flex flex-col gap-1.5">
+        {NOTES.slice(0, n).map((note, i) => {
+          const now = i === n - 1;
+          return (
+            <motion.li
+              key={note}
+              initial={{ opacity: 0, x: -14, rotate: -2 }}
+              animate={{ opacity: now ? 1 : 0.42, x: 0, rotate: (i % 2 ? 1 : -1) * 0.6 }}
+              transition={{ type: 'spring', stiffness: 220, damping: 20 }}
+              className={cx('font-display flex items-center gap-3 text-[clamp(1.7rem,3.8vw,2.5rem)] leading-tight', now ? 'text-accent' : 'text-ink')}
+            >
+              <span
+                className={cx(
+                  'flex size-6 shrink-0 items-center justify-center rounded-full transition',
+                  now ? 'bg-accent/15' : 'bg-olive/25 text-[var(--olive-deep)] dark:text-olive',
+                )}
+                aria-hidden
+              >
+                {now ? <span className="size-2 animate-ping rounded-full bg-accent" /> : <Check className="size-3.5" strokeWidth={3} />}
+              </span>
+              {note}
+              {now ? '…' : ''}
+            </motion.li>
+          );
+        })}
       </ul>
     </motion.div>
   );

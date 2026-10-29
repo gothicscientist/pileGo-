@@ -64,7 +64,10 @@ export function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 lg:py-8">
-      <h1 className="font-display text-5xl leading-[0.9] font-extrabold sm:text-6xl">Settings</h1>
+      <header className="border-b border-line pb-5">
+        <p className="label-caps">06 / How pileGo works for you</p>
+        <h1 className="font-display mt-2 text-[clamp(2.6rem,6vw,4.6rem)] leading-[0.92]">Settings</h1>
+      </header>
       <div className="mt-8 flex flex-col gap-8">
         <Marketplaces profile={profile} />
         <Ebay />
@@ -81,7 +84,7 @@ export function SettingsPage() {
 function Section({ id, title, children, intro }: { id: string; title: string; children: ReactNode; intro?: ReactNode }) {
   return (
     <section id={id} className="scroll-mt-20" aria-labelledby={`${id}-title`}>
-      <h2 id={`${id}-title`} className="font-display text-2xl font-bold">
+      <h2 id={`${id}-title`} className="font-display text-2xl">
         {title}
       </h2>
       {intro && <p className="mt-1 mb-3 max-w-prose text-sm text-ink-2">{intro}</p>}
@@ -155,7 +158,7 @@ function FeeEditor({ profile, id, onDone }: { profile: FullProfile; id: Marketpl
   const [fixed, setFixed] = useState(String(rule.fixed));
   return (
     <form
-      className="mt-3 flex flex-wrap items-end gap-3 rounded-lg bg-paper-2 p-3"
+      className="mt-3 flex flex-wrap items-end gap-3 rounded-xl bg-paper-2 p-3"
       onSubmit={e => {
         e.preventDefault();
         const p = Number(percent);
@@ -354,7 +357,7 @@ function EbaySetupNeeded({ setup }: { setup?: EbayStatus['setup'] }) {
         eBay isn’t switched on for this copy of pileGo yet, so the Connect button is hidden. Until it is, use the listing kit on an
         item’s eBay listing: it copies the title, description and photos for eBay’s own sell form.
       </p>
-      <details className="rounded-lg bg-paper-2 px-3 py-2">
+      <details className="rounded-xl bg-paper-2 px-3 py-2">
         <summary className="cursor-pointer font-semibold text-ink">For whoever runs pileGo</summary>
         <p className="mt-2">
           Add these eBay developer keys to the Supabase function secrets ({setup?.environment ?? 'production'} keys). The steps are in{' '}
@@ -366,7 +369,7 @@ function EbaySetupNeeded({ setup }: { setup?: EbayStatus['setup'] }) {
         <ul className="mt-2 flex flex-col gap-1">
           {steps.map(([label, done]) => (
             <li key={label} className="flex items-start gap-2">
-              <span aria-hidden className={cx('font-bold', done ? 'text-tag' : 'text-muted')}>
+              <span aria-hidden className={cx('font-semibold', done ? 'text-accent' : 'text-muted')}>
                 {done ? '✓' : '○'}
               </span>
               <span>
@@ -426,20 +429,20 @@ function Extension() {
       intro="Vinted, Depop, Poshmark, Mercari, Grailed and Facebook have no public API for sellers. The pileGo extension works in your own logged-in tabs: one click on Vinted, a filled-in form on the others."
     >
       {ext.installed && ext.needs_approval ? (
-        <p className="flex items-start gap-2 rounded-lg bg-sticker p-3 text-sm font-semibold text-ink">
+        <p className="flex items-start gap-2 kraft rounded-xl p-3 text-sm font-semibold">
           <PlugZap className="mt-0.5 size-5 shrink-0" aria-hidden />
           The extension wants your OK before it links to this copy of pileGo. Click the pileGo icon in your browser’s toolbar and choose Allow.
         </p>
       ) : ext.installed ? (
         <div className="flex flex-col gap-4">
           <p className="flex items-center gap-2 text-sm font-semibold">
-            <span className={cx('size-2.5 rounded-full', ext.linked ? 'bg-[#1fa36b]' : 'bg-sticker')} aria-hidden />
+            <span className={cx('size-2.5 rounded-full', ext.linked ? 'bg-[var(--olive)]' : 'bg-kraft')} aria-hidden />
             {ext.linked ? 'Connected' : 'Installed, linking…'}
             {ext.version ? `, version ${ext.version}` : ''}
             {ext.running ? `, running ${ext.running} ${ext.running === 1 ? 'job' : 'jobs'}` : ''}
           </p>
           {older(ext.version, EXTENSION_VERSION) && (
-            <p className="rounded-lg bg-sticker/60 px-3 py-2 text-sm text-[#16172b]">
+            <p className="kraft rounded-xl px-3 py-2 text-sm">
               Version {EXTENSION_VERSION} is out.{' '}
               <Link to="/extension" className="font-semibold underline">
                 Download it
@@ -449,7 +452,7 @@ function Extension() {
           )}
           <ul className="flex flex-wrap gap-2" aria-label="Marketplace tabs open in this browser">
             {EXTENSION_MARKETS.map(m => (
-              <li key={m} className="flex items-center gap-1.5 rounded-lg bg-paper-2 px-2 py-1 text-xs">
+              <li key={m} className="flex items-center gap-1.5 rounded-xl bg-paper-2 px-2 py-1 text-xs">
                 <Sticker id={m} size="sm" tilt={false} muted={!ext.tabs[m]} />
                 {ext.tabs[m] ? 'tab open' : 'no tab'}
               </li>

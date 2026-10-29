@@ -1,4 +1,5 @@
 import { computeAnalytics, findCategory, MARKETPLACES, isMarketplaceId } from '@pilego/core';
+import { motion } from 'motion/react';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { BarList, ColumnChart, StatTile } from '~/components/charts';
@@ -48,18 +49,32 @@ export function Insights() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="font-display text-5xl leading-[0.9] font-extrabold sm:text-6xl">Insights</h1>
-        <div className="flex gap-1 rounded-lg bg-paper-2 p-1" role="group" aria-label="Period">
+      <header className="flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
+        <div>
+          <p className="label-caps">05 / What sold, where, for how much</p>
+          <h1 className="font-display mt-2 text-[clamp(2.6rem,6vw,4.6rem)] leading-[0.92]">Insights</h1>
+        </div>
+        <div className="flex gap-1 rounded-full bg-paper-2 p-1" role="group" aria-label="Period">
           {PERIODS.map(p => (
             <button
               key={p.id}
               type="button"
               aria-pressed={period === p.id}
               onClick={() => setPeriod(p.id)}
-              className={cx('rounded-md px-2.5 py-1.5 text-sm font-semibold', period === p.id ? 'bg-card text-ink shadow-sm' : 'text-muted')}
+              className={cx(
+                'relative rounded-full px-3 py-1.5 text-sm font-medium transition-colors active:scale-95',
+                period === p.id ? 'text-ink' : 'text-muted hover:text-ink',
+              )}
             >
-              {p.label}
+              {period === p.id && (
+                <motion.span
+                  layoutId="insights-period"
+                  className="absolute inset-0 rounded-full bg-card shadow-[0_1px_2px_rgb(0_0_0/0.08)]"
+                  transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                  aria-hidden
+                />
+              )}
+              <span className="relative">{p.label}</span>
             </button>
           ))}
         </div>

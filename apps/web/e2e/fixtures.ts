@@ -1,6 +1,8 @@
 // A fake Supabase for end-to-end tests and screenshots: a signed-in seller
 // with a small closet, served by intercepting the app's network calls.
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import type { Page, Route } from '@playwright/test';
 
 export const SUPABASE = 'http://supabase.test';
@@ -9,60 +11,54 @@ export const UID = '00000000-0000-4000-8000-000000000001';
 const now = Date.now();
 const daysAgo = (d: number) => new Date(now - d * 86_400_000).toISOString();
 
-type Kind = 'tee' | 'jeans' | 'jacket' | 'dress' | 'sneaker' | 'tote';
+type Art =
+  | 'anorak' | 'beanie' | 'camel-blazer' | 'cap' | 'dark-jeans' | 'denim-jacket' | 'flannel' | 'light-jeans'
+  | 'longsleeve' | 'navy-bomber' | 'rust-bomber' | 'sweatshirt' | 'white-hoodie' | 'white-tee' | 'yellow-hoodie';
+type Print = 'denim-pair' | 'grey-hoodie' | 'hanging-hoodie' | 'knit' | 'navy-hoodie' | 'tan-hoodie';
 
 interface Seed {
   id: string;
   title: string;
   brand: string;
-  kind: Kind;
-  color: string;
+  /** A real cutout from src/assets/closet; without one the cover is a plain photo. */
+  art: Art | null;
+  /** The plain photo for covers without a cutout and for the second photo. */
+  print: Print;
   category: string;
   subcategory: string;
   size: string;
   price: number | null;
   status: 'draft' | 'ready' | 'listed' | 'sold' | 'shipped';
   created: number;
-  cutout: boolean;
   listings?: Array<{ m: string; status: string; days: number; price?: number }>;
   sold?: { days: number; price: number; m: string | null };
   cost?: number;
 }
 
+// Everyday pieces: mostly unbranded basics, denim and a few fun finds.
 const SEEDS: Seed[] = [
-  { id: 'a1', title: "Levi's 501 straight leg jeans", brand: "Levi's", kind: 'jeans', color: '#3d5a8a', category: 'bottoms', subcategory: 'jeans', size: 'W32 L30', price: 45, status: 'listed', created: 48, cutout: true, cost: 8, listings: [{ m: 'ebay', status: 'listed', days: 41 }, { m: 'vinted', status: 'listed', days: 41 }] },
-  { id: 'a2', title: 'Carhartt Detroit jacket, brown duck canvas', brand: 'Carhartt', kind: 'jacket', color: '#8a5a2b', category: 'outerwear', subcategory: 'jackets', size: 'L', price: 120, status: 'listed', created: 20, cutout: true, cost: 30, listings: [{ m: 'depop', status: 'listed', days: 12 }, { m: 'ebay', status: 'queued', days: 0 }] },
-  { id: 'a3', title: 'Patagonia Synchilla fleece', brand: 'Patagonia', kind: 'jacket', color: '#2f7d6d', category: 'knitwear', subcategory: 'sweatshirts', size: 'M', price: null, status: 'draft', created: 1, cutout: false },
-  { id: 'a4', title: 'Ralph Lauren oxford shirt', brand: 'Ralph Lauren', kind: 'tee', color: '#9cc3e6', category: 'tops', subcategory: 'shirts', size: 'M', price: 28, status: 'ready', created: 3, cutout: true },
-  { id: 'a5', title: 'Dr. Martens 1460 boots', brand: 'Dr. Martens', kind: 'sneaker', color: '#2a1c18', category: 'shoes', subcategory: 'boots', size: 'UK 7', price: 75, status: 'sold', created: 60, cutout: true, cost: 15, listings: [{ m: 'vinted', status: 'sold', days: 30 }, { m: 'depop', status: 'delisted', days: 30 }], sold: { days: 2, price: 70, m: 'vinted' } },
-  { id: 'a6', title: 'Nike Air Max 90 tee', brand: 'Nike', kind: 'tee', color: '#f2f2ec', category: 'tops', subcategory: 't-shirts', size: 'S', price: 18, status: 'listed', created: 9, cutout: true, listings: [{ m: 'vinted', status: 'listed', days: 8 }, { m: 'poshmark', status: 'needs_action', days: 0 }] },
-  { id: 'a7', title: 'Zara satin slip dress', brand: 'Zara', kind: 'dress', color: '#c2185b', category: 'dresses', subcategory: 'midi-dresses', size: 'S', price: 22, status: 'listed', created: 15, cutout: true, listings: [{ m: 'poshmark', status: 'listed', days: 14 }] },
-  { id: 'a8', title: 'Coach leather tote', brand: 'Coach', kind: 'tote', color: '#6d4c41', category: 'bags', subcategory: 'totes', size: '', price: 95, status: 'shipped', created: 90, cutout: false, cost: 20, listings: [{ m: 'ebay', status: 'sold', days: 70 }], sold: { days: 40, price: 92, m: 'ebay' } },
-  { id: 'a9', title: 'Uniqlo merino crewneck', brand: 'Uniqlo', kind: 'tee', color: '#f2b234', category: 'knitwear', subcategory: 'sweaters', size: 'L', price: 20, status: 'draft', created: 2, cutout: true },
-  { id: 'a10', title: "Arc'teryx Beta shell jacket", brand: "Arc'teryx", kind: 'jacket', color: '#1e88e5', category: 'outerwear', subcategory: 'jackets', size: 'M', price: 210, status: 'listed', created: 70, cutout: true, cost: 60, listings: [{ m: 'ebay', status: 'listed', days: 66 }, { m: 'grailed', status: 'listed', days: 66 }] },
-  { id: 'a11', title: 'Stussy 8 ball hoodie', brand: 'Stussy', kind: 'tee', color: '#212121', category: 'knitwear', subcategory: 'hoodies', size: 'XL', price: 65, status: 'sold', created: 130, cutout: true, cost: 10, listings: [{ m: 'depop', status: 'sold', days: 120 }], sold: { days: 100, price: 60, m: 'depop' } },
-  { id: 'a12', title: 'Levi\'s trucker jacket', brand: "Levi's", kind: 'jacket', color: '#5b7fb0', category: 'outerwear', subcategory: 'denim-jackets', size: 'M', price: 55, status: 'shipped', created: 200, cutout: true, cost: 12, listings: [{ m: 'vinted', status: 'sold', days: 190 }], sold: { days: 160, price: 50, m: 'vinted' } },
+  { id: 'a1', title: 'Baggy light wash jeans', brand: '', art: 'light-jeans', print: 'denim-pair', category: 'bottoms', subcategory: 'jeans', size: 'W30 L32', price: 45, status: 'listed', created: 48, cost: 8, listings: [{ m: 'ebay', status: 'listed', days: 41 }, { m: 'vinted', status: 'listed', days: 41 }] },
+  { id: 'a2', title: 'Rust bomber jacket', brand: '', art: 'rust-bomber', print: 'tan-hoodie', category: 'outerwear', subcategory: 'jackets', size: 'L', price: 38, status: 'listed', created: 20, cost: 9, listings: [{ m: 'depop', status: 'listed', days: 12 }, { m: 'ebay', status: 'queued', days: 0 }] },
+  { id: 'a3', title: 'Plain white hoodie', brand: '', art: null, print: 'hanging-hoodie', category: 'knitwear', subcategory: 'hoodies', size: 'M', price: null, status: 'draft', created: 1 },
+  { id: 'a4', title: 'Grey check flannel shirt', brand: '', art: 'flannel', print: 'navy-hoodie', category: 'tops', subcategory: 'shirts', size: 'M', price: 24, status: 'ready', created: 3 },
+  { id: 'a5', title: 'Cord collar denim jacket', brand: 'Lee', art: 'denim-jacket', print: 'denim-pair', category: 'outerwear', subcategory: 'denim-jackets', size: 'M', price: 55, status: 'sold', created: 60, cost: 15, listings: [{ m: 'vinted', status: 'sold', days: 30 }, { m: 'depop', status: 'delisted', days: 30 }], sold: { days: 2, price: 50, m: 'vinted' } },
+  { id: 'a6', title: 'White crew neck tee', brand: '', art: 'white-tee', print: 'hanging-hoodie', category: 'tops', subcategory: 't-shirts', size: 'S', price: 12, status: 'listed', created: 9, listings: [{ m: 'vinted', status: 'listed', days: 8 }, { m: 'poshmark', status: 'needs_action', days: 0 }] },
+  { id: 'a7', title: 'Yellow pullover hoodie', brand: '', art: 'yellow-hoodie', print: 'grey-hoodie', category: 'knitwear', subcategory: 'hoodies', size: 'L', price: 22, status: 'listed', created: 15, listings: [{ m: 'poshmark', status: 'listed', days: 14 }] },
+  { id: 'a8', title: 'Chunky brown knit', brand: '', art: null, print: 'knit', category: 'knitwear', subcategory: 'sweaters', size: 'M', price: 30, status: 'shipped', created: 90, cost: 6, listings: [{ m: 'ebay', status: 'sold', days: 70 }], sold: { days: 40, price: 28, m: 'ebay' } },
+  { id: 'a9', title: 'Black long sleeve tee', brand: '', art: 'longsleeve', print: 'navy-hoodie', category: 'tops', subcategory: 't-shirts', size: 'L', price: 14, status: 'draft', created: 2 },
+  { id: 'a10', title: 'Colour block anorak', brand: '', art: 'anorak', print: 'navy-hoodie', category: 'outerwear', subcategory: 'jackets', size: 'M', price: 48, status: 'listed', created: 70, cost: 12, listings: [{ m: 'ebay', status: 'listed', days: 66 }, { m: 'grailed', status: 'listed', days: 66 }] },
+  { id: 'a11', title: 'Smiley graphic hoodie', brand: '', art: null, print: 'grey-hoodie', category: 'knitwear', subcategory: 'hoodies', size: 'XL', price: 28, status: 'sold', created: 130, cost: 4, listings: [{ m: 'depop', status: 'sold', days: 120 }], sold: { days: 100, price: 25, m: 'depop' } },
+  { id: 'a12', title: 'Navy sherpa collar jacket', brand: '', art: 'navy-bomber', print: 'navy-hoodie', category: 'outerwear', subcategory: 'jackets', size: 'M', price: 42, status: 'shipped', created: 200, cost: 10, listings: [{ m: 'vinted', status: 'sold', days: 190 }], sold: { days: 160, price: 40, m: 'vinted' } },
+  { id: 'a13', title: 'Camel wool blend blazer', brand: '', art: 'camel-blazer', print: 'tan-hoodie', category: 'outerwear', subcategory: 'blazers', size: '40R', price: 35, status: 'listed', created: 26, listings: [{ m: 'ebay', status: 'listed', days: 24 }] },
+  { id: 'a14', title: 'Yellow dad cap', brand: '', art: 'cap', print: 'grey-hoodie', category: 'accessories', subcategory: 'hats', size: '', price: 9, status: 'ready', created: 4 },
+  { id: 'a15', title: 'Dark wash straight jeans', brand: '', art: 'dark-jeans', print: 'denim-pair', category: 'bottoms', subcategory: 'jeans', size: 'W32 L30', price: 26, status: 'listed', created: 11, listings: [{ m: 'depop', status: 'listed', days: 10 }, { m: 'vinted', status: 'listed', days: 10 }] },
+  { id: 'a16', title: 'Plain white crewneck', brand: '', art: 'sweatshirt', print: 'hanging-hoodie', category: 'knitwear', subcategory: 'sweatshirts', size: 'M', price: 16, status: 'draft', created: 1 },
 ];
 
-const GARMENT: Record<Kind, { view: string; body: string }> = {
-  tee: { view: '0 0 140 130', body: 'M48 6 C56 16 84 16 92 6 L132 26 L118 56 L104 50 L104 124 L36 124 L36 50 L22 56 L8 26 Z' },
-  jeans: { view: '0 0 110 150', body: 'M14 4 L96 4 L104 146 L64 146 L56 50 L54 50 L46 146 L6 146 Z' },
-  jacket: { view: '0 0 150 150', body: 'M52 6 L98 6 L140 28 L146 140 L120 140 L116 70 L114 144 L36 144 L34 70 L30 140 L4 140 L10 28 Z' },
-  dress: { view: '0 0 120 150', body: 'M38 4 L48 4 C50 18 70 18 72 4 L82 4 L84 40 C84 48 80 52 80 56 L112 146 L8 146 L40 56 C40 52 36 48 36 40 Z' },
-  sneaker: { view: '0 0 160 90', body: 'M8 52 C8 30 22 14 40 12 L60 14 C70 30 92 40 118 44 C140 48 152 56 152 68 L152 80 L8 80 Z' },
-  tote: { view: '0 0 120 140', body: 'M10 46 L110 46 L104 136 L16 136 Z M36 46 C36 4 84 4 84 46 L76 46 C76 16 44 16 44 46 Z' },
-};
-
-function garmentSvg(seed: Seed, cutout: boolean): string {
-  const g = GARMENT[seed.kind];
-  const [, , w, h] = g.view.split(' ').map(Number);
-  const shade = `<path d="${g.body}" fill="url(#s)" fill-rule="evenodd"/>`;
-  const defs = `<defs><linearGradient id="s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".18"/><stop offset="1" stop-color="#000" stop-opacity=".22"/></linearGradient></defs>`;
-  if (cutout) {
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${g.view}" width="${w! * 4}" height="${h! * 4}">${defs}<path d="${g.body}" fill="${seed.color}" fill-rule="evenodd"/>${shade}</svg>`;
-  }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 -30 ${w! + 60} ${(w! + 60) * 1.25}" width="800" height="1000">${defs}<rect x="-30" y="-30" width="${w! + 60}" height="${(w! + 60) * 1.25}" fill="#d9d4cb"/><rect x="-30" y="${h! + 10}" width="${w! + 60}" height="200" fill="#c9c1b4"/><path d="${g.body}" fill="${seed.color}" fill-rule="evenodd"/>${shade}</svg>`;
-}
+const ASSETS = fileURLToPath(new URL('../src/assets/', import.meta.url));
+const file = (dir: string, name: string) => readFileSync(`${ASSETS}${dir}/${name}.webp`);
+// The garment on a plain backdrop: what a seller's own photo of it looks like.
+const STUDIO = fileURLToPath(new URL('./photos/', import.meta.url));
 
 function buildItems() {
   return SEEDS.map(s => {
@@ -101,7 +97,7 @@ function buildItems() {
       condition: 'good',
       flaws: null,
       measurements: null,
-      style_tags: ['vintage', 'workwear'],
+      style_tags: ['casual', 'everyday'],
       era: null,
       description: `${s.title}. Good condition, light wear, no holes or stains.`,
       price: s.price == null ? null : String(s.price),
@@ -121,7 +117,7 @@ function buildItems() {
       created_at: daysAgo(s.created),
       updated_at: daysAgo(s.created),
       photos: [
-        { id: `${s.id}-p0`, user_id: UID, item_id: s.id, path: `${UID}/${s.id}/p0.jpg`, cutout_path: s.cutout ? `${UID}/${s.id}/p0-cut.webp` : null, position: 0, width: 800, height: 1000 },
+        { id: `${s.id}-p0`, user_id: UID, item_id: s.id, path: `${UID}/${s.id}/p0.jpg`, cutout_path: s.art ? `${UID}/${s.id}/p0-cut.webp` : null, position: 0, width: 800, height: 1000 },
         { id: `${s.id}-p1`, user_id: UID, item_id: s.id, path: `${UID}/${s.id}/p1.jpg`, cutout_path: null, position: 1, width: 800, height: 1000 },
       ],
       listings,
@@ -234,7 +230,7 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
           reasons: ['10 similar pieces sold (6 on eBay, 4 on Poshmark). The middle is 44 USD.'], comps_used: 10, computed_at: daysAgo(0),
           sold_prices: sold, asking_prices: [], sources: { sold: 10, asking: 0, own: 0, ai: false, dropped: 2, sold_by: { ebay: 6, poshmark: 4 } },
         },
-        comps: sold.map((price, i) => ({ source: 'ebay', title: `Levi's 501 jeans W32 #${i}`, price, currency: 'USD', url: `https://www.ebay.com/itm/${i}`, sold: true })),
+        comps: sold.map((price, i) => ({ source: 'ebay', title: `Baggy light wash jeans W30 #${i}`, price, currency: 'USD', url: `https://www.ebay.com/itm/${i}`, sold: true })),
         sources: { ebay_configured: false, asking: 0, sold: 10, own_sales: 0, notes: ['eBay is not connected on this server yet, so live eBay listings are not included.'] },
         error: null,
       });
@@ -246,10 +242,15 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
     }
     if (path.startsWith('/storage/v1/object/sign/photos/')) {
       const parts = path.split('/');
-      const file = parts.at(-1)!;
+      const name = parts.at(-1)!;
       const seed = seeds.get(parts.at(-2)!);
       if (!seed) return route.fulfill({ status: 404 });
-      return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: garmentSvg(seed, file.includes('-cut')), headers: { 'access-control-allow-origin': '*' } });
+      const body = !seed.art
+        ? file('photos', seed.print)
+        : name.includes('-cut')
+          ? file('closet', seed.art)
+          : readFileSync(`${STUDIO}${seed.art}.webp`);
+      return route.fulfill({ status: 200, contentType: 'image/webp', body, headers: { 'access-control-allow-origin': '*' } });
     }
     if (path.startsWith('/auth/v1/user')) return json(route, session().user);
     return json(route, {});

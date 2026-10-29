@@ -20,9 +20,9 @@ import { useProfile } from '~/lib/queries';
 const DEFAULT_MARKETS: MarketplaceId[] = ['ebay', 'vinted', 'depop', 'poshmark'];
 
 const TONE_STYLE: Record<PriceTone, string> = {
-  high: 'bg-sticker/45',
-  low: 'bg-sticker/45',
-  fast: 'bg-mint/45',
+  high: 'kraft',
+  low: 'kraft',
+  fast: 'bg-olive/30',
   fair: 'bg-paper-2',
   slow: 'bg-paper-2',
 };
@@ -105,8 +105,8 @@ export function PricePicker({
 
   return (
     <div className="flex flex-col gap-3">
-      <div role="radiogroup" aria-label={`${label}: pick one`} className="grid grid-cols-3 gap-2">
-        {cards.map(c => {
+      <div role="radiogroup" aria-label={`${label}: pick one`} className="grid grid-cols-3 gap-2 pt-2 sm:gap-3">
+        {cards.map((c, i) => {
           const on = value === c.price;
           return (
             <button
@@ -117,22 +117,40 @@ export function PricePicker({
               disabled={disabled}
               onClick={() => onChange(c.price)}
               className={cx(
-                'relative flex min-h-[4.25rem] flex-col items-center justify-center gap-0.5 rounded-xl px-1.5 py-2.5 text-center transition',
+                'group relative rounded-[10px] transition duration-300 ease-[var(--ease-spring)]',
                 'disabled:cursor-not-allowed disabled:opacity-60',
+                // Filters follow the cut shape, so the outline traces the tag's corners too.
                 on
-                  ? 'bg-ink text-paper shadow-[0_2px_0_rgb(var(--shadow)/0.25)]'
-                  : 'bg-card text-ink shadow-[inset_0_0_0_1.5px_var(--line)] hover:shadow-[inset_0_0_0_1.5px_var(--ink-2)]',
+                  ? '-translate-y-1 [filter:drop-shadow(0_0_0.6px_rgb(0_0_0/0.4))_drop-shadow(0_10px_10px_rgb(0_0_0/0.16))]'
+                  : '[filter:drop-shadow(0_0_0.6px_rgb(0_0_0/0.45))_drop-shadow(0_1px_1px_rgb(0_0_0/0.06))] hover:-translate-y-0.5 hover:[filter:drop-shadow(0_0_0.8px_rgb(0_0_0/0.7))_drop-shadow(0_6px_8px_rgb(0_0_0/0.1))] active:scale-95',
               )}
+              style={{ rotate: on ? `${[-2, 1.5, 2][i]}deg` : '0deg' }}
             >
+              {/* The card is cut like a hang tag; the badge sits outside the cut so it is not clipped. */}
+              <span className={cx('swing block origin-top', on && 'swing-now')}>
+                <span
+                  className={cx(
+                    'relative flex min-h-[4.9rem] flex-col items-center justify-center gap-0.5 px-1.5 pt-5 pb-2.5 text-center transition-colors',
+                    on ? 'kraft' : 'bg-card text-ink',
+                  )}
+                  style={{ clipPath: 'polygon(16% 0, 84% 0, 100% 15%, 100% 100%, 0 100%, 0 15%)', borderRadius: 8 }}
+                >
+                  <span
+                    className={cx(
+                      'absolute top-2 left-1/2 size-2 -translate-x-1/2 rounded-full shadow-[inset_0_1px_1.5px_rgb(0_0_0/0.35)]',
+                      on ? 'bg-paper' : 'bg-paper-2',
+                    )}
+                    aria-hidden
+                  />
+                  <span className={cx('text-xs sm:text-sm', on ? 'opacity-80' : 'text-ink-2')}>{c.label}</span>
+                  <span className={cx('font-display tabular', compact ? 'text-lg' : 'text-xl sm:text-2xl')}>{money(c.price, currency)}</span>
+                </span>
+              </span>
               {c.key === 'balanced' && (
-                <span className="absolute -top-2 rotate-[-3deg] rounded bg-tag px-1.5 py-px text-[0.65rem] font-bold text-tag-ink shadow-[0_1px_0_rgb(0_0_0/0.18)]">
+                <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rotate-[-3deg] rounded-full bg-accent px-2 py-px text-[0.65rem] font-semibold whitespace-nowrap text-accent-ink shadow-[0_2px_4px_rgb(0_0_0/0.18)]">
                   Suggested
                 </span>
               )}
-              <span className={cx('text-xs sm:text-sm', on ? 'text-paper/85' : 'text-ink-2')}>{c.label}</span>
-              <span className={cx('font-display font-extrabold tabular', compact ? 'text-lg' : 'text-xl sm:text-2xl')}>
-                {money(c.price, currency)}
-              </span>
             </button>
           );
         })}
@@ -144,7 +162,7 @@ export function PricePicker({
         <label htmlFor={ids.input} className="sr-only">
           {label} in {currency}
         </label>
-        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm font-bold text-ink-2" aria-hidden>
+        <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-sm font-semibold text-ink-2" aria-hidden>
           {sign}
         </span>
         <input
@@ -186,7 +204,7 @@ export function PricePicker({
       {advice && advice.take_home.length > 0 && (
         <ul className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4" aria-label="What you keep after fees">
           {advice.take_home.map(t => (
-            <li key={t.marketplace} className="rounded-lg bg-paper-2 px-3 py-2">
+            <li key={t.marketplace} className="rounded-xl bg-paper-2 px-3 py-2">
               <span className="block text-xs text-muted">{MARKETPLACES[t.marketplace].name}, you keep</span>
               <span className="font-semibold tabular">{money(t.keep, currency)}</span>
             </li>
@@ -224,7 +242,7 @@ function SoldStrip({
       <div className="relative h-7" aria-hidden>
         <div className="absolute inset-x-0 top-1/2 h-px bg-line" />
         <div
-          className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-mint/60"
+          className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-olive/60"
           style={{ left: at(tiers.likely), width: `calc(${at(tiers.less_likely)} - ${at(tiers.likely)})` }}
         />
         {sold.map((v, i) => (
@@ -232,7 +250,7 @@ function SoldStrip({
         ))}
         {value != null && value > 0 && (
           <span
-            className="absolute top-0 h-7 w-1 -translate-x-1/2 rounded-full bg-tag shadow-[0_0_0_2px_var(--card)]"
+            className="absolute top-0 h-7 w-1 -translate-x-1/2 rounded-full bg-accent shadow-[0_0_0_2px_var(--card)] transition-[left] duration-500 ease-[var(--ease-spring)]"
             style={{ left: at(Math.min(value, hi)) }}
           />
         )}
@@ -240,7 +258,7 @@ function SoldStrip({
       <figcaption className="flex justify-between text-[0.7rem] text-muted tabular">
         <span>{money(sold[0]!, currency)}</span>
         <span>
-          {sold.length} similar sales{value ? <>, <span className="font-semibold text-tag">your price</span></> : null}
+          {sold.length} similar sales{value ? <>, <span className="font-semibold text-accent">your price</span></> : null}
         </span>
         <span>{money(sold.at(-1)!, currency)}</span>
       </figcaption>

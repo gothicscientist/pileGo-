@@ -22,10 +22,11 @@ import {
   Star,
   Trash2,
 } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { JobRow } from '~/components/JobRow';
-import { ItemStatusTag, ListingStatusText, PhotoImg, Sticker, TierLabel } from '~/components/bits';
+import { HangTag, ItemStatusTag, ListingStatusText, PhotoImg, PriceTag, Sticker, TierLabel } from '~/components/bits';
 import { CrossListSheet } from '~/components/CrossListSheet';
 import { EbayAspects, missingEbayAspects } from '~/components/EbayAspects';
 import { diffForm, formFromItem, ItemForm, type FormValue } from '~/components/ItemForm';
@@ -76,6 +77,7 @@ export function ItemPage() {
   const del = useDeleteItem();
   const navigate = useNavigate();
   const toast = useToast();
+  const reduce = useReducedMotion();
 
   const setParam = (key: string, value: string | null) =>
     setParams(
@@ -110,8 +112,8 @@ export function ItemPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:py-8">
-      <Link to="/closet" className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-ink-2 hover:text-ink">
-        <ArrowLeft className="size-4" aria-hidden />
+      <Link to="/closet" className="group mb-5 inline-flex items-center gap-1.5 rounded-full py-1 pr-3 text-sm font-medium text-ink-2 transition hover:text-ink">
+        <ArrowLeft className="size-4 transition-transform duration-300 ease-[var(--ease-spring)] group-hover:-translate-x-1" aria-hidden />
         Closet
       </Link>
 
@@ -120,15 +122,17 @@ export function ItemPage() {
 
         <div className="min-w-0">
           <header className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
+            <div className="flex flex-wrap items-center gap-2.5">
               <ItemStatusTag status={item.status} />
-              <span className="tabular">{item.sku}</span>
-              {item.location && <span>at {item.location}</span>}
+              <span className="label-caps text-muted tabular">{item.sku}</span>
+              {item.location && <span className="label-caps text-muted">at {item.location}</span>}
             </div>
-            <h1 className="font-display text-4xl leading-[0.95] font-extrabold sm:text-5xl">{item.title || 'Untitled item'}</h1>
-            <p className="font-display text-2xl font-bold tabular">
-              {sold ? `Sold for ${money(item.sold_price, item.currency)}` : money(item.price, item.currency)}
-              {liveCount > 0 && !sold && <span className="ml-2 text-base font-medium text-ink-2">live on {liveCount}</span>}
+            <h1 className="font-display text-[clamp(2.3rem,5vw,3.6rem)] leading-[0.95]">{item.title || 'Untitled item'}</h1>
+            <p className="flex flex-wrap items-center gap-3">
+              <PriceTag empty={!sold && item.price == null} className="py-1 pr-3.5 pl-6 text-xl">
+                {sold ? `Sold for ${money(item.sold_price, item.currency)}` : item.price == null ? 'No price yet' : money(item.price, item.currency)}
+              </PriceTag>
+              {liveCount > 0 && !sold && <span className="text-sm font-medium text-ink-2">live on {liveCount}</span>}
             </p>
             <div className="flex flex-wrap gap-2">
               {!sold && (
@@ -171,7 +175,7 @@ export function ItemPage() {
             </div>
           </header>
 
-          <div role="tablist" aria-label="Item sections" className="mt-6 flex gap-1 border-b border-line">
+          <div role="tablist" aria-label="Item sections" className="scrollbar-none mt-7 flex gap-1 overflow-x-auto border-b border-line">
             {TABS.map(t => (
               <button
                 key={t.id}
@@ -180,21 +184,36 @@ export function ItemPage() {
                 aria-selected={tab === t.id}
                 onClick={() => setParam('tab', t.id === 'details' ? null : t.id)}
                 className={cx(
-                  '-mb-px border-b-[3px] px-3 py-2.5 text-sm font-semibold transition',
-                  tab === t.id ? 'border-tag text-ink' : 'border-transparent text-muted hover:text-ink',
+                  'relative shrink-0 px-3.5 pt-2 pb-3 text-sm font-medium transition-colors active:scale-95',
+                  tab === t.id ? 'text-ink' : 'text-muted hover:text-ink',
                 )}
               >
                 {t.label}
+                {tab === t.id && (
+                  <motion.span
+                    layoutId="item-tab"
+                    className="absolute inset-x-2 -bottom-px h-[3px] rounded-full bg-accent"
+                    transition={{ type: 'spring', stiffness: 460, damping: 36 }}
+                    aria-hidden
+                  />
+                )}
               </button>
             ))}
           </div>
 
-          <div className="pt-5" role="tabpanel">
+          <motion.div
+            key={tab}
+            className="pt-5"
+            role="tabpanel"
+            initial={reduce ? false : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+          >
             {tab === 'details' && <Details key={item.id} item={item} />}
             {tab === 'listings' && <Listings item={item} onCrossList={() => setParam('crosslist', '1')} />}
             {tab === 'price' && <PriceTab item={item} />}
             {tab === 'history' && <History item={item} />}
-          </div>
+          </motion.div>
         </div>
       </div>
 
@@ -248,6 +267,9 @@ function Photos({ item }: { item: Item }) {
   const toast = useToast();
   const input = useRef<HTMLInputElement>(null);
   const current = photos[Math.min(index, photos.length - 1)];
+  const reduce = useReducedMotion();
+  const [nudge, setNudge] = useState(0);
+  const onCutout = Boolean(current?.cutout_path && showCut);
 
   async function cut() {
     if (!current) return;
@@ -266,25 +288,49 @@ function Photos({ item }: { item: Item }) {
 
   return (
     <div className="flex flex-col gap-3 lg:sticky lg:top-6 lg:self-start">
-      <div className={cx('relative aspect-[4/5] overflow-hidden rounded-2xl', current?.cutout_path && showCut ? 'floor' : 'bg-paper-2')}>
+      <div
+        className={cx('swing-on-hover relative aspect-[4/5] overflow-hidden rounded-[22px] lift', onCutout ? 'grain bg-paper-2' : 'bg-paper-2')}
+        onPointerDown={() => setNudge(n => n + 1)}
+      >
         {current ? (
-          <PhotoImg
-            photo={current}
-            cutout={showCut}
-            className={cx('absolute inset-0 size-full', current.cutout_path && showCut ? 'object-contain p-6 cutout-shadow' : 'object-cover')}
-            alt={item.title}
-          />
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.div
+              key={`${current.id}-${onCutout}`}
+              className="absolute inset-0"
+              initial={reduce ? false : onCutout ? { opacity: 0, y: -24, rotate: -4, scale: 0.94 } : { opacity: 0, scale: 1.03 }}
+              animate={{ opacity: 1, y: 0, rotate: onCutout ? -1.5 : 0, scale: 1 }}
+              exit={{ opacity: 0, transition: { duration: 0.15 } }}
+              transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+            >
+              <PhotoImg
+                photo={current}
+                cutout={showCut}
+                className={cx('absolute inset-0 size-full', onCutout ? 'object-contain p-8 cutout-sticker' : 'object-cover')}
+                alt={item.title}
+              />
+            </motion.div>
+          </AnimatePresence>
         ) : (
           <div className="flex size-full flex-col items-center justify-center gap-2 text-muted">
             <ImagePlus className="size-8" aria-hidden />
             No photos yet
           </div>
         )}
+        {onCutout && (
+          <span key={nudge} className={cx('swing absolute top-5 right-7 z-[2] origin-top', nudge > 0 && 'swing-now')}>
+            <HangTag
+              price={item.price == null ? '?' : money(item.price, item.currency)}
+              note={item.size ? `Size ${item.size}` : 'Your find'}
+              empty={item.price == null}
+              className="relative"
+            />
+          </span>
+        )}
         {cutting != null && (
-          <div className="absolute inset-x-3 bottom-3 rounded-lg bg-ink/85 px-3 py-2 text-xs text-paper">
+          <div className="absolute inset-x-3 bottom-3 z-[3] rounded-xl bg-ink/85 px-3 py-2 text-xs text-paper backdrop-blur">
             Cutting out
             <div className="mt-1 h-1 overflow-hidden rounded bg-white/20">
-              <div className="h-full bg-tag" style={{ width: `${Math.round(cutting * 100)}%` }} />
+              <div className="h-full bg-accent" style={{ width: `${Math.round(cutting * 100)}%` }} />
             </div>
           </div>
         )}
@@ -330,7 +376,10 @@ function Photos({ item }: { item: Item }) {
               aria-label={`Photo ${i + 1}`}
               aria-current={i === index}
               onClick={() => setIndex(i)}
-              className={cx('block aspect-square w-full overflow-hidden rounded-lg', i === index && 'ring-2 ring-ink ring-offset-2 ring-offset-paper')}
+              className={cx(
+                'block aspect-square w-full overflow-hidden rounded-xl transition duration-300 ease-[var(--ease-spring)] hover:-translate-y-0.5 active:scale-95',
+                i === index ? 'ring-2 ring-accent ring-offset-2 ring-offset-paper' : 'opacity-85 hover:opacity-100',
+              )}
             >
               <PhotoImg photo={p} className="size-full object-cover" />
             </button>
@@ -341,7 +390,7 @@ function Photos({ item }: { item: Item }) {
             type="button"
             onClick={() => input.current?.click()}
             disabled={add.isPending}
-            className="flex aspect-square w-full items-center justify-center rounded-lg border-2 border-dashed border-line text-muted hover:border-ink-2 hover:text-ink"
+            className="flex aspect-square w-full items-center justify-center rounded-xl border-2 border-dashed border-line text-muted transition hover:border-ink-2 hover:text-ink active:scale-95"
             aria-label="Add photos"
           >
             {add.isPending ? <Spinner /> : <ImagePlus className="size-5" aria-hidden />}
@@ -394,7 +443,7 @@ function Details({ item }: { item: Item }) {
         unit={profile?.measurement_unit ?? 'in'}
         scan={item.ai}
       />
-      <div className={cx('z-10 mt-5 flex items-center gap-3 rounded-xl bg-paper/95 py-3 backdrop-blur', changed && 'sticky bottom-20 md:bottom-4')}>
+      <div className={cx('z-10 mt-5 flex items-center gap-3 rounded-full bg-paper/90 py-3 backdrop-blur-md', changed && 'sticky bottom-24 md:bottom-4')}>
         <Button
           variant="ink"
           disabled={!changed}
@@ -454,7 +503,7 @@ function Listings({ item, onCrossList }: { item: Item; onCrossList: () => void }
     <div className="flex flex-col gap-3">
       {itemJobs.length > 0 && (
         <Paper className="p-4">
-          <h3 className="mb-2 font-display text-lg font-bold">In progress</h3>
+          <h3 className="mb-2 font-display text-lg">In progress</h3>
           <ul className="flex flex-col gap-2">
             {itemJobs.map(j => (
               <JobRow key={j.id} job={j} />
@@ -532,7 +581,7 @@ function ListingRow({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <Sticker id={listing.marketplace} />
         <ListingStatusText status={listing.status} />
-        <span className="font-display text-lg font-bold tabular">{money(listing.price, item.currency)}</span>
+        <PriceTag empty={listing.price == null}>{money(listing.price, item.currency)}</PriceTag>
         {days != null && listing.status === 'listed' && <span className="text-sm text-muted">{days === 0 ? 'today' : `${days} days`}</span>}
         {listing.relist_count > 0 && <span className="text-sm text-muted">relisted {listing.relist_count}×</span>}
         {listing.external_url && (
@@ -641,7 +690,7 @@ function PriceTab({ item }: { item: Item }) {
       <Paper className="p-5" torn>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="font-display text-xl font-bold">Suggested price</h3>
+            <h3 className="font-display text-xl">Suggested price</h3>
             {suggestion ? (
               <p className="mt-1 text-sm text-muted">
                 {suggestion.confidence} confidence, {suggestion.comps_used} comparable{suggestion.comps_used === 1 ? '' : 's'}, checked{' '}
@@ -695,7 +744,7 @@ function PriceTab({ item }: { item: Item }) {
           </div>
         )}
         {result?.sources?.notes.length ? (
-          <ul className="mt-3 flex flex-col gap-1 rounded-lg bg-paper-2 px-3 py-2 text-sm text-ink-2">
+          <ul className="mt-3 flex flex-col gap-1 rounded-xl bg-paper-2 px-3 py-2 text-sm text-ink-2">
             {result.sources.notes.map(n => (
               <li key={n}>{n}</li>
             ))}
@@ -717,11 +766,11 @@ function PriceTab({ item }: { item: Item }) {
 
       {result?.comps?.length ? (
         <Paper className="p-5">
-          <h3 className="mb-3 font-display text-xl font-bold">Comparables</h3>
+          <h3 className="mb-3 font-display text-xl">Comparables</h3>
           <ul className="divide-y divide-dashed divide-line">
             {result.comps.map((c, i) => (
               <li key={i} className="flex items-center gap-3 py-2 text-sm">
-                <span className={cx('w-12 shrink-0 text-xs font-bold', c.sold ? 'text-tag' : 'text-muted')}>{c.sold ? 'Sold' : 'Asking'}</span>
+                <span className={cx('w-12 shrink-0 text-xs font-semibold', c.sold ? 'text-accent' : 'text-muted')}>{c.sold ? 'Sold' : 'Asking'}</span>
                 <span className="min-w-0 flex-1 truncate">
                   {c.url ? (
                     <a href={c.url} target="_blank" rel="noreferrer" className="hover:underline">
@@ -743,7 +792,7 @@ function PriceTab({ item }: { item: Item }) {
 
       {item.price != null && (
         <Paper className="p-5">
-          <h3 className="mb-3 font-display text-xl font-bold">What you keep</h3>
+          <h3 className="mb-3 font-display text-xl">What you keep</h3>
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-muted">
@@ -793,16 +842,22 @@ function History({ item }: { item: Item }) {
   if (!events?.length) return <p className="text-ink-2">Nothing has happened to this item yet.</p>;
   return (
     <ol className="relative flex flex-col gap-4 border-l-2 border-dashed border-line pl-5">
-      {events.map(ev => (
-        <li key={ev.id} className="relative">
-          <span className="absolute top-1.5 -left-[1.6rem] size-2.5 rounded-full bg-ink" aria-hidden />
+      {events.map((ev, i) => (
+        <motion.li
+          key={ev.id}
+          className="relative"
+          initial={{ opacity: 0, x: -8 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ type: 'spring', stiffness: 260, damping: 24, delay: Math.min(i, 10) * 0.04 }}
+        >
+          <span className={cx('absolute top-1.5 -left-[1.6rem] size-2.5 rounded-full ring-4 ring-paper', ev.type === 'sold' ? 'bg-rose' : 'bg-accent')} aria-hidden />
           <p className="font-medium">
             {(EVENT_TEXT[ev.type] ?? (() => ev.type))(ev.data ?? {}, ev.marketplace ? MARKETPLACES[ev.marketplace]?.name ?? ev.marketplace : '')}
           </p>
           <p className="text-sm text-muted">
             {shortDate(ev.at)}, {ago(ev.at)}
           </p>
-        </li>
+        </motion.li>
       ))}
     </ol>
   );

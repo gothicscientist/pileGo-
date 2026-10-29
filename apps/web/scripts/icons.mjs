@@ -8,7 +8,7 @@ const pub = fileURLToPath(new URL('../public/', import.meta.url));
 const ext = fileURLToPath(new URL('../../extension/static/icons/', import.meta.url));
 await mkdir(ext, { recursive: true });
 const svg = await readFile(`${pub}favicon.svg`, 'utf8');
-const browser = await chromium.launch();
+const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
 const page = await browser.newPage();
 // Maskable icons are cropped by the OS, so they get square corners and room.
 const maskable = svg.replace('rx="14"', 'rx="0"').replace('<g transform="rotate(-14 32 32)">', '<g transform="translate(6.4 6.4) scale(.8) rotate(-14 32 32)">');

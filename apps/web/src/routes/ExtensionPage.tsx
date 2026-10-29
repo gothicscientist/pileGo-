@@ -78,7 +78,8 @@ export function ExtensionPage() {
       </div>
 
       <header className="mt-8">
-        <h1 className="font-display text-5xl leading-[0.9] font-extrabold sm:text-6xl">Get the browser extension</h1>
+        <p className="label-caps">Two minutes, once</p>
+        <h1 className="font-display mt-2 text-[clamp(2.4rem,6vw,4.2rem)] leading-[0.92]">Get the browser extension</h1>
         <p className="mt-3 max-w-2xl text-ink-2">
           Vinted, Depop, Poshmark, Mercari, Grailed and Facebook have no public API for sellers. The pileGo extension does that work
           in tabs where you are already logged in: Vinted in one click, a filled-in sell form on the others. It also reads eBay’s
@@ -97,7 +98,7 @@ export function ExtensionPage() {
       )}
 
       {isPhone() && (
-        <p className="mt-4 flex items-start gap-2 rounded-lg bg-sticker/70 p-3 text-sm text-[#16172b]">
+        <p className="mt-4 flex items-start gap-2 kraft rounded-xl p-3 text-sm">
           <TriangleAlert className="mt-0.5 size-5 shrink-0" aria-hidden />
           Phones and tablets cannot run browser extensions. Open pilego.app on a computer in Chrome, Edge, Brave or Firefox.
         </p>
@@ -122,7 +123,7 @@ export function ExtensionPage() {
       {firefox ? <FirefoxSteps /> : <ChromeSteps pages={pages} browser={browser} />}
 
       <Paper className="mt-8 p-5 sm:p-6">
-        <h2 className="font-display text-2xl font-bold">If something is off</h2>
+        <h2 className="font-display text-2xl font-semibold">If something is off</h2>
         <dl className="mt-3 flex flex-col gap-4 text-sm">
           <Trouble q="Chrome says “Manifest file is missing or unreadable”">
             You picked the zip, or the folder around the right one. Choose the folder that has <code>manifest.json</code> directly
@@ -195,12 +196,12 @@ function StatusCard({ ext, checking, signedIn }: { ext: ReturnType<typeof useExt
       data-testid="extension-status"
       className={cx(
         'mt-6 flex items-start gap-3 rounded-xl border-2 p-4',
-        tone === 'good' ? 'border-[#1fa36b] bg-[#1fa36b]/10' : tone === 'wait' ? 'border-sticker bg-sticker/30' : 'border-dashed border-line',
+        tone === 'good' ? 'border-[var(--olive)] bg-[var(--olive)]/10' : tone === 'wait' ? 'border-kraft bg-kraft/30' : 'border-dashed border-line',
       )}
     >
-      <Icon className={cx('mt-0.5 size-6 shrink-0', tone === 'good' && 'text-[#1fa36b]')} aria-hidden />
+      <Icon className={cx('mt-0.5 size-6 shrink-0', tone === 'good' && 'text-[var(--olive)]')} aria-hidden />
       <div className="min-w-0">
-        <p className="font-display text-xl font-bold">
+        <p className="font-display text-xl font-semibold">
           {title}
           {tone === 'good' ? ' ✓' : ''}
         </p>
@@ -220,7 +221,7 @@ function ChromeSteps({ pages, browser }: { pages: string; browser: Browser }) {
   const name = browser === 'edge' ? 'Edge' : browser === 'brave' ? 'Brave' : 'Chrome';
   return (
     <Paper className="mt-8 p-5 sm:p-6">
-      <h2 className="font-display text-2xl font-bold">Install in {name}</h2>
+      <h2 className="font-display text-2xl font-semibold">Install in {name}</h2>
       <ol className="mt-4 flex flex-col gap-4">
         <Step n={1}>
           <strong>Download</strong> the Chrome, Edge or Brave zip above.
@@ -256,7 +257,7 @@ function ChromeSteps({ pages, browser }: { pages: string; browser: Browser }) {
 function FirefoxSteps() {
   return (
     <Paper className="mt-8 p-5 sm:p-6">
-      <h2 className="font-display text-2xl font-bold">Install in Firefox</h2>
+      <h2 className="font-display text-2xl font-semibold">Install in Firefox</h2>
       <ol className="mt-4 flex flex-col gap-4">
         <Step n={1}>
           <strong>Download</strong> the Firefox zip above. You do not need to unzip it.
@@ -273,7 +274,7 @@ function FirefoxSteps() {
           itself.
         </Step>
       </ol>
-      <p className="mt-4 rounded-lg bg-paper-2 p-3 text-sm text-ink-2">
+      <p className="mt-4 rounded-xl bg-paper-2 p-3 text-sm text-ink-2">
         Firefox removes add-ons loaded this way when it restarts, so you repeat step 3 after each restart. For something that
         stays, use Chrome, Edge or Brave.
       </p>
@@ -284,7 +285,7 @@ function FirefoxSteps() {
 function Step({ n, children }: { n: number; children: ReactNode }) {
   return (
     <li className="flex gap-3">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ink font-display font-bold text-paper" aria-hidden>
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ink font-display font-semibold text-paper" aria-hidden>
         {n}
       </span>
       <div className="min-w-0 pt-1 text-ink-2 [&_strong]:text-ink">{children}</div>

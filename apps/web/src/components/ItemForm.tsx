@@ -281,7 +281,7 @@ export function ItemForm({
             Measurements, laid flat ({unit})
           </legend>
           {estimated.length ? (
-            <div className="mb-3 rounded-lg bg-sticker/40 px-3 py-2 text-xs text-[#16172b]" data-testid="estimate-note">
+            <div className="mb-3 kraft rounded-xl px-3 py-2 text-xs" data-testid="estimate-note">
               <p className="flex items-start gap-1.5">
                 <Sparkles className="mt-px size-3.5 shrink-0" aria-hidden />
                 <span>
@@ -312,7 +312,7 @@ export function ItemForm({
                   <span className="flex items-center gap-1">
                     {label}
                     {guess && (
-                      <span className="rounded bg-tag/15 px-1 text-[0.6rem] font-bold tracking-wide text-tag uppercase" title="Estimated by the AI">
+                      <span className="rounded bg-accent/15 px-1 text-[0.6rem] font-semibold tracking-wide text-accent uppercase" title="Estimated by the AI">
                         AI est.
                       </span>
                     )}

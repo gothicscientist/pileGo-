@@ -10,8 +10,8 @@ export function Privacy() {
       <Link to="/">
         <Wordmark />
       </Link>
-      <article className="mt-10 flex flex-col gap-5 leading-relaxed text-ink-2 [&_h2]:font-display [&_h2]:mt-4 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:text-ink">
-        <h1 className="font-display text-5xl leading-none font-extrabold text-ink">Privacy notes</h1>
+      <article className="mt-10 flex flex-col gap-5 leading-relaxed text-ink-2 [&_h2]:font-display [&_h2]:mt-4 [&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:text-ink">
+        <h1 className="font-display text-5xl leading-none font-semibold text-ink">Privacy notes</h1>
         <p>
           pileGo is free, open-source software for selling secondhand clothes. Whoever runs a copy of pileGo is responsible for
           the data in it. These notes describe what the software stores and where it sends it.

@@ -1,5 +1,6 @@
 import {
   CATEGORIES,
+  findSubcategory,
   MARKETPLACE_IDS,
   MARKETPLACES,
   priceOn,
@@ -8,12 +9,13 @@ import {
   type MarketplaceId,
 } from '@pilego/core';
 import { Check, LayoutGrid, Rows3, Search, X } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ItemStatusTag, PhotoImg, PriceTag, Sticker, TierLabel } from '~/components/bits';
 import { Sheet, useToast } from '~/components/overlay';
-import { Button, Empty, ErrorNote, Select, Spinner } from '~/components/ui';
-import { cx, daysSince, money, plural } from '~/lib/format';
+import { Button, Empty, ErrorNote, PageHeader, Select, Spinner } from '~/components/ui';
+import { cx, daysSince, money, plural, seeded } from '~/lib/format';
 import { useItems, useProfile, useQueuePublish, useUpdateItem, type ListingOverride } from '~/lib/queries';
 import { errorMessage } from '~/lib/supabase';
 
@@ -61,6 +63,7 @@ export function Closet() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const update = useUpdateItem();
   const toast = useToast();
+  const reduce = useReducedMotion();
 
   const set = (key: string, value: string | null) =>
     setParams(
@@ -116,9 +119,8 @@ export function Closet() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="font-display text-5xl leading-[0.9] font-extrabold sm:text-6xl">Closet</h1>
-        <div className="flex items-center gap-1 rounded-lg bg-paper-2 p-1" role="group" aria-label="View">
+      <PageHeader label={`02 / Everything you own / ${plural(counts.all ?? 0, 'piece')}`} title="Closet">
+        <div className="flex items-center gap-1 rounded-full bg-paper-2 p-1" role="group" aria-label="View">
           <ViewButton on={view === 'rack'} label="Rack" onClick={() => set('view', null)}>
             <LayoutGrid className="size-4" aria-hidden />
           </ViewButton>
@@ -126,9 +128,9 @@ export function Closet() {
             <Rows3 className="size-4" aria-hidden />
           </ViewButton>
         </div>
-      </header>
+      </PageHeader>
 
-      <div className="scrollbar-none -mx-4 mt-5 flex gap-1 overflow-x-auto px-4 sm:mx-0 sm:px-0" role="tablist" aria-label="Status">
+      <div className="scrollbar-none -mx-4 mt-5 flex gap-1 overflow-x-auto px-4 py-1 sm:mx-0 sm:px-0" role="tablist" aria-label="Status">
         {STATUS_TABS.map(t => (
           <button
             key={t.id}
@@ -140,12 +142,22 @@ export function Closet() {
               setPicked(new Set());
             }}
             className={cx(
-              'shrink-0 rounded-lg px-3 py-2 text-sm font-semibold transition',
-              status === t.id ? 'bg-ink text-paper' : 'text-ink-2 hover:bg-paper-2',
+              'relative shrink-0 rounded-full px-3.5 py-2 text-sm font-medium transition-colors active:scale-95',
+              status === t.id ? 'text-paper' : 'text-ink-2 hover:bg-paper-2 hover:text-ink',
             )}
           >
-            {t.label}
-            <span className={cx('ml-1.5 tabular', status === t.id ? 'text-paper/70' : 'text-muted')}>{counts[t.id] ?? 0}</span>
+            {status === t.id && (
+              <motion.span
+                layoutId="closet-tab"
+                className="absolute inset-0 rounded-full bg-ink"
+                transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                aria-hidden
+              />
+            )}
+            <span className="relative">
+              {t.label}
+              <span className={cx('ml-1.5 tabular', status === t.id ? 'text-paper/65' : 'text-muted')}>{counts[t.id] ?? 0}</span>
+            </span>
           </button>
         ))}
       </div>
@@ -207,18 +219,25 @@ export function Closet() {
           </div>
         ) : !filtered.length ? (
           (items?.length ?? 0) === 0 ? (
-            <Empty title="Your closet is empty" action={<Link to="/scan" className="btn btn-tag">Scan an item</Link>}>
+            <Empty title="Your closet is empty" art="whiteHoodie" action={<Link to="/scan" className="btn btn-tag">Scan an item</Link>}>
               Everything you scan or import lands here.
             </Empty>
           ) : (
-            <Empty title="Nothing matches">Try another filter or clear the search.</Empty>
+            <Empty title="Nothing matches" art="beanie">
+              Try another filter or clear the search.
+            </Empty>
           )
         ) : view === 'rack' ? (
-          <ul className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {filtered.map(item => (
-              <li key={item.id}>
+          <ul className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 xl:grid-cols-5">
+            {filtered.map((item, i) => (
+              <motion.li
+                key={item.id}
+                initial={reduce ? false : { opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ type: 'spring', stiffness: 220, damping: 24, delay: reduce ? 0 : Math.min(i, 14) * 0.025 }}
+              >
                 <RackCard item={item} picked={picked.has(item.id)} onPick={() => toggle(item.id)} />
-              </li>
+              </motion.li>
             ))}
           </ul>
         ) : (
@@ -226,9 +245,16 @@ export function Closet() {
         )}
       </div>
 
+      <AnimatePresence>
       {pickedItems.length > 0 && (
-        <div className="fixed inset-x-0 bottom-20 z-30 flex justify-center px-4 md:bottom-6">
-          <div className="flex flex-wrap items-center gap-2 rounded-xl bg-ink p-2 pl-4 text-paper lift-lg">
+        <motion.div
+          initial={{ y: 40, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 40, opacity: 0 }}
+          transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+          className="fixed inset-x-0 bottom-24 z-30 flex justify-center px-4 md:bottom-6"
+        >
+          <div className="flex flex-wrap items-center gap-2 rounded-full bg-ink p-1.5 pl-5 text-paper lift-lg">
             <span className="text-sm font-semibold">{plural(pickedItems.length, 'item')} picked</span>
             <Button variant="tag" size="sm" onClick={() => setBulkOpen(true)}>
               Cross-list
@@ -246,12 +272,13 @@ export function Closet() {
             >
               Archive
             </Button>
-            <button type="button" aria-label="Clear selection" className="rounded-full p-2 hover:bg-white/10" onClick={() => setPicked(new Set())}>
+            <button type="button" aria-label="Clear selection" className="rounded-full p-2 transition hover:bg-white/10 active:scale-90" onClick={() => setPicked(new Set())}>
               <X className="size-4" aria-hidden />
             </button>
           </div>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       <BulkCrossList
         items={pickedItems}
@@ -272,7 +299,10 @@ function ViewButton({ on, label, onClick, children }: { on: boolean; label: stri
       type="button"
       aria-pressed={on}
       onClick={onClick}
-      className={cx('inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-semibold', on ? 'bg-card text-ink shadow-sm' : 'text-muted')}
+      className={cx(
+        'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition active:scale-95',
+        on ? 'bg-card text-ink shadow-[0_1px_2px_rgb(0_0_0/0.08)]' : 'text-muted hover:text-ink',
+      )}
     >
       {children}
       {label}
@@ -289,7 +319,7 @@ function PickBox({ on, onClick, label }: { on: boolean; onClick: () => void; lab
       aria-label={label}
       onClick={onClick}
       className={cx(
-        'flex size-6 items-center justify-center rounded-md border-2 transition',
+        'flex size-6 items-center justify-center rounded-full border-2 transition duration-300 ease-[var(--ease-spring)] active:scale-90',
         on ? 'border-ink bg-ink text-paper' : 'border-white/90 bg-black/20 text-transparent hover:bg-black/35',
       )}
     >
@@ -298,31 +328,51 @@ function PickBox({ on, onClick, label }: { on: boolean; onClick: () => void; lab
   );
 }
 
+/** "Lee, size M, denim jackets": whatever the seller filled in, no blanks. */
+function details(item: Item): string {
+  const kind = findSubcategory(item.category, item.subcategory)?.label;
+  return [item.brand, item.size && `Size ${item.size}`, kind].filter(Boolean).join(' · ');
+}
+
 function RackCard({ item, picked, onPick }: { item: Item; picked: boolean; onPick: () => void }) {
   const live = (item.listings ?? []).filter(l => l.status === 'listed');
   const needs = (item.listings ?? []).some(l => l.status === 'needs_action' || l.status === 'failed');
+  const tilt = (seeded(item.id) - 0.5) * 3;
+  const line = details(item);
   return (
-    <div className="group relative">
-      <Link to={`/item/${item.id}`} className="block">
-        <div className="relative overflow-hidden rounded-xl bg-paper-2 transition group-hover:-translate-y-0.5 lift">
-          <PhotoImg photo={item.photos?.[0]} className="aspect-[4/5] w-full object-cover" alt="" />
+    <div className="group swing-on-hover relative">
+      <Link to={`/item/${item.id}`} className="block rounded-[18px]">
+        <div
+          className="relative overflow-hidden rounded-[18px] bg-paper-2 transition duration-500 ease-[var(--ease-spring)] lift group-hover:-translate-y-1 group-hover:rotate-[var(--tilt)] group-hover:shadow-[0_2px_4px_rgb(var(--shadow)/0.06),0_28px_56px_-26px_rgb(var(--shadow)/0.42)]"
+          style={{ '--tilt': `${tilt.toFixed(2)}deg` } as React.CSSProperties}
+        >
+          <PhotoImg
+            photo={item.photos?.[0]}
+            className="aspect-[4/5] w-full object-cover transition-transform duration-700 ease-[var(--ease-out-soft)] group-hover:scale-[1.04]"
+            alt=""
+          />
           {item.status === 'sold' && (
-            <span className="absolute top-1/3 left-1/2 -translate-x-1/2 -rotate-12 rounded-md border-4 border-tag bg-paper/80 px-2 font-display text-2xl font-extrabold text-tag">
+            <span className="stamp-in absolute top-1/3 left-1/2 -translate-x-1/2 -rotate-12 rounded-md border-[3px] border-rose bg-paper/85 px-2 font-display text-2xl text-rose">
               SOLD
             </span>
           )}
+          {needs && (
+            <span className="absolute right-2 bottom-2 rounded-full bg-paper/90 px-2 py-0.5 text-[0.7rem] font-semibold text-danger backdrop-blur">
+              Needs you
+            </span>
+          )}
         </div>
-        <div className="mt-2 flex flex-col gap-1 px-0.5">
-          <div className="flex items-center justify-between gap-2">
-            <span className="truncate text-sm font-bold">{item.brand || 'No brand'}</span>
-            <PriceTag className={cx(item.price == null && '!bg-sticker')}>{item.price == null ? 'price?' : money(item.price, item.currency)}</PriceTag>
+        <div className="mt-2.5 flex flex-col gap-1 px-1">
+          <div className="flex items-start justify-between gap-2">
+            <span className="line-clamp-2 text-[0.93rem] leading-snug font-medium">{item.title || 'Untitled item'}</span>
+            <span className="swing shrink-0 origin-left pt-0.5">
+              <PriceTag empty={item.price == null}>{item.price == null ? 'price?' : money(item.price, item.currency)}</PriceTag>
+            </span>
           </div>
-          <span className="line-clamp-2 text-sm leading-snug text-ink-2">{item.title || 'Untitled item'}</span>
-          <div className="flex flex-wrap items-center gap-1">
-            {item.size && <span className="text-xs text-muted">Size {item.size}</span>}
-            {needs && <span className="text-xs font-bold text-danger">needs you</span>}
+          <div className="flex min-h-4 items-center gap-2">
+            {line && <span className="truncate text-xs text-muted">{line}</span>}
             {live.length > 0 && (
-              <span className="ml-auto flex -space-x-1" aria-label={`Live on ${live.map(l => MARKETPLACES[l.marketplace].name).join(', ')}`}>
+              <span className="ml-auto flex shrink-0 -space-x-1" aria-label={`Live on ${live.map(l => MARKETPLACES[l.marketplace].name).join(', ')}`}>
                 {live.map(l => (
                   <span key={l.id} className="size-3 rounded-full ring-2 ring-paper" style={{ background: MARKETPLACES[l.marketplace].color }} />
                 ))}
@@ -331,7 +381,7 @@ function RackCard({ item, picked, onPick }: { item: Item; picked: boolean; onPic
           </div>
         </div>
       </Link>
-      <div className={cx('absolute top-2 left-2 transition', picked ? 'opacity-100' : 'opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100')}>
+      <div className={cx('absolute top-2.5 left-2.5 transition', picked ? 'opacity-100' : 'opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100')}>
         <PickBox on={picked} onClick={onPick} label={`Pick ${item.title}`} />
       </div>
     </div>
@@ -351,7 +401,7 @@ function Table({
 }) {
   const all = items.length > 0 && items.every(i => picked.has(i.id));
   return (
-    <div className="overflow-x-auto rounded-xl bg-card lift">
+    <div className="overflow-x-auto rounded-[20px] bg-card lift">
       <table className="w-full min-w-[46rem] text-sm">
         <thead>
           <tr className="border-b border-line text-left text-xs text-muted">
@@ -383,7 +433,7 @@ function Table({
                 </td>
                 <td className="p-3">
                   <Link to={`/item/${item.id}`} className="flex items-center gap-3">
-                    <PhotoImg photo={item.photos?.[0]} className="size-10 shrink-0 rounded-md object-cover" />
+                    <PhotoImg photo={item.photos?.[0]} className="size-11 shrink-0 rounded-xl object-cover" />
                     <span className="min-w-0">
                       <span className="block truncate font-semibold">{item.title || 'Untitled item'}</span>
                       <span className="block text-xs text-muted tabular">
@@ -472,7 +522,7 @@ function BulkCrossList({ items, open, onClose, onDone }: { items: Item[]; open: 
           Each item gets the version each marketplace wants, written from its details. Open an item first if you want to edit one by hand.
         </p>
         {skipped > 0 && (
-          <p className="rounded-lg bg-sticker/50 px-3 py-2 text-sm text-[#16172b]">
+          <p className="kraft rounded-xl px-3 py-2 text-sm">
             {plural(skipped, 'item')} will be skipped: {skipped === 1 ? 'it needs' : 'they need'} a price and at least one photo.
           </p>
         )}
@@ -485,9 +535,12 @@ function BulkCrossList({ items, open, onClose, onDone }: { items: Item[]; open: 
                   type="button"
                   aria-pressed={on}
                   onClick={() => setSelected(s => (on ? s.filter(x => x !== m) : [...s, m]))}
-                  className={cx('flex w-full items-center gap-3 rounded-xl border-2 p-2.5 text-left', on ? 'border-ink bg-card' : 'border-transparent bg-paper-2')}
+                  className={cx(
+                    'flex w-full items-center gap-3 rounded-2xl border-2 p-2.5 text-left transition duration-300 ease-[var(--ease-spring)] active:scale-[0.98]',
+                    on ? 'border-ink bg-card' : 'border-transparent bg-paper-2 hover:bg-line/60',
+                  )}
                 >
-                  <span className={cx('flex size-5 items-center justify-center rounded border-2', on ? 'border-ink bg-ink text-paper' : 'border-line bg-card')}>
+                  <span className={cx('flex size-5 items-center justify-center rounded-md border-2 transition', on ? 'border-ink bg-ink text-paper' : 'border-line bg-card')}>
                     {on && <Check className="size-3.5" strokeWidth={3} aria-hidden />}
                   </span>
                   <Sticker id={m} size="sm" />

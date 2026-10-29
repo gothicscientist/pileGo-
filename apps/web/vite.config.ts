@@ -41,8 +41,8 @@ export default defineConfig({
         name: 'pileGo',
         short_name: 'pileGo',
         description: 'Scan, list and cross-list your secondhand clothes.',
-        theme_color: '#2B3FE8',
-        background_color: '#F6F6F1',
+        theme_color: '#F5F4EF',
+        background_color: '#F5F4EF',
         display: 'standalone',
         start_url: '/',
         icons: [

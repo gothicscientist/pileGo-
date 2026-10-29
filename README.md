@@ -5,7 +5,7 @@ let the AI fill in the listing, and send it to eBay, Vinted, Depop, Poshmark,
 Mercari, Grailed and Facebook Marketplace from one place. When it sells
 somewhere, pileGo takes it down everywhere else.
 
-![The pile: unsold pieces scattered on a blue floor, with a receipt of what is listed and what to do next](docs/screenshots/pile.webp)
+![The pile: unsold everyday pieces scattered on a paper floor with kraft price tags, with a receipt of what is listed and what to do next](docs/screenshots/pile.webp)
 
 ## What it does
 
