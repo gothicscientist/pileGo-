@@ -46,3 +46,6 @@ verify_jwt = false
 
 [functions.extension-link]
 verify_jwt = false
+
+[functions.ebay-account-deletion]
+verify_jwt = false

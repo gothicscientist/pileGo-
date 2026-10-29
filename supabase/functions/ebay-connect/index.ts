@@ -57,13 +57,18 @@ serve(async req => {
     await saveTokens(admin, uid, tokens);
 
     let username: string | null = null;
+    let ebayUserId: string | null = null;
     try {
       const me = await fetch(
         (Deno.env.get('EBAY_ENV') === 'sandbox' ? 'https://apiz.sandbox.ebay.com' : 'https://apiz.ebay.com') +
           '/commerce/identity/v1/user/',
         { headers: { Authorization: `Bearer ${tokens.access_token}` } },
       );
-      if (me.ok) username = ((await me.json()) as { username?: string }).username ?? null;
+      if (me.ok) {
+        const who = (await me.json()) as { username?: string; userId?: string };
+        username = who.username ?? null;
+        ebayUserId = who.userId ?? null;
+      }
     } catch {
       // The username is a nicety.
     }
@@ -80,7 +85,8 @@ serve(async req => {
         marketplace: 'ebay',
         status: 'connected',
         username,
-        meta: existing?.meta ?? {},
+        // eBay's account-deletion notices name the user by id, so keep it.
+        meta: { ...(existing?.meta ?? {}), ...(ebayUserId ? { ebay_user_id: ebayUserId } : {}) },
         last_error: null,
         connected_at: new Date().toISOString(),
       },
