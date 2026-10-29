@@ -64,6 +64,9 @@ function chips(name: string): Array<{ label: string; remove: HTMLElement }> {
   }));
 }
 
+/** The options each menu last showed, for saying why a field could not be filled. */
+const seen = new Map<string, string[]>();
+
 /**
  * Pick one or more options of a Downshift combobox. Chips the item does not
  * want are removed first. Returns what is selected at the end.
@@ -82,8 +85,18 @@ async function choose(name: string, wants: string[][], max = wants.length): Prom
   for (const want of wants) {
     if (picked.length >= max) break;
     if (picked.some(p => want.map(norm).includes(norm(p)))) continue;
-    const opts = await openMenu(name);
-    const hit = pickOption(opts, label, want);
+    // A menu can open empty or stale while the form redraws (after the
+    // category changes, say), so look again before giving up on it.
+    let hit: HTMLElement | null = null;
+    for (let attempt = 0; attempt < 3 && !hit; attempt += 1) {
+      if (attempt) {
+        closeMenu(name);
+        await sleep(700);
+      }
+      const opts = await openMenu(name);
+      seen.set(name, opts.map(label));
+      hit = pickOption(opts, label, want);
+    }
     if (!hit) continue;
     picked.push(label(hit));
     press(hit);
@@ -255,7 +268,14 @@ export const fillDepop: Driver = async (work: ListingWork, files: File[], ctx: D
   const needed = ['photos', 'description', 'category', 'condition', 'price'];
   if (byId('variants-input') && item.size) needed.push('size');
   const blocking = needed.filter(n => tally.missing.includes(n));
-  if (blocking.length) return tally.result(false);
+  if (blocking.length) {
+    const sizes = seen.get('variants');
+    const hint =
+      blocking.includes('size') && item.size
+        ? ` The item's size is ${item.size}; Depop offered ${sizes?.length ? sizes.slice(0, 12).join(', ') : 'no sizes'}.`
+        : '';
+    return tally.result(false, hint.trim() || undefined);
+  }
 
   ctx.check();
   const post = [...document.querySelectorAll<HTMLButtonElement>('button[type="submit"]')].find(b => text(b) === 'Post' && shown(b));

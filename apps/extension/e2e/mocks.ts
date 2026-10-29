@@ -34,6 +34,8 @@ export const DEPOP_FORM = `<!doctype html><html><body><main><form id="f">
     if (def.value) input.value = def.value;
     const render = filter => {
       menu.innerHTML = '';
+      // Depop sometimes opens a menu before its options arrive.
+      if (def.emptyFirst && !def.shown) { def.shown = true; input.setAttribute('aria-expanded', 'true'); return; }
       const add = (parent, text) => {
         const li = document.createElement('li'); li.setAttribute('role', 'option'); li.innerText = text; li.style.display = 'block';
         li.addEventListener('click', () => pick(text.split('\\n')[0])); parent.append(li);
@@ -69,7 +71,7 @@ export const DEPOP_FORM = `<!doctype html><html><body><main><form id="f">
   document.querySelector('#colour-toggle-button').click();
   function onCategory() {
     if (document.getElementById('variants-input')) return;
-    combo('variants', { label: 'Size', options: ['XS', 'S', 'M', 'L', 'XL'] }, brandWrap);
+    combo('variants', { label: 'Size', options: ['XS', 'S', 'M', 'L', 'XL'], emptyFirst: true }, brandWrap);
   }
   document.getElementById('upload-input__input').addEventListener('change', e => {
     for (const f of e.target.files) { const img = document.createElement('img'); img.style.cssText = 'display:block;width:40px;height:40px'; document.getElementById('thumbs').append(img); }

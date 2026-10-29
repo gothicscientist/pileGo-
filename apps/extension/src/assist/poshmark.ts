@@ -282,8 +282,12 @@ export const fillPoshmark: Driver = async (work: ListingWork, files: File[], ctx
   const { item, listing } = work;
 
   ctx.step('Waiting for Poshmark’s form…');
-  const ready = await waitFor(() => document.querySelector('input[data-vv-name="title"]') && document.querySelector('.listing-editor__category-container'), 30_000);
-  if (!ready) return tally.result(false, 'Poshmark’s listing form did not load. Are you logged in to Poshmark?');
+  const ready = await waitFor(() => document.querySelector('input[data-vv-name="title"]') && document.querySelector('.listing-editor__category-container'), 60_000);
+  if (!ready) {
+    // Say what the tab shows instead, so a login page or a pop-up is easy to spot.
+    const shows = text(document.querySelector('main') ?? document.body).replace(/\s+/g, ' ').slice(0, 120);
+    return tally.result(false, `Poshmark’s listing form did not load (the tab shows ${location.pathname}${shows ? `: “${shows}”` : ''}). Are you logged in to Poshmark?`);
+  }
 
   ctx.check();
   ctx.step('Adding photos…');
