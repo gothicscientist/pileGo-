@@ -3,6 +3,26 @@
 const g = globalThis as unknown as { browser?: typeof chrome; chrome?: typeof chrome };
 export const ext: typeof chrome = (g.browser ?? g.chrome)!;
 
+/**
+ * False in a content script left behind when the extension was reloaded or
+ * updated: the page keeps running it, but it can no longer reach the worker.
+ */
+export const alive = () => Boolean(ext.runtime?.id);
+
+/**
+ * sendMessage that never throws. An orphaned content script's sendMessage
+ * throws "Extension context invalidated" before returning a promise, which a
+ * .catch() never sees.
+ */
+export function send<T = unknown>(msg: unknown): Promise<T | undefined> {
+  if (!alive()) return Promise.resolve(undefined);
+  try {
+    return (ext.runtime.sendMessage(msg) as Promise<T>).catch(() => undefined);
+  } catch {
+    return Promise.resolve(undefined);
+  }
+}
+
 export const sleep = (ms: number) => new Promise<void>(done => setTimeout(done, ms));
 
 /** A random whole number of milliseconds between low and high. */
