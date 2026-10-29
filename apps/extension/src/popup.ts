@@ -80,7 +80,7 @@ function render(v: View) {
     ),
     s.last_message ? h('p', { className: 'note', textContent: s.last_message }) : null,
     s.last_error ? h('p', { className: 'err', textContent: s.last_error }) : null,
-    h('p', { className: 'muted', textContent: 'Vinted runs by itself while a Vinted tab is open. Run now opens the forms for Depop, Poshmark, Mercari, Grailed and Facebook.' }),
+    h('p', { className: 'muted', textContent: 'Waiting listings go up by themselves within two minutes. Run now starts them straight away.' }),
     h('div', { className: 'row' }, button('Run now', 'popup:run', 'go'), button('Check for sales', 'popup:sync')),
     h(
       'div',

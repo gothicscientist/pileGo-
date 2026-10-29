@@ -523,14 +523,19 @@ export async function onTabClosed(tabId: number) {
 // ---------------------------------------------------------------------------
 
 let busy = false;
+/** Asked to run while already running: go round again when done. */
+let again: boolean | null = null;
 
 /**
- * Claim and run jobs. On a timer only Vinted runs, and only with a Vinted tab
- * open. When the seller has just asked for something (interactive), pileGo
- * may open a Vinted tab in the background and opens the assisted sell forms.
+ * Claim and run jobs. With `interactive`, pileGo may open a Vinted tab in the
+ * background and opens the assisted sell forms; without it only Vinted runs,
+ * and only in a Vinted tab that is already open.
  */
 export async function runQueue(sb: SupabaseClient, interactive: boolean): Promise<number> {
-  if (busy) return 0;
+  if (busy) {
+    again = (again ?? false) || interactive;
+    return 0;
+  }
   busy = true;
   let ran = 0;
   try {
@@ -568,6 +573,12 @@ export async function runQueue(sb: SupabaseClient, interactive: boolean): Promis
   } finally {
     busy = false;
     await closeOpenedTabs();
+  }
+  if (again !== null) {
+    // A poke from the app landed mid-run; its jobs were not claimed yet.
+    const next = again;
+    again = null;
+    ran += await runQueue(sb, next);
   }
   return ran;
 }

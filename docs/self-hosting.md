@@ -174,8 +174,8 @@ to Edge Functions > scan-item > Logs for the error.
 sign in. If the toolbar icon shows **!**, approve the app in the popup.
 
 **Vinted jobs wait.** Vinted work needs a Vinted tab in which you are logged
-in. pileGo opens one in the background when you press Run now in the popup, or
-when you cross-list from the app. After a rate limit or a bot check, the
+in. pileGo opens one in the background when you cross-list from the app, when
+you press Run now in the popup, and on its two-minute timer while jobs wait. After a rate limit or a bot check, the
 extension pauses Vinted for 15 minutes to 6 hours. The popup says how long.
 
 **eBay sales are not showing up.** The scheduled sync needs the Vault secrets

@@ -1,7 +1,7 @@
 // Small pieces of the pileGo look: marketplace stickers, tier labels, status
 // tags and photos that load from private storage.
 
-import { MARKETPLACES, TIER_EXPLAINER, TIER_LABEL, type ItemStatus, type ListingStatus, type MarketplaceId, type Photo, type Tier } from '@pilego/core';
+import { AUTO_POST_EXPLAINER, AUTO_POST_LABEL, MARKETPLACES, TIER_EXPLAINER, TIER_LABEL, type ItemStatus, type ListingStatus, type MarketplaceId, type Photo, type Tier } from '@pilego/core';
 import { ClipboardCopy, Hand, ImageOff, MousePointerClick, Shirt, Zap } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 import { cx, inkOn, seeded } from '~/lib/format';
@@ -56,13 +56,16 @@ const TIER_ICON: Record<Tier, typeof Zap> = {
   manual: ClipboardCopy,
 };
 
-export function TierLabel({ tier, className, explain }: { tier: Tier; className?: string; explain?: boolean }) {
-  const Icon = TIER_ICON[tier];
+/** How a marketplace lists. Pass `auto` for an assisted one where the extension also posts. */
+export function TierLabel({ tier, auto, className, explain }: { tier: Tier; auto?: boolean; className?: string; explain?: boolean }) {
+  const Icon = auto ? Zap : TIER_ICON[tier];
+  const label = auto ? AUTO_POST_LABEL : TIER_LABEL[tier];
+  const explainer = auto ? AUTO_POST_EXPLAINER : TIER_EXPLAINER[tier];
   return (
-    <span className={cx('inline-flex items-center gap-1 text-xs font-semibold text-ink-2', className)} title={TIER_EXPLAINER[tier]}>
+    <span className={cx('inline-flex items-center gap-1 text-xs font-semibold text-ink-2', className)} title={explainer}>
       <Icon className="size-3.5" aria-hidden />
-      {TIER_LABEL[tier]}
-      {explain && <span className="font-normal text-muted">: {TIER_EXPLAINER[tier]}</span>}
+      {label}
+      {explain && <span className="font-normal text-muted">: {explainer}</span>}
     </span>
   );
 }

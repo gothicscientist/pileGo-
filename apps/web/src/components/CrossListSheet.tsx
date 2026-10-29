@@ -206,7 +206,7 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
                         <Sticker id={m} size="sm" />
                         {listing && <span className="text-xs font-semibold text-ink-2">{listingStatusLabel(listing.status)}</span>}
                       </span>
-                      <TierLabel tier={info.capabilities.create} />
+                      <TierLabel tier={info.capabilities.create} auto={info.auto_post} />
                       {price != null && (
                         <span className="text-xs text-muted tabular">
                           {money(price, item.currency)}, fees about {money(feeFor(price, rule), item.currency)}, you keep{' '}

@@ -543,7 +543,7 @@ function ListingRow({
         )}
       </div>
       <div className="mt-1">
-        <TierLabel tier={info.capabilities.create} />
+        <TierLabel tier={info.capabilities.create} auto={info.auto_post} />
       </div>
       {listing.error && <ErrorNote error={listing.error} className="mt-3" />}
       <EbayAspects listing={listing} />

@@ -37,6 +37,8 @@ export interface MarketplaceInfo {
   color: string;
   /** Host patterns the extension needs for this marketplace. */
   hosts: string[];
+  /** An assisted marketplace where the extension also presses post. */
+  auto_post?: boolean;
 }
 
 export const MARKETPLACES: Record<MarketplaceId, MarketplaceInfo> = {
@@ -84,6 +86,7 @@ export const MARKETPLACES: Record<MarketplaceId, MarketplaceInfo> = {
   },
   depop: {
     id: 'depop',
+    auto_post: true,
     name: 'Depop',
     blurb: 'The extension fills every field of Depop’s sell form in your logged-in tab and posts it.',
     regions: ['US', 'UK', 'EU', 'AU'],
@@ -110,6 +113,7 @@ export const MARKETPLACES: Record<MarketplaceId, MarketplaceInfo> = {
   },
   poshmark: {
     id: 'poshmark',
+    auto_post: true,
     name: 'Poshmark',
     blurb: 'The extension fills every field of Poshmark’s listing form in your logged-in tab and lists it.',
     regions: ['US', 'CA', 'AU'],
@@ -236,6 +240,9 @@ export const TIER_LABEL: Record<Tier, string> = {
   assist: 'Assisted',
   manual: 'Listing kit',
 };
+
+export const AUTO_POST_LABEL = 'Auto-post';
+export const AUTO_POST_EXPLAINER = 'The extension fills in the marketplace’s own form in your logged-in tab and posts it for you.';
 
 export const TIER_EXPLAINER: Record<Tier, string> = {
   api: 'pileGo does it through the marketplace’s official API. Your browser can be closed.',
