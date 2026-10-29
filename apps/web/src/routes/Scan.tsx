@@ -3,12 +3,14 @@
 // role to the AI. Photos upload as soon as they are picked so the AI can read
 // them; the garment is cut out for the pile while the AI works.
 
-import { DEFAULT_VOICE, type PhotoRole, type ScanResult, type SellerVoice } from '@pilego/core';
+import { cleanSellerAddress, type SellerAddress, DEFAULT_VOICE, type PhotoRole, type ScanResult, type SellerVoice } from '@pilego/core';
 import { Camera, Check, ImagePlus, Scissors, Smartphone, Wand2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { emptyForm, formFromScan, ItemForm, type FormValue } from '~/components/ItemForm';
+import { SellerAddressFields } from '~/components/SellerAddressFields';
+import { SellerLoginReminder } from '~/components/SellerLoginReminder';
 import { useToast } from '~/components/overlay';
 import { PhoneSheet } from '~/components/PhoneSheet';
 import { CoverPreview, ShotGuide, type Shot } from '~/components/ShotGuide';
@@ -49,6 +51,7 @@ export function Scan() {
   const strategy = priceStrategy ?? profile?.price_strategy ?? 'same';
   const voice = { ...DEFAULT_VOICE, ...profile?.voice };
   const tone = listingTone ?? voice.tone;
+  const [sellerAddress, setSellerAddress] = useState<SellerAddress | null | undefined>(undefined);
 
   const [itemId, setItemId] = useState(newId);
   const [shots, setShots] = useState<Shot[]>([]);
@@ -199,8 +202,10 @@ export function Scan() {
 
   async function savePreferences() {
     if (!profile) throw new Error('Your listing settings have not loaded. Please try again.');
-    if (strategy !== profile.price_strategy || tone !== voice.tone) {
-      await preferences.mutateAsync({ price_strategy: strategy, voice: { ...voice, tone } });
+    const addressPatch = sellerAddress === undefined ? {} : { seller_address: cleanSellerAddress(sellerAddress) };
+    if (strategy !== profile.price_strategy || tone !== voice.tone || sellerAddress !== undefined) {
+      await preferences.mutateAsync({ price_strategy: strategy, voice: { ...voice, tone }, ...addressPatch });
+      setSellerAddress(undefined);
     }
   }
 
@@ -423,6 +428,12 @@ export function Scan() {
                         { value: 'vintage-nerd', label: 'Vintage nerd', title: 'Era, construction and label details up front.' },
                       ]}
                     />
+                    <SellerAddressFields
+                      value={sellerAddress === undefined ? profile?.seller_address : sellerAddress}
+                      onChange={setSellerAddress}
+                      country={profile?.region === 'UK' ? 'GB' : profile?.region === 'EU' ? '' : profile?.region ?? 'US'}
+                    />
+                    <SellerLoginReminder markets={profile?.marketplaces ?? []} />
                     <p className="text-xs text-muted">Saved as your defaults when you continue. You can change them in Settings.</p>
                   </fieldset>
                   {ready.length > 0 && missing.length > 0 && (

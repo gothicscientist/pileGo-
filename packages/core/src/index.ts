@@ -1,4 +1,5 @@
 export * from './types.ts';
+export * from './seller-address.ts';
 export * from './marketplaces.ts';
 export * from './conditions.ts';
 export * from './taxonomy.ts';

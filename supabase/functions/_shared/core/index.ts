@@ -1,5 +1,6 @@
 // Generated from packages/core/src by scripts/sync-core.mjs. Do not edit.
 export * from './types.ts';
+export * from './seller-address.ts';
 export * from './marketplaces.ts';
 export * from './conditions.ts';
 export * from './taxonomy.ts';

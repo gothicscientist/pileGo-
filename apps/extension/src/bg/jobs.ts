@@ -158,6 +158,7 @@ async function buildWork(sb: SupabaseClient, job: Job, withPhotos: boolean) {
     },
     photos: withPhotos ? await photoBytes(sb, it, MARKETPLACES[job.marketplace].photos_max) : [],
     learned,
+    seller_address: withPhotos ? profile?.seller_address ?? null : null,
     external_id: li.external_id,
     external_url: li.external_url,
   };

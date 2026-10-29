@@ -24,6 +24,7 @@ import { cx, money } from '~/lib/format';
 import { useEbayActions, useEbayStatus, useProfile, useQueuePublish, type ListingOverride } from '~/lib/queries';
 import { errorMessage } from '~/lib/supabase';
 import { listingStatusLabel, MarketIcon, Sticker, TierLabel } from './bits';
+import { SellerLoginReminder } from './SellerLoginReminder';
 import { ListingKit } from './ListingKit';
 import { Sheet, useToast } from './overlay';
 import { Button, ErrorNote, Field, Input, TextArea } from './ui';
@@ -284,6 +285,7 @@ export function CrossListSheet({ item, open, onClose }: { item: Item; open: bool
               </Link>
             </Notice>
           )}
+          <SellerLoginReminder markets={selected} />
           {ebayBlocked && (
             <Notice icon={<AlertTriangle className="size-5" aria-hidden />}>
               {ebay.data?.configured ? (

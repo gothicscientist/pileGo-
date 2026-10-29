@@ -7,6 +7,7 @@ import { MARKETPLACES, type MarketplaceId } from '@pilego/core';
 import { ext, fromBase64, send, sleep } from '../shared/browser.ts';
 import type { AssistProgress, AssistReport, AssistRequest, FillResult, ListingWork } from '../shared/messages.ts';
 import { readComps } from './comps.ts';
+import { watchSellerAddress } from './seller-address.ts';
 import { fillDepop } from './depop.ts';
 import { norm, pageError, text, waitFor } from './dom.ts';
 import { Stopped, type Driver, type DriverContext } from './driver.ts';
@@ -179,6 +180,7 @@ const DRIVERS: Partial<Record<MarketplaceId, Driver>> = { depop: fillDepop, posh
 const GRACE_SECONDS = 3;
 
 let stopped = false;
+let stopAddressFill = () => {};
 
 function progressPanel(work: ListingWork, message: string) {
   const name = MARKETPLACES[work.marketplace].name;
@@ -191,6 +193,7 @@ function progressPanel(work: ListingWork, message: string) {
     onGo: () => {},
     onNo: () => {
       stopped = true;
+      stopAddressFill();
     },
   });
 }
@@ -268,8 +271,8 @@ async function runDriver(work: ListingWork, driver: Driver): Promise<FillResult>
     rows,
     go: 'I’ve posted it',
     no: 'Stop',
-    onGo: () => report({ type: 'assist:posted', job_id: work.job_id, url: null }),
-    onNo: () => report({ type: 'assist:gave-up', job_id: work.job_id, message: `You stopped the ${name} form.` }),
+    onGo: () => { stopAddressFill(); report({ type: 'assist:posted', job_id: work.job_id, url: null }); },
+    onNo: () => { stopAddressFill(); report({ type: 'assist:gave-up', job_id: work.job_id, message: `You stopped the ${name} form.` }); },
   });
   return result;
 }
@@ -312,8 +315,15 @@ async function startFill(work: ListingWork): Promise<FillResult> {
     return { ok: false, filled: [], missing: [], photos: 0, posted: false, error: 'Not on the sell page.' };
   }
   filling = work.job_id;
+  stopAddressFill();
+  stopAddressFill = watchSellerAddress(document, work.seller_address);
   try {
-    return driver ? await runDriver(work, driver) : await assistFill(work);
+    const result = driver ? await runDriver(work, driver) : await assistFill(work);
+    if (result.posted || stopped) stopAddressFill();
+    return result;
+  } catch (err) {
+    stopAddressFill();
+    throw err;
   } finally {
     filling = null;
   }
@@ -327,8 +337,8 @@ async function assistFill(work: ListingWork): Promise<FillResult> {
     rows: [],
     go: 'I’ve posted it',
     no: 'Stop',
-    onGo: () => report({ type: 'assist:posted', job_id: work.job_id, url: null }),
-    onNo: () => report({ type: 'assist:gave-up', job_id: work.job_id, message: `You stopped the ${name} form.` }),
+    onGo: () => { stopAddressFill(); report({ type: 'assist:posted', job_id: work.job_id, url: null }); },
+    onNo: () => { stopAddressFill(); report({ type: 'assist:gave-up', job_id: work.job_id, message: `You stopped the ${name} form.` }); },
   });
   const { filled, photos } = await fill(work);
   const rows = work.listing.fields.map(f => ({ label: f.label, value: f.value, done: filled.includes(f.key as FieldKey) }));
@@ -347,8 +357,8 @@ async function assistFill(work: ListingWork): Promise<FillResult> {
     rows,
     go: 'I’ve posted it',
     no: 'Stop',
-    onGo: () => report({ type: 'assist:posted', job_id: work.job_id, url: null }),
-    onNo: () => report({ type: 'assist:gave-up', job_id: work.job_id, message: `You stopped the ${name} form.` }),
+    onGo: () => { stopAddressFill(); report({ type: 'assist:posted', job_id: work.job_id, url: null }); },
+    onNo: () => { stopAddressFill(); report({ type: 'assist:gave-up', job_id: work.job_id, message: `You stopped the ${name} form.` }); },
   });
   return { ok: true, filled, missing: [], photos, posted: false };
 }

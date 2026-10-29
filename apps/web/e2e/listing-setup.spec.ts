@@ -40,6 +40,45 @@ test('listing setup saves pricing and tone before continuing and reuses them in 
   await expect(page.getByRole('button', { name: 'Minimal', exact: true })).toHaveAttribute('aria-pressed', 'true');
 });
 
+test('initial setup saves a private address and Settings can edit or remove it', async ({ page }) => {
+  await mockSupabase(page, { empty: true });
+  let profile: Record<string, unknown> = sellerProfile();
+  await page.route(`${SUPABASE}/rest/v1/profiles*`, async route => {
+    if (route.request().method() === 'PATCH') profile = { ...profile, ...route.request().postDataJSON() };
+    const single = (route.request().headers()['accept'] ?? '').includes('vnd.pgrst.object');
+    return route.fulfill({ contentType: 'application/json', body: JSON.stringify(single ? profile : [profile]) });
+  });
+  await page.goto('/scan');
+  await expect(page.getByRole('complementary', { name: 'Before listing with the extension' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open Depop', exact: true })).toHaveAttribute('href', /depop\.com/);
+  await page.getByLabel('Full name', { exact: true }).fill('Sam Seller');
+  await page.getByLabel('Street address', { exact: true }).fill('123 Test Lane');
+  await page.getByLabel('City / town', { exact: true }).fill('Berkeley');
+  await page.getByLabel('State / province / region', { exact: true }).fill('CA');
+  await page.getByLabel('ZIP / postal code', { exact: true }).fill('09470');
+  await page.getByRole('button', { name: 'Fill it in myself', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Check it over' })).toBeVisible();
+  expect(profile.seller_address).toMatchObject({ full_name: 'Sam Seller', line1: '123 Test Lane', city: 'Berkeley', state: 'CA', postal_code: '09470', country: 'US' });
+  await page.goto('/settings#seller-address');
+  await expect(page.getByLabel('Street address', { exact: true })).toHaveValue('123 Test Lane');
+  await page.getByLabel('Street address', { exact: true }).fill('456 Test Road');
+  await page.getByRole('button', { name: 'Save address', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Address saved' })).toBeVisible();
+  expect(profile.seller_address).toMatchObject({ line1: '456 Test Road' });
+  await page.getByRole('button', { name: 'Remove saved address', exact: true }).click();
+  await expect(page.getByLabel('Street address', { exact: true })).toHaveValue('');
+  expect(profile.seller_address).toBeNull();
+});
+
+test('an incomplete address stays in setup so the seller can correct it', async ({ page }) => {
+  await mockSupabase(page);
+  await page.goto('/scan');
+  await page.getByLabel('Street address', { exact: true }).fill('123 Test Lane');
+  await page.getByRole('button', { name: 'Fill it in myself', exact: true }).click();
+  await expect(page.getByText('Complete your name, street address, city, postal code and country, or leave the address blank.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Scan an item' })).toBeVisible();
+});
+
 test('a failed defaults save keeps the seller in setup and can be retried', async ({ page }) => {
   await mockSupabase(page);
   let fail = true;

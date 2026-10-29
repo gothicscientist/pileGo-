@@ -23,6 +23,7 @@ export function Privacy() {
           <li>The items you add: photos, titles, descriptions, prices, sizes, measurements and notes.</li>
           <li>Your listings on each marketplace: their ids, links, prices and status.</li>
           <li>Sales: the price, the date and the marketplace. Buyer names and addresses are not stored.</li>
+          <li>Your optional ship-from / return address and contact phone. The extension uses these only for seller-address forms while listing; they are never added to listing descriptions or sent to the AI provider.</li>
           <li>Settings such as your currency, region, writing style and fee overrides.</li>
         </ul>
 
@@ -64,4 +65,3 @@ export function Privacy() {
     </div>
   );
 }
-
