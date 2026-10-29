@@ -80,7 +80,7 @@ export function ExtensionPage() {
       <header className="mt-8">
         <h1 className="font-display text-[clamp(2.4rem,6vw,4.2rem)] leading-[0.92]">Get the browser extension</h1>
         <p className="mt-3 max-w-2xl text-ink-2">
-          Vinted, Depop, Poshmark, Mercari, Grailed and Facebook have no public API for sellers. The pileGo! extension does that work
+          Vinted, Depop, Poshmark, Mercari and Grailed have no public API for sellers. The pileGo! extension does that work
           in tabs where you are already logged in: Vinted in one click, a filled-in sell form on the others. It also reads eBay’s
           sold listings so price suggestions use what things actually sold for. It takes about two minutes to install.
         </p>
@@ -325,3 +325,4 @@ function Trouble({ q, children }: { q: string; children: ReactNode }) {
     </div>
   );
 }
+

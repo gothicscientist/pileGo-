@@ -4,6 +4,7 @@
 
 import {
   compQuery,
+  isMarketplaceId,
   makeSku,
   type Item,
   type ItemEvent,
@@ -68,7 +69,7 @@ function normalizeItem(row: Item): Item {
     cost: num(row.cost),
     sold_price: num(row.sold_price),
     photos: [...(row.photos ?? [])].sort((a, b) => a.position - b.position),
-    listings: (row.listings ?? []).map(normalizeListing),
+    listings: (row.listings ?? []).filter(l => isMarketplaceId(l.marketplace)).map(normalizeListing),
   };
 }
 
@@ -89,7 +90,8 @@ export function useProfile() {
     enabled: Boolean(session),
     queryFn: async () => {
       const row = check(await supabase.from('profiles').select('*').eq('id', session!.user.id).maybeSingle());
-      return row as FullProfile | null;
+      const profile = row as FullProfile | null;
+      return profile ? { ...profile, marketplaces: (profile.marketplaces ?? []).filter(isMarketplaceId) } : null;
     },
     staleTime: 5 * 60_000,
   });
@@ -128,14 +130,14 @@ export function useJobs() {
     queryKey: keys.jobs,
     enabled: Boolean(session),
     queryFn: async () =>
-      check(
+      (check(
         await supabase
           .from('jobs')
           .select('*')
           .gte('created_at', new Date(Date.now() - 7 * 86_400_000).toISOString())
           .order('created_at', { ascending: false })
           .limit(200),
-      ) as Job[],
+      ) as Job[]).filter(j => isMarketplaceId(j.marketplace)),
   });
 }
 
@@ -157,7 +159,7 @@ export function useAccounts() {
   return useQuery({
     queryKey: keys.accounts,
     enabled: Boolean(session),
-    queryFn: async () => check(await supabase.from('marketplace_accounts').select('*')) as MarketplaceAccount[],
+    queryFn: async () => (check(await supabase.from('marketplace_accounts').select('*')) as MarketplaceAccount[]).filter(a => isMarketplaceId(a.marketplace)),
   });
 }
 

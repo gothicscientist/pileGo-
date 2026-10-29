@@ -81,11 +81,11 @@ export function SaleSheet({ item, open, onClose }: { item: Item; open: boolean; 
         <TextField label={`Sold for (${item.currency})`} inputMode="decimal" value={price} onChange={e => setPrice(e.target.value)} className="max-w-48" />
         {others.length > 0 && (
           <p className="text-sm text-ink-2">
-            pileGo! will end it on {others.map(l => MARKETPLACES[l.marketplace].name).join(', ')}. Listing-kit and Facebook listings are flagged for
-            you to remove by hand.
+            pileGo! will end it on {others.map(l => MARKETPLACES[l.marketplace].name).join(', ')}.
           </p>
         )}
       </div>
     </Sheet>
   );
 }
+

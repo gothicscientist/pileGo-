@@ -109,5 +109,6 @@ The small round icons next to marketplace names (`apps/web/src/assets/marketplac
 are each site's own favicon, fetched through Google's favicon service
 (`https://www.google.com/s2/favicons?domain=<site>&sz=128`), except eBay's, which is
 its `apple-touch-icon.png`. They are scaled to 64 px. The names and logos are
-trademarks of Depop, eBay, Etsy, Meta (Facebook Marketplace), Grailed, Mercari,
-Poshmark, Vestiaire Collective and Vinted, used only to say which site a listing is on.
+trademarks of Depop, eBay, Grailed, Mercari, Poshmark and Vinted,
+used only to say which site a listing is on.
+

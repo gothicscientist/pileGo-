@@ -11,7 +11,7 @@
    ▼                    │ its own session                │ official API
  Extension ─────────────┘                                │
  (MV3 worker) ── Vinted tab: Vinted's web endpoints      eBay
-             └── Depop, Poshmark, Mercari, Grailed, Facebook tabs: fill the sell form
+             └── Depop, Poshmark, Mercari, Grailed tabs: fill the sell form
 ```
 
 ## Packages
@@ -55,8 +55,8 @@ event. Then `take_down_others` works through the item's other listings:
 
 - Queued listings go back to draft.
 - Listings on marketplaces pileGo can end get a `delist` job.
-- Facebook and listing-kit listings are flagged for the seller, because they
-  can only come down by hand.
+- Historical listings on unsupported marketplaces are flagged for the seller
+  to remove by hand.
 
 If a second marketplace reports a sale after the first, that listing is flagged
 with both sales named, so the seller can cancel one order.

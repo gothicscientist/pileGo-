@@ -1,7 +1,7 @@
 // Runs the extension's share of the job queue: Vinted in a logged-in tab, and
 // the assisted marketplaces by filling their sell forms for the seller.
 
-import { generateListing, MARKETPLACES, type Item, type Job, type Listing, type MarketplaceId, type Profile } from '@pilego/core';
+import { generateListing, isMarketplaceId, MARKETPLACES, type Item, type Job, type Listing, type MarketplaceId, type Profile } from '@pilego/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { between, errorText, ext, sleep, toBase64, within } from '../shared/browser.ts';
 import type { AssistReport, FillResult, ListingWork, PhotoBytes, VintedOutcome, VintedRequest } from '../shared/messages.ts';
@@ -9,7 +9,7 @@ import { blockMessage, capWait, noteWrite, readBlock } from '../shared/pace.ts';
 import { leftForm, postedListing } from '../assist/sites.ts';
 import { activate, createTab, navigate, openTabs, readyTab, removeTab, sendToTab, updateTab, vintedSiteFor, waitForLoad } from './tabs.ts';
 
-export const ASSIST_MARKETS: MarketplaceId[] = ['depop', 'poshmark', 'mercari', 'grailed', 'facebook'];
+export const ASSIST_MARKETS: MarketplaceId[] = ['depop', 'poshmark', 'mercari', 'grailed'];
 
 /** Marketplaces where pileGo fills every field and presses the site's own post button. */
 export const AUTO_POST: MarketplaceId[] = ['depop', 'poshmark'];
@@ -350,7 +350,8 @@ const FILL_TIMEOUT = 10 * 60_000;
 const SERVER_TRIES = 3;
 
 async function waitingList(): Promise<Record<string, Waiting>> {
-  return ((await ext.storage.local.get('assist.waiting'))['assist.waiting'] as Record<string, Waiting> | undefined) ?? {};
+  const saved = ((await ext.storage.local.get('assist.waiting'))['assist.waiting'] as Record<string, Waiting> | undefined) ?? {};
+  return Object.fromEntries(Object.entries(saved).filter(([, w]) => isMarketplaceId(w.marketplace)));
 }
 
 let waitingLock: Promise<unknown> = Promise.resolve();
