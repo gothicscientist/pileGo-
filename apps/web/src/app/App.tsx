@@ -1,9 +1,10 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router';
 import { Spinner } from '~/components/ui';
-import { useAuth } from '~/lib/auth';
+import { isOnboarded, useAuth } from '~/lib/auth';
 import { isConfigured } from '~/lib/supabase';
 import { ExtensionPage } from '~/routes/ExtensionPage';
+import { Onboarding } from '~/routes/Onboarding';
 import { Pile } from '~/routes/Pile';
 import { Privacy } from '~/routes/Privacy';
 import { SetupNeeded } from '~/routes/SetupNeeded';
@@ -32,6 +33,8 @@ function Gate({ children }: { children: ReactNode }) {
   if (!isConfigured) return <SetupNeeded />;
   if (loading) return <Loading />;
   if (!session) return <SignIn />;
+  // New sellers answer a few setup questions before the app opens.
+  if (!isOnboarded(session)) return <Onboarding />;
   return <>{children}</>;
 }
 

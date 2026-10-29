@@ -155,7 +155,7 @@ const JOBS = [
   },
 ];
 
-function session() {
+function session(onboarded = true) {
   const exp = Math.floor(now / 1000) + 3600 * 24;
   const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url');
   const token = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: UID, role: 'authenticated', exp, email: 'sam@example.com' })}.sig`;
@@ -165,13 +165,15 @@ function session() {
     token_type: 'bearer',
     expires_in: 3600 * 24,
     expires_at: exp,
-    user: { id: UID, aud: 'authenticated', role: 'authenticated', email: 'sam@example.com', app_metadata: {}, user_metadata: {}, created_at: daysAgo(200) },
+    user: { id: UID, aud: 'authenticated', role: 'authenticated', email: 'sam@example.com', app_metadata: {}, user_metadata: onboarded ? { onboarded: true } : {}, created_at: daysAgo(200) },
   };
 }
 
 export interface MockOptions {
   signedIn?: boolean;
   empty?: boolean;
+  /** Signed in for the first time: the setup quiz has not been answered. */
+  newUser?: boolean;
   marketplaces?: string[];
   legacyMarketplace?: string;
 }
@@ -187,7 +189,7 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
       ([key, value]) => {
         window.localStorage.setItem(key!, value!);
       },
-      ['sb-supabase-auth-token', JSON.stringify(session())],
+      ['sb-supabase-auth-token', JSON.stringify(session(!opts.newUser))],
     );
   }
 
@@ -263,7 +265,12 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
           : readFileSync(`${STUDIO}${seed.art}.webp`);
       return route.fulfill({ status: 200, contentType: 'image/webp', body, headers: { 'access-control-allow-origin': '*' } });
     }
-    if (path.startsWith('/auth/v1/user')) return json(route, session().user);
+    if (path.startsWith('/auth/v1/user')) {
+      // updateUser({ data }) merges into the user's metadata.
+      const user = session(!opts.newUser).user;
+      const data = req.method() === 'PUT' ? (req.postDataJSON() as { data?: Record<string, unknown> }).data : undefined;
+      return json(route, data ? { ...user, user_metadata: { ...user.user_metadata, ...data } } : user);
+    }
     return json(route, {});
   });
 }

@@ -1,26 +1,25 @@
 // Scan: photos in, a drafted listing out. The seller is asked for three key
 // shots (front, back, clothing label) plus any extras; each photo carries its
 // role to the AI. Photos upload as soon as they are picked so the AI can read
-// them; the garment is cut out for the pile while the AI works.
+// them; the garment is cut out for the pile while the AI works. Once the three
+// key shots are in, the scan starts by itself and the AI fills in the details.
 
-import { cleanSellerAddress, type SellerAddress, DEFAULT_VOICE, type PhotoRole, type ScanResult, type SellerVoice } from '@pilego/core';
-import { Camera, Check, ImagePlus, Scissors, Smartphone, Wand2 } from 'lucide-react';
+import type { PhotoRole, ScanResult } from '@pilego/core';
+import { Camera, Check, ImagePlus, MessageSquarePlus, Scissors, Smartphone, Wand2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { emptyForm, formFromScan, ItemForm, type FormValue } from '~/components/ItemForm';
-import { SellerAddressFields } from '~/components/SellerAddressFields';
-import { SellerLoginReminder } from '~/components/SellerLoginReminder';
 import { useToast } from '~/components/overlay';
 import { PhoneSheet } from '~/components/PhoneSheet';
 import { CoverPreview, ShotGuide, type Shot } from '~/components/ShotGuide';
-import { Button, ChoiceChips, ErrorNote, Paper, TextField } from '~/components/ui';
+import { Button, ErrorNote, Paper, TextField } from '~/components/ui';
 import { useUserId } from '~/lib/auth';
 import { cx } from '~/lib/format';
 import { imageFiles, takeHandedOffFiles } from '~/lib/handoff';
 import { onComputer, usePhoneCapture } from '~/lib/phone';
 import { newId, removePhotos } from '~/lib/photos';
-import { scanPhotos, stageCutout, stagePhoto, useCreateItem, useProfile, useUpdateProfile, type PriceStrategyName, type StagedPhoto } from '~/lib/queries';
+import { scanPhotos, stageCutout, stagePhoto, useCreateItem, useProfile, type StagedPhoto } from '~/lib/queries';
 import { assignRoles, listWords, missingShots, orderShots, withRole } from '~/lib/shots';
 import { errorMessage } from '~/lib/supabase';
 
@@ -28,6 +27,9 @@ type Phase = 'pick' | 'scanning' | 'review';
 
 const CUT_PREF = 'pilego-cutouts';
 const MAX_PHOTOS = 12;
+/** Seconds between the last key shot landing and the scan starting by itself. */
+const AUTO_SCAN_AFTER = 3;
+const AI_FILLS = ['Title', 'Brand', 'Category', 'Size', 'Colour', 'Fabric', 'Condition', 'Flaws', 'Measurements', 'Description', 'Price'];
 
 function cutoutsOn(): boolean {
   try {
@@ -45,18 +47,15 @@ export function Scan() {
   const navigate = useNavigate();
   const toast = useToast();
   const create = useCreateItem();
-  const preferences = useUpdateProfile();
-  const [priceStrategy, setPriceStrategy] = useState<PriceStrategyName | null>(null);
-  const [listingTone, setListingTone] = useState<SellerVoice['tone'] | null>(null);
-  const strategy = priceStrategy ?? profile?.price_strategy ?? 'same';
-  const voice = { ...DEFAULT_VOICE, ...profile?.voice };
-  const tone = listingTone ?? voice.tone;
-  const [sellerAddress, setSellerAddress] = useState<SellerAddress | null | undefined>(undefined);
 
   const [itemId, setItemId] = useState(newId);
   const [shots, setShots] = useState<Shot[]>([]);
   const [phase, setPhase] = useState<Phase>('pick');
   const [hint, setHint] = useState('');
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [autoIn, setAutoIn] = useState<number | null>(null);
+  // Off once a scan has started for this piece, or the seller wants to add more first.
+  const [autoOff, setAutoOff] = useState(false);
   const [scan, setScan] = useState<ScanResult | null>(null);
   const [form, setForm] = useState<FormValue>(emptyForm);
   const [error, setError] = useState<string | null>(null);
@@ -200,21 +199,29 @@ export function Scan() {
       .catch(() => setCut(c => (c.coverKey === coverKey ? { state: 'error', progress: 0, coverKey } : c)));
   }
 
-  async function savePreferences() {
-    if (!profile) throw new Error('Your listing settings have not loaded. Please try again.');
-    const addressPatch = sellerAddress === undefined ? {} : { seller_address: cleanSellerAddress(sellerAddress) };
-    if (strategy !== profile.price_strategy || tone !== voice.tone || sellerAddress !== undefined) {
-      await preferences.mutateAsync({ price_strategy: strategy, voice: { ...voice, tone }, ...addressPatch });
-      setSellerAddress(undefined);
+  // Front, back and label are in: count down, then scan without waiting for a tap.
+  const allIn = phase === 'pick' && !autoOff && Boolean(profile) && !uploading && ready.length > 0 && missing.length === 0;
+  const readyKeys = ready.map(s => s.key).join();
+  useEffect(() => setAutoIn(allIn ? AUTO_SCAN_AFTER : null), [allIn, readyKeys]);
+  useEffect(() => {
+    if (autoIn === null) return;
+    if (autoIn <= 0) {
+      setAutoIn(null);
+      void runScan();
+      return;
     }
-  }
+    const t = window.setTimeout(() => setAutoIn(n => (n === null ? null : n - 1)), 1000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoIn]);
 
   async function runScan() {
     setError(null);
+    setAutoOff(true);
+    setAutoIn(null);
     setPhase('scanning');
     if (cutouts && cut.state === 'idle') startCutout();
     try {
-      await savePreferences();
       const result = await scanPhotos(
         ready.map(s => s.staged!.path),
         currency,
@@ -229,15 +236,12 @@ export function Scan() {
     }
   }
 
-  async function fillByHand() {
+  function fillByHand() {
     setError(null);
-    try {
-      await savePreferences();
-      if (cutouts && cut.state === 'idle') startCutout();
-      setPhase('review');
-    } catch (err) {
-      setError(errorMessage(err));
-    }
+    setAutoOff(true);
+    setAutoIn(null);
+    if (cutouts && cut.state === 'idle') startCutout();
+    setPhase('review');
   }
 
   async function save(thenCrossList: boolean) {
@@ -264,6 +268,8 @@ export function Scan() {
       setScan(null);
       setForm(emptyForm());
       setHint('');
+      setNoteOpen(false);
+      setAutoOff(false);
       setCut({ state: 'idle', progress: 0 });
       setPhase('pick');
       window.scrollTo({ top: 0 });
@@ -397,71 +403,95 @@ export function Scan() {
             {phase === 'pick' && (
               <motion.div key="pick" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <Paper className="flex flex-col gap-4 p-5">
-                  <TextField
-                    label="Anything the photos don’t show? (optional)"
-                    value={hint}
-                    onChange={e => setHint(e.target.value)}
-                    placeholder="Label says M but fits like L. Bought new in 2021."
-                  />
-                  <fieldset disabled={!profile || preferences.isPending} className="flex flex-col gap-5 disabled:opacity-60">
-                    <legend className="mb-3 font-semibold">Set up your listings</legend>
-                    <ChoiceChips<PriceStrategyName>
-                      label="How should prices work across marketplaces?"
-                      value={strategy}
-                      onChange={v => v && setPriceStrategy(v)}
-                      options={[
-                        { value: 'same', label: 'Same price everywhere' },
-                        { value: 'match_take_home', label: 'Same take-home everywhere' },
-                      ]}
-                      hint={strategy === 'match_take_home'
-                        ? 'Adjust prices for each marketplace’s fees so you keep about the same amount after fees.'
-                        : 'Buyers see the same asking price on every marketplace. What you keep varies with fees.'}
-                    />
-                    <ChoiceChips<SellerVoice['tone']>
-                      label="How should your listings sound?"
-                      value={tone}
-                      onChange={v => v && setListingTone(v)}
-                      options={[
-                        { value: 'friendly', label: 'Friendly', title: 'Warm, plain sentences. Invites questions.' },
-                        { value: 'minimal', label: 'Minimal', title: 'Just the facts.' },
-                        { value: 'hype', label: 'Hype', title: 'Short, punchy, streetwear energy.' },
-                        { value: 'vintage-nerd', label: 'Vintage nerd', title: 'Era, construction and label details up front.' },
-                      ]}
-                    />
-                    <SellerAddressFields
-                      value={sellerAddress === undefined ? profile?.seller_address : sellerAddress}
-                      onChange={setSellerAddress}
-                      country={profile?.region === 'UK' ? 'GB' : profile?.region === 'EU' ? '' : profile?.region ?? 'US'}
-                    />
-                    <SellerLoginReminder markets={profile?.marketplaces ?? []} />
-                    <p className="text-xs text-muted">Saved as your defaults when you continue. You can change them in Settings.</p>
-                  </fieldset>
-                  {ready.length > 0 && missing.length > 0 && (
-                    <p className="kraft rounded-xl px-3.5 py-2.5 text-sm" role="note" data-testid="missing-shots">
-                      <strong>No {listWords(missing.map(k => k.label.toLowerCase()))} photo yet.</strong>{' '}
-                      {missing.some(k => k.role === 'label')
-                        ? 'The label tells the AI the brand, size and fabric, and the size lets it estimate measurements.'
-                        : `It helps the AI with ${listWords(missing.map(k => k.why))}.`}{' '}
-                      You can scan anyway.
-                    </p>
+                  {!ready.length ? (
+                    <div>
+                      <h2 className="font-display text-2xl leading-tight">Add photos. The AI does the rest.</h2>
+                      <p className="mt-2 text-ink-2">
+                        Once the front, back and label are in, pileGo! reads them and fills in the listing for you. You just check it over.
+                      </p>
+                      <ul className="mt-4 flex flex-wrap gap-1.5" aria-label="What the AI fills in">
+                        {AI_FILLS.map(f => (
+                          <li key={f} className="rounded-full bg-paper-2 px-2.5 py-1 text-xs font-medium text-ink-2">
+                            {f}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <div>
+                      <h2 className="font-display text-2xl leading-tight">
+                        {missing.length ? 'Looking good. Keep going.' : 'All set for the AI.'}
+                      </h2>
+                      {missing.length > 0 && (
+                        <p className="kraft mt-3 rounded-xl px-3.5 py-2.5 text-sm" role="note" data-testid="missing-shots">
+                          <strong>No {listWords(missing.map(k => k.label.toLowerCase()))} photo yet.</strong>{' '}
+                          {missing.some(k => k.role === 'label')
+                            ? 'The label tells the AI the brand, size and fabric, and the size lets it estimate measurements.'
+                            : `It helps the AI with ${listWords(missing.map(k => k.why))}.`}{' '}
+                          You can scan anyway.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {autoIn !== null && (
+                    <div className="flex flex-wrap items-center gap-3 rounded-xl bg-accent/12 px-3.5 py-2.5 text-sm" role="status" data-testid="auto-scan">
+                      <span className="font-semibold text-ink">Scanning in {autoIn}…</span>
+                      <button
+                        type="button"
+                        className="ml-auto font-semibold text-ink-2 underline underline-offset-2 hover:text-ink"
+                        onClick={() => {
+                          setAutoOff(true);
+                          setAutoIn(null);
+                        }}
+                      >
+                        Wait, I’m adding more
+                      </button>
+                    </div>
                   )}
                   <ErrorNote error={error} />
+                  {noteOpen ? (
+                    <TextField
+                      label="Anything the photos don’t show? (optional)"
+                      value={hint}
+                      autoFocus
+                      onChange={e => {
+                        setHint(e.target.value);
+                        setAutoIn(null);
+                        setAutoOff(true);
+                      }}
+                      placeholder="Label says M but fits like L. Bought new in 2021."
+                    />
+                  ) : (
+                    ready.length > 0 && (
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 self-start text-sm font-semibold text-ink-2 hover:text-ink"
+                        onClick={() => {
+                          setNoteOpen(true);
+                          setAutoIn(null);
+                          setAutoOff(true);
+                        }}
+                      >
+                        <MessageSquarePlus className="size-4" aria-hidden />
+                        Add a note for the AI
+                      </button>
+                    )
+                  )}
                   <div className="flex flex-wrap items-center gap-3">
                     <Button
                       variant="tag"
                       className="text-base"
                       icon={<Wand2 className="size-5" aria-hidden />}
-                      disabled={!ready.length || uploading || !profile || preferences.isPending}
-                      busy={preferences.isPending || (uploading && ready.length > 0)}
-                      onClick={runScan}
+                      disabled={!ready.length || uploading || !profile}
+                      busy={uploading && ready.length > 0}
+                      onClick={() => void runScan()}
                     >
-                      {uploading ? 'Uploading photos' : 'Scan with AI'}
+                      {uploading ? 'Uploading photos' : autoIn !== null ? 'Scan now' : 'Scan with AI'}
                     </Button>
-                    <Button variant="ghost" disabled={!profile || preferences.isPending} onClick={fillByHand}>
+                    <Button variant="ghost" size="sm" disabled={!profile} onClick={fillByHand}>
                       Fill it in myself
                     </Button>
                   </div>
-                  {!shots.length && <p className="text-sm text-muted">Add at least one photo to scan. Front, back and label work best.</p>}
                 </Paper>
               </motion.div>
             )}

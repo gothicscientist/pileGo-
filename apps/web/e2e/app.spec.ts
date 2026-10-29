@@ -476,3 +476,54 @@ test('a closed phone code says so', async ({ page }, info) => {
   await expect(page.getByText('This code was closed on your computer')).toBeVisible();
 });
 
+
+test('the scan starts by itself once the front, back and label are in', async ({ page }) => {
+  await mockSupabase(page, { empty: true });
+  await page.addInitScript(() => window.localStorage.setItem('pilego-cutouts', 'off'));
+  let scans = 0;
+  await page.route(`${SUPABASE}/functions/v1/scan-item`, async route => {
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' } });
+    scans += 1;
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: { 'access-control-allow-origin': '*' },
+      body: JSON.stringify({
+        title: 'Grey heavyweight hoodie', brand: null, department: 'men', category: 'knitwear', subcategory: 'hoodies', size: 'L',
+        size_system: 'letter', colors: ['grey'], materials: ['cotton'], condition: 'excellent', flaws: null, era: null,
+        style_tags: [], description: 'A grey hoodie.', keywords: [], price: { low: 20, high: 40, suggested: 30, currency: 'USD' },
+        measurements_to_take: [], confidence: 0.9, notes: null,
+      }),
+    });
+  });
+  await page.goto('/scan');
+  await expect(page.getByText('Add photos. The AI does the rest.')).toBeVisible();
+  const jpeg = await page.screenshot({ type: 'jpeg', clip: { x: 0, y: 0, width: 160, height: 200 } });
+  const add = async (slot: string) => {
+    const chooser = page.waitForEvent('filechooser');
+    await page.getByRole('button', { name: new RegExp(`Add the ${slot} photo`) }).click();
+    await (await chooser).setFiles({ name: `${slot}.jpg`, mimeType: 'image/jpeg', buffer: jpeg });
+  };
+
+  await add('front');
+  await add('back');
+  await expect(page.getByTestId('auto-scan')).toHaveCount(0);
+  await add('label');
+  await expect(page.getByTestId('auto-scan')).toContainText('Scanning in');
+  // Waiting stops the countdown; the button still scans.
+  await page.getByRole('button', { name: 'Wait, I’m adding more' }).click();
+  await expect(page.getByTestId('auto-scan')).toHaveCount(0);
+  await page.waitForTimeout(3500);
+  expect(scans).toBe(0);
+  await page.getByRole('button', { name: 'Scan with AI' }).click();
+  await expect(page.getByRole('heading', { name: 'Check it over' })).toBeVisible();
+  await expect(page.getByLabel('Title')).toHaveValue('Grey heavyweight hoodie');
+  expect(scans).toBe(1);
+
+  // The next piece scans with no tap at all.
+  await page.getByRole('button', { name: 'Save, scan the next one' }).click();
+  await expect(page.getByRole('heading', { name: 'Scan an item' })).toBeVisible();
+  for (const slot of ['front', 'back', 'label']) await add(slot);
+  await expect(page.getByRole('heading', { name: 'Check it over' })).toBeVisible({ timeout: 10_000 });
+  expect(scans).toBe(2);
+});
