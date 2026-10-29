@@ -11,6 +11,7 @@ import {
   type JobKind,
   type Listing,
   type MarketplaceId,
+  type PhotoRole,
   type PriceComp,
   type PriceSuggestion,
   type Profile,
@@ -447,8 +448,18 @@ export function usePhotoActions() {
 // AI and pricing
 // ---------------------------------------------------------------------------
 
-export function scanPhotos(paths: string[], currency: string, hint?: string): Promise<ScanResult> {
-  return callFunction<ScanResult>('scan-item', { photos: paths, currency, hint: hint || undefined });
+export function scanPhotos(
+  paths: string[],
+  currency: string,
+  opts: { hint?: string; roles?: PhotoRole[]; unit?: 'cm' | 'in' } = {},
+): Promise<ScanResult> {
+  return callFunction<ScanResult>('scan-item', {
+    photos: paths,
+    roles: opts.roles,
+    currency,
+    unit: opts.unit,
+    hint: opts.hint || undefined,
+  });
 }
 
 export interface PriceSources {

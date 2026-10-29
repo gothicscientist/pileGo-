@@ -9,3 +9,4 @@ export * from './listing.ts';
 export * from './analytics.ts';
 export * from './sku.ts';
 export * from './scan.ts';
+export * from './measurements.ts';

@@ -1,5 +1,5 @@
 import { assertEquals, assertThrows } from 'jsr:@std/assert@1';
-import { parseJsonLoose, toGeminiSchema } from './ai.ts';
+import { parseJsonLoose, rankFlashModels, toGeminiSchema, withBenchedLast } from './ai.ts';
 import { buildAspects, matchValue, type Aspect } from './ebay-listing.ts';
 import { decodeXml, xmlValues } from './ebay.ts';
 import { isServiceCall } from './supabase.ts';
@@ -48,6 +48,16 @@ Deno.test('Gemini schema types are upper-cased', () => {
   assertEquals(s.type, 'OBJECT');
   assertEquals(s.properties.a.items.type, 'STRING');
   assertEquals(s.properties.a.items.enum, ['x']);
+});
+
+Deno.test('Gemini models: newest stable Flash first, no aliases or variants', () => {
+  const names = [
+    'models/gemini-2.5-flash', 'models/gemini-flash-latest', 'models/gemini-3-flash-preview', 'models/gemini-3.5-flash',
+    'models/gemini-3.5-flash-lite', 'models/gemini-3.8-flash', 'models/gemini-3.8-flash-tts', 'models/gemini-3.1-flash-image',
+    'models/gemini-omni-1.1-flash', 'models/gemini-3.10-flash',
+  ];
+  assertEquals(rankFlashModels(names), ['gemini-3.10-flash', 'gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-2.5-flash']);
+  assertEquals(withBenchedLast(['a', 'b', 'c', 'd'], m => m === 'a' || m === 'c'), ['b', 'd', 'a', 'c']);
 });
 
 Deno.test('parseJsonLoose reads fenced and padded JSON', () => {

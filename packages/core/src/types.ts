@@ -50,6 +50,9 @@ export type JobKind = 'publish' | 'delist' | 'relist' | 'import' | 'sync' | 'upd
 export type JobStatus = 'pending' | 'running' | 'done' | 'failed' | 'needs_user' | 'cancelled';
 export type JobRunner = 'server' | 'extension';
 
+export type MeasurementKey = 'pit_to_pit' | 'length' | 'shoulder' | 'sleeve' | 'waist' | 'hips' | 'inseam' | 'rise';
+
+/** Flat measurements. Waist and hips are laid flat, so half the circumference. */
 export interface Measurements {
   unit: 'cm' | 'in';
   pit_to_pit?: number | null;
@@ -60,7 +63,19 @@ export interface Measurements {
   hips?: number | null;
   inseam?: number | null;
   rise?: number | null;
+  /** Keys whose value is still the AI's estimate, not measured by the seller. */
+  estimated?: MeasurementKey[];
 }
+
+/** The AI's guess at flat measurements, from the size tag and the photos. */
+export type EstimatedMeasurements = Partial<Record<MeasurementKey, number | null>> & {
+  unit: 'cm' | 'in';
+  /** How the estimate was made, for example "Size M on a standard US chart". */
+  basis: string | null;
+};
+
+/** What each photo shows, in the order they are sent to the scan. */
+export type PhotoRole = 'front' | 'back' | 'label' | 'extra';
 
 export interface Photo {
   id: string;
@@ -188,6 +203,8 @@ export interface ScanResult {
   keywords: string[];
   price: { low: number; high: number; suggested: number; currency: string };
   measurements_to_take: string[];
+  /** Flat measurements estimated from the size tag; null when the AI could not say. */
+  estimated_measurements: EstimatedMeasurements | null;
   confidence: number;
   notes: string | null;
 }

@@ -6,18 +6,22 @@ import {
   CONDITION_LABEL,
   CONDITIONS,
   DEPARTMENTS,
+  clearEstimates,
   findCategory,
   suggestPrice,
+  measurementsFromEstimate,
+  setMeasurement,
   type Condition,
   type Department,
   type Item,
+  type MeasurementKey,
   type Measurements,
   type PriceSuggestion,
   type ScanResult,
 } from '@pilego/core';
 import { Sparkles } from 'lucide-react';
 import { useId, useMemo } from 'react';
-import { money } from '~/lib/format';
+import { cx, money } from '~/lib/format';
 import type { ItemDraft } from '~/lib/queries';
 import { PricingTool } from './PricingTool';
 import { ChipInput, ChoiceChips, Field, Input, Select, TextArea, TextField } from './ui';
@@ -98,6 +102,7 @@ export function formFromScan(scan: ScanResult, base: FormValue = emptyForm()): F
     era: scan.era,
     style_tags: scan.style_tags,
     description: scan.description,
+    measurements: base.measurements ?? measurementsFromEstimate(scan.estimated_measurements),
     price: base.price ?? aiSuggestion(scan, scan.condition)?.suggested ?? null,
   };
 }
@@ -120,7 +125,7 @@ export function diffForm(before: FormValue, after: FormValue): ItemDraft {
 const COLOR_SUGGESTIONS = ['Black', 'White', 'Grey', 'Navy', 'Blue', 'Brown', 'Beige', 'Green', 'Red', 'Pink', 'Cream', 'Multi'];
 const MATERIAL_SUGGESTIONS = ['Cotton', 'Denim', 'Wool', 'Polyester', 'Leather', 'Linen', 'Silk', 'Cashmere', 'Nylon'];
 
-const MEASURE_FIELDS: Record<string, Array<[keyof Omit<Measurements, 'unit'>, string]>> = {
+const MEASURE_FIELDS: Record<string, Array<[MeasurementKey, string]>> = {
   top: [
     ['pit_to_pit', 'Pit to pit'],
     ['length', 'Length'],
@@ -142,7 +147,7 @@ const MEASURE_FIELDS: Record<string, Array<[keyof Omit<Measurements, 'unit'>, st
   ],
 };
 
-function measureSet(category: string | null): Array<[keyof Omit<Measurements, 'unit'>, string]> | null {
+function measureSet(category: string | null): Array<[MeasurementKey, string]> | null {
   if (!category) return MEASURE_FIELDS.top!;
   if (category === 'bottoms') return MEASURE_FIELDS.bottom!;
   if (category === 'dresses') return MEASURE_FIELDS.dress!;
@@ -172,7 +177,9 @@ export function ItemForm({
   const set = <K extends keyof FormValue>(key: K, v: FormValue[K]) => onChange({ ...value, [key]: v });
   const category = findCategory(value.category);
   const measures = measureSet(value.category);
-  const m = value.measurements ?? { unit };
+  const m: Measurements = value.measurements ?? { unit };
+  const estimated = (m.estimated ?? []).filter(k => measures?.some(([key]) => key === k) && m[k] != null);
+  const basis = scan?.estimated_measurements?.basis;
   const ids = { cat: useId(), sub: useId(), desc: useId(), price: useId() };
   const aiPrice = useMemo(() => (scan ? aiSuggestion(scan, value.condition) : null), [scan, value.condition]);
 
@@ -273,23 +280,53 @@ export function ItemForm({
           <legend className="mb-1.5 text-sm font-semibold text-ink-2">
             Measurements, laid flat ({unit})
           </legend>
-          {scan?.measurements_to_take?.length ? (
+          {estimated.length ? (
+            <div className="mb-3 rounded-lg bg-sticker/40 px-3 py-2 text-xs text-[#16172b]" data-testid="estimate-note">
+              <p className="flex items-start gap-1.5">
+                <Sparkles className="mt-px size-3.5 shrink-0" aria-hidden />
+                <span>
+                  <strong>AI estimates</strong>, worked out from {basis ? basis.charAt(0).toLowerCase() + basis.slice(1) : 'the size tag'}.
+                  Measure flat to confirm: listings say “approx.” next to each one until you change it.
+                </span>
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 pl-5 font-semibold">
+                <button type="button" className="underline underline-offset-2" onClick={() => set('measurements', { ...m, estimated: [] })}>
+                  I measured, they’re right
+                </button>
+                <button type="button" className="underline underline-offset-2" onClick={() => set('measurements', clearEstimates(m))}>
+                  Clear the estimates
+                </button>
+              </div>
+            </div>
+          ) : scan?.measurements_to_take?.length ? (
             <p className="mb-2 flex items-center gap-1.5 text-xs text-muted">
               <Sparkles className="size-3.5" aria-hidden />
               Worth measuring: {scan.measurements_to_take.join(', ')}
             </p>
           ) : null}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            {measures.map(([key, label]) => (
-              <label key={key} className="flex flex-col gap-1 text-xs text-muted">
-                {label}
-                <Input
-                  inputMode="decimal"
-                  value={m[key] ?? ''}
-                  onChange={e => set('measurements', { ...m, unit, [key]: numOrNull(e.target.value) })}
-                />
-              </label>
-            ))}
+            {measures.map(([key, label]) => {
+              const guess = estimated.includes(key);
+              return (
+                <label key={key} className="flex flex-col gap-1 text-xs text-muted">
+                  <span className="flex items-center gap-1">
+                    {label}
+                    {guess && (
+                      <span className="rounded bg-tag/15 px-1 text-[0.6rem] font-bold tracking-wide text-tag uppercase" title="Estimated by the AI">
+                        AI est.
+                      </span>
+                    )}
+                  </span>
+                  <Input
+                    inputMode="decimal"
+                    className={cx(guess && 'field-estimate')}
+                    aria-description={guess ? 'AI estimate, measure to confirm' : undefined}
+                    value={m[key] ?? ''}
+                    onChange={e => set('measurements', setMeasurement({ ...m, unit }, key, numOrNull(e.target.value)))}
+                  />
+                </label>
+              );
+            })}
           </div>
         </fieldset>
       )}

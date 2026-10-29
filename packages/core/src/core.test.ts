@@ -17,9 +17,17 @@ import {
   feeFor,
   feeRule,
   generateListing,
+  clearEstimates,
+  isEstimated,
   makeSku,
   matchCategory,
+  measurementLines,
+  measurementsFromEstimate,
+  normalizeEstimate,
   normalizeScan,
+  photoCaption,
+  scanUserPrompt,
+  setMeasurement,
   priceForTakeHome,
   priceOn,
   suggestPrice,
@@ -336,5 +344,57 @@ describe('sku', () => {
     const sku = makeSku('outerwear', () => (n++ % 10) / 10);
     expect(sku).toMatch(/^OUT-[2-9A-Z]{5}$/);
     expect(sku).not.toMatch(/[01OIL]/.source.replace('O', '0'));
+  });
+});
+
+describe('measurement estimates', () => {
+  it('keeps plausible estimates, rounds them and drops absurd ones', () => {
+    const scan = normalizeScan(
+      {
+        title: 'Grey crewneck sweatshirt',
+        category: 'tops',
+        estimated_measurements: { pit_to_pit: '22.3', length: 27, sleeve: 400, waist: -3, shoulder: 'wide', basis: 'Size L on a US chart' },
+      },
+      'USD',
+      'in',
+    );
+    expect(scan.estimated_measurements).toEqual({ unit: 'in', basis: 'Size L on a US chart', pit_to_pit: 22.5, length: 27 });
+  });
+  it('checks ranges in the unit asked for', () => {
+    expect(normalizeEstimate({ pit_to_pit: 22 }, 'in')?.pit_to_pit).toBe(22);
+    // 12 cm is no garment's pit to pit; 12 in is a small child's.
+    expect(normalizeEstimate({ pit_to_pit: 12 }, 'cm')).toBeNull();
+    expect(normalizeEstimate({ pit_to_pit: 12 }, 'in')?.pit_to_pit).toBe(12);
+    expect(normalizeEstimate({ pit_to_pit: 56 }, 'cm')?.pit_to_pit).toBe(56);
+    expect(normalizeEstimate({ inseam: 90 }, 'in')).toBeNull();
+    expect(normalizeEstimate(null, 'in')).toBeNull();
+  });
+  it('never estimates shoes, bags or accessories', () => {
+    const scan = normalizeScan({ title: 'Nike trainers', category: 'shoes', estimated_measurements: { length: 30 } }, 'USD', 'cm');
+    expect(scan.estimated_measurements).toBeNull();
+  });
+  it('marks estimated values until the seller changes them', () => {
+    const m = measurementsFromEstimate({ unit: 'in', basis: null, pit_to_pit: 21, length: 28, sleeve: null })!;
+    expect(m).toEqual({ unit: 'in', pit_to_pit: 21, length: 28, estimated: ['pit_to_pit', 'length'] });
+    expect(isEstimated(m, 'length')).toBe(true);
+    const measured = setMeasurement(m, 'length', 29);
+    expect(measured.estimated).toEqual(['pit_to_pit']);
+    expect(measured.length).toBe(29);
+    expect(setMeasurement(measured, 'pit_to_pit', 21).estimated).toBeUndefined();
+    expect(clearEstimates(m)).toEqual({ unit: 'in' });
+    expect(measurementsFromEstimate(null)).toBeNull();
+  });
+  it('labels estimated measurements approximate in listings', () => {
+    expect(measurementLines({ unit: 'in', pit_to_pit: 22, length: 26.5, estimated: ['length'] })).toEqual([
+      'Pit to pit: 22 in',
+      'Length: approx. 26.5 in',
+    ]);
+    const listing = generateListing(baseItem({ measurements: { unit: 'cm', pit_to_pit: 56, estimated: ['pit_to_pit'] } }), 'ebay');
+    expect(listing.description).toContain('Pit to pit: approx. 56 cm');
+  });
+  it('captions photos by role for the model', () => {
+    expect(photoCaption('label', 2)).toMatch(/^Photo 3: the clothing label/);
+    expect(photoCaption(null, 0)).toBe('Photo 1.');
+    expect(scanUserPrompt('GBP', null, 'cm')).toContain('Measurements in centimetres');
   });
 });
