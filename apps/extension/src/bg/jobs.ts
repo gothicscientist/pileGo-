@@ -390,20 +390,26 @@ async function runAssist(sb: SupabaseClient, job: Job, first: boolean) {
 
   await waitForLoad(tab.id);
   if (posting) await backToForm(tab.id, url);
+  // Wait for the content script with pings, then send the job once. Resending
+  // it after posting has moved the tab on would start a second fill there.
+  const ready = await sendToTab(tab.id, { type: 'assist:ping' }, 30_000).then(
+    () => true,
+    err => (console.warn('[pileGo] assist tab did not answer', errorText(err)), false),
+  );
   if (!auto) {
-    await sendToTab(tab.id, posting ? { type: 'assist:fill', work } : { type: 'assist:remove', work, reason }, 30_000).catch(err =>
-      console.warn('[pileGo] assist tab did not answer', errorText(err)),
-    );
+    if (ready) void ext.tabs.sendMessage(tab.id, posting ? { type: 'assist:fill', work } : { type: 'assist:remove', work, reason }).catch(() => {});
     return;
   }
 
   await activate(tab.id).catch(() => {});
   state.lastMessage = `Listing on ${info.name}…`;
-  const reply = await sendToTab<FillResult>(tab.id, { type: 'assist:fill', work }, 30_000).catch(err => {
-    // Posting navigates away, which closes the channel before the tab answers.
-    console.debug('[pileGo] assist tab closed the channel', errorText(err));
-    return null;
-  });
+  const reply = ready
+    ? ((await ext.tabs.sendMessage(tab.id, { type: 'assist:fill', work }).catch(err => {
+        // Posting navigates away, which closes the channel before the tab answers.
+        console.debug('[pileGo] assist tab closed the channel', errorText(err));
+        return null;
+      })) as FillResult | null)
+    : null;
   await settleAuto(sb, job.id, tab.id, reply);
 }
 
@@ -488,6 +494,7 @@ export async function onAssistReport(sb: SupabaseClient, report: AssistReport, t
   const w = list[report.job_id];
   if (!w) return;
   if (report.type === 'assist:stuck') {
+    if (settled.has(report.job_id)) return;
     // Still waiting: the seller finishes the form, and posting it settles the job.
     w.stuck = true;
     await setWaiting(list);

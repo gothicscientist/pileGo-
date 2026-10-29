@@ -273,9 +273,15 @@ let filling: string | null = null;
 async function startFill(work: ListingWork): Promise<FillResult> {
   // The same job sent twice (a retry after a slow load) must not fill twice.
   if (filling === work.job_id) return { ok: false, filled: [], missing: [], photos: 0, posted: false, error: 'Already filling.' };
+  const driver = DRIVERS[work.marketplace];
+  // Posting moves the tab to the new listing or the seller's closet; a fill
+  // that arrives there is a stale resend, not a new listing.
+  const site = SITES[work.marketplace];
+  if (driver && site && !site.sellPage.test(location.href)) {
+    return { ok: false, filled: [], missing: [], photos: 0, posted: false, error: 'Not on the sell page.' };
+  }
   filling = work.job_id;
   try {
-    const driver = DRIVERS[work.marketplace];
     return driver ? await runDriver(work, driver) : await assistFill(work);
   } finally {
     filling = null;
