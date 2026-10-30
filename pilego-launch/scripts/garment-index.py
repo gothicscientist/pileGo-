@@ -5,8 +5,8 @@ from PIL import Image
 
 root = pathlib.Path(__file__).resolve().parent.parent
 out = {}
-for p in sorted((root / "public/garments").glob("*.png")):
-    if p.stem == "contact-sheet":
+for p in sorted((root / "public/garments").glob("*.webp")):
+    if p.stem.startswith("contact"):
         continue
     with Image.open(p) as im:
         out[p.stem] = {"src": f"garments/{p.name}", "w": im.width, "h": im.height}

@@ -1,0 +1,358 @@
+{
+ "packs": {
+  "rpg-audio": "https://kenney.nl/assets/rpg-audio",
+  "casino-audio": "https://kenney.nl/assets/casino-audio",
+  "impact-sounds": "https://kenney.nl/assets/impact-sounds",
+  "interface-sounds": "https://kenney.nl/assets/interface-sounds",
+  "ui-audio": "https://kenney.nl/assets/ui-audio"
+ },
+ "files": {
+  "fabric_swish_1": {
+   "how": "Kenney cloth1 + synthesized air whoosh (band-pass noise sweep)",
+   "sources": [
+    "Kenney 'rpg-audio' pack: cloth1.ogg"
+   ],
+   "duration": 0.62
+  },
+  "fabric_swish_2": {
+   "how": "Kenney cloth2 + synthesized air whoosh",
+   "sources": [
+    "Kenney 'rpg-audio' pack: cloth2.ogg"
+   ],
+   "duration": 0.415
+  },
+  "fabric_swish_3": {
+   "how": "Kenney cloth3, varispeed -2.5 st + synthesized air whoosh",
+   "sources": [
+    "Kenney 'rpg-audio' pack: cloth3.ogg"
+   ],
+   "duration": 0.575
+  },
+  "fabric_swish_4": {
+   "how": "Kenney cloth4 (+1.5 st) layered with cloth2 (+3 st) + air whoosh",
+   "sources": [
+    "Kenney 'rpg-audio' pack: cloth2.ogg",
+    "Kenney 'rpg-audio' pack: cloth4.ogg"
+   ],
+   "duration": 0.4
+  },
+  "fabric_drop_1": {
+   "how": "Kenney dropLeather + synthesized soft low thump, small room",
+   "sources": [
+    "Kenney 'rpg-audio' pack: dropLeather.ogg"
+   ],
+   "duration": 0.42
+  },
+  "fabric_drop_2": {
+   "how": "Kenney impactSoft_heavy_000 (low-passed) + cloth2 rustle (-2 st)",
+   "sources": [
+    "Kenney 'impact-sounds' pack: impactSoft_heavy_000.ogg",
+    "Kenney 'rpg-audio' pack: cloth2.ogg"
+   ],
+   "duration": 0.45
+  },
+  "fabric_drop_3": {
+   "how": "Kenney footstep_carpet_001 + cloth3 tail + synthesized thump",
+   "sources": [
+    "Kenney 'impact-sounds' pack: footstep_carpet_001.ogg",
+    "Kenney 'rpg-audio' pack: cloth3.ogg"
+   ],
+   "duration": 0.36
+  },
+  "fabric_drop_4": {
+   "how": "Kenney impactSoft_medium_002 (-3 st, low-passed) + handleSmallLeather + thump",
+   "sources": [
+    "Kenney 'impact-sounds' pack: impactSoft_medium_002.ogg",
+    "Kenney 'rpg-audio' pack: handleSmallLeather.ogg"
+   ],
+   "duration": 0.3
+  },
+  "paper_shuffle_1": {
+   "how": "Kenney card-fan-1",
+   "sources": [
+    "Kenney 'casino-audio' pack: card-fan-1.ogg"
+   ],
+   "duration": 0.689
+  },
+  "paper_shuffle_2": {
+   "how": "Kenney card-shuffle (excerpt 0.10-0.95 s)",
+   "sources": [
+    "Kenney 'casino-audio' pack: card-shuffle.ogg"
+   ],
+   "duration": 0.85
+  },
+  "paper_shuffle_3": {
+   "how": "Kenney bookFlip1 + card-shuffle excerpt (+1 st)",
+   "sources": [
+    "Kenney 'casino-audio' pack: card-shuffle.ogg",
+    "Kenney 'rpg-audio' pack: bookFlip1.ogg"
+   ],
+   "duration": 0.569
+  },
+  "paper_slide_1": {
+   "how": "Kenney card-slide-2",
+   "sources": [
+    "Kenney 'casino-audio' pack: card-slide-2.ogg"
+   ],
+   "duration": 0.5
+  },
+  "paper_slide_2": {
+   "how": "Kenney card-slide-5 (-1 st)",
+   "sources": [
+    "Kenney 'casino-audio' pack: card-slide-5.ogg"
+   ],
+   "duration": 0.524
+  },
+  "paper_slide_3": {
+   "how": "Kenney card-shove-3 (gentle top cut)",
+   "sources": [
+    "Kenney 'casino-audio' pack: card-shove-3.ogg"
+   ],
+   "duration": 0.571
+  },
+  "tag_flick_1": {
+   "how": "Kenney bookFlip3 + synthesized paper tick",
+   "sources": [
+    "Kenney 'rpg-audio' pack: bookFlip3.ogg"
+   ],
+   "duration": 0.202
+  },
+  "tag_flick_2": {
+   "how": "synthesized paper tick x2 (flick + swing-back) + Kenney card-slide-8 excerpt (+4 st)",
+   "sources": [
+    "Kenney 'casino-audio' pack: card-slide-8.ogg"
+   ],
+   "duration": 0.171
+  },
+  "tag_flick_3": {
+   "how": "Kenney card-place-3 attack (+2 st) + synthesized ticks",
+   "sources": [
+    "Kenney 'casino-audio' pack: card-place-3.ogg"
+   ],
+   "duration": 0.16
+  },
+  "tape_rip_1": {
+   "how": "synthesized stick-slip tear (impulse train + band-passed noise) + Kenney card-place-1 as the press",
+   "sources": [
+    "Kenney 'casino-audio' pack: card-place-1.ogg"
+   ],
+   "duration": 0.58
+  },
+  "tape_rip_2": {
+   "how": "synthesized quick tear + Kenney card-place-1 (+1 st) press",
+   "sources": [
+    "Kenney 'casino-audio' pack: card-place-1.ogg"
+   ],
+   "duration": 0.44
+  },
+  "stamp_1": {
+   "how": "Kenney bookPlace1 + synthesized rubber thump + paper slap",
+   "sources": [
+    "Kenney 'rpg-audio' pack: bookPlace1.ogg"
+   ],
+   "duration": 0.34
+  },
+  "stamp_2": {
+   "how": "Kenney bookPlace3 (-2 st) + impactSoft_medium_001 + synthesized thump",
+   "sources": [
+    "Kenney 'impact-sounds' pack: impactSoft_medium_001.ogg",
+    "Kenney 'rpg-audio' pack: bookPlace3.ogg"
+   ],
+   "duration": 0.36
+  },
+  "shutter_1": {
+   "how": "synthesized two-curtain mechanical shutter + mirror slap + advance ratchet, Kenney metalLatch layered low",
+   "sources": [
+    "Kenney 'rpg-audio' pack: metalLatch.ogg"
+   ],
+   "duration": 0.36
+  },
+  "shutter_2": {
+   "how": "Kenney ui-audio click3 + click1 + synthesized ticks and air (modern digital shutter)",
+   "sources": [
+    "Kenney 'ui-audio' pack: click1.ogg",
+    "Kenney 'ui-audio' pack: click3.ogg"
+   ],
+   "duration": 0.237
+  },
+  "ui_tick_1": {
+   "how": "synthesized wooden tap at 1850 Hz + Kenney tick_001 (low-passed), peak -6 dBFS",
+   "sources": [
+    "Kenney 'interface-sounds' pack: tick_001.ogg"
+   ],
+   "duration": 0.07
+  },
+  "ui_tick_2": {
+   "how": "synthesized wooden tap at 2150 Hz + Kenney tick_002 (low-passed), peak -6 dBFS",
+   "sources": [
+    "Kenney 'interface-sounds' pack: tick_002.ogg"
+   ],
+   "duration": 0.07
+  },
+  "ui_tick_3": {
+   "how": "synthesized wooden tap at 2500 Hz + Kenney click2 (low-passed), peak -6 dBFS",
+   "sources": [
+    "Kenney 'ui-audio' pack: click2.ogg"
+   ],
+   "duration": 0.07
+  },
+  "ui_tick_4": {
+   "how": "synthesized wooden tap at 1600 Hz + Kenney click5 (low-passed), peak -6 dBFS",
+   "sources": [
+    "Kenney 'ui-audio' pack: click5.ogg"
+   ],
+   "duration": 0.07
+  },
+  "ui_pop_1": {
+   "how": "synthesized rising-sine bubble pop (~380 Hz) + Kenney pluck_001 at -14 dB",
+   "sources": [
+    "Kenney 'interface-sounds' pack: pluck_001.ogg"
+   ],
+   "duration": 0.18
+  },
+  "ui_pop_2": {
+   "how": "synthesized rising-sine bubble pop (~470 Hz) + Kenney pluck_002 at -14 dB",
+   "sources": [
+    "Kenney 'interface-sounds' pack: pluck_002.ogg"
+   ],
+   "duration": 0.18
+  },
+  "ui_pop_3": {
+   "how": "synthesized rising-sine bubble pop (~560 Hz) + Kenney drop_001 at -14 dB",
+   "sources": [
+    "Kenney 'interface-sounds' pack: drop_001.ogg"
+   ],
+   "duration": 0.18
+  },
+  "ui_confirm_1": {
+   "how": "synthesized FM mallet chime, notes MIDI 81->86 (A5-D6)",
+   "sources": [
+    "synthesized in sound/make_sfx.py"
+   ],
+   "duration": 0.58
+  },
+  "ui_confirm_2": {
+   "how": "synthesized FM mallet chime, notes MIDI 77->84 (F5-C6)",
+   "sources": [
+    "synthesized in sound/make_sfx.py"
+   ],
+   "duration": 0.58
+  },
+  "scan_sweep_1": {
+   "how": "synthesized resonant band-pass noise sweep + pentatonic shimmer + soft glide tone",
+   "sources": [
+    "synthesized in sound/make_sfx.py"
+   ],
+   "duration": 1.65
+  },
+  "scan_sweep_2": {
+   "how": "synthesized resonant band-pass noise sweep + pentatonic shimmer + soft glide tone",
+   "sources": [
+    "synthesized in sound/make_sfx.py"
+   ],
+   "duration": 1.78
+  },
+  "ai_sparkle_1": {
+   "how": "synthesized FM bell grains in F-major pentatonic (ascending) + reverb",
+   "sources": [
+    "synthesized in sound/make_sfx.py"
+   ],
+   "duration": 0.78
+  },
+  "ai_sparkle_2": {
+   "how": "synthesized FM bell grains in F-major pentatonic (descending) + reverb",
+   "sources": [
+    "synthesized in sound/make_sfx.py"
+   ],
+   "duration": 0.78
+  },
+  "type_1": {
+   "how": "6 soft key clicks from Kenney ui-audio/interface clicks (random pitch, level, timing) + synthesized key-bed thump, peak -6 dBFS",
+   "sources": [
+    "Kenney 'interface-sounds' pack: click_001.ogg",
+    "Kenney 'ui-audio' pack: click1.ogg",
+    "Kenney 'ui-audio' pack: click2.ogg",
+    "Kenney 'ui-audio' pack: click3.ogg",
+    "Kenney 'ui-audio' pack: click4.ogg",
+    "Kenney 'ui-audio' pack: click5.ogg",
+    "Kenney 'ui-audio' pack: mouseclick1.ogg",
+    "Kenney 'ui-audio' pack: mouserelease1.ogg",
+    "synthesized in sound/make_sfx.py"
+   ],
+   "duration": 0.556
+  },
+  "type_2": {
+   "how": "8 soft key clicks from Kenney ui-audio/interface clicks (random pitch, level, timing) + synthesized key-bed thump, peak -6 dBFS",
+   "sources": [
+    "Kenney 'interface-sounds' pack: click_001.ogg",
+    "Kenney 'ui-audio' pack: click1.ogg",
+    "Kenney 'ui-audio' pack: click2.ogg",
+    "Kenney 'ui-audio' pack: click3.ogg",
+    "Kenney 'ui-audio' pack: click4.ogg",
+    "Kenney 'ui-audio' pack: click5.ogg",
+    "Kenney 'ui-audio' pack: mouseclick1.ogg",
+    "Kenney 'ui-audio' pack: mouserelease1.ogg",
+    "synthesized in sound/make_sfx.py"
+   ],
+   "duration": 0.787
+  },
+  "type_3": {
+   "how": "10 soft key clicks from Kenney ui-audio/interface clicks (random pitch, level, timing) + synthesized key-bed thump, peak -6 dBFS",
+   "sources": [
+    "Kenney 'interface-sounds' pack: click_001.ogg",
+    "Kenney 'ui-audio' pack: click1.ogg",
+    "Kenney 'ui-audio' pack: click2.ogg",
+    "Kenney 'ui-audio' pack: click3.ogg",
+    "Kenney 'ui-audio' pack: click4.ogg",
+    "Kenney 'ui-audio' pack: click5.ogg",
+    "Kenney 'ui-audio' pack: mouseclick1.ogg",
+    "Kenney 'ui-audio' pack: mouserelease1.ogg",
+    "synthesized in sound/make_sfx.py"
+   ],
+   "duration": 0.8
+  },
+  "whoosh_soft_1": {
+   "how": "synthesized: band-pass noise sweep (SVF) with pan motion + low air layer",
+   "sources": [
+    "synthesized in sound/make_sfx.py"
+   ],
+   "duration": 0.54
+  },
+  "whoosh_soft_2": {
+   "how": "synthesized: band-pass noise sweep (SVF) with pan motion + low air layer",
+   "sources": [
+    "synthesized in sound/make_sfx.py"
+   ],
+   "duration": 0.67
+  },
+  "whoosh_soft_3": {
+   "how": "synthesized: band-pass noise sweep (SVF) with pan motion + low air layer",
+   "sources": [
+    "synthesized in sound/make_sfx.py"
+   ],
+   "duration": 0.8
+  },
+  "riser_1": {
+   "how": "synthesized: resonant noise sweep 300 Hz-11 kHz + D-minor sine cluster gliding up an octave; peak at file end",
+   "sources": [
+    "synthesized in sound/make_sfx.py"
+   ],
+   "duration": 2.0
+  },
+  "impact_soft_1": {
+   "how": "synthesized sub boom (100->38 Hz, with 2nd/3rd harmonics) + low noise thump + Kenney impactSoft_heavy_001 (low-passed), hall",
+   "sources": [
+    "Kenney 'impact-sounds' pack: impactSoft_heavy_001.ogg"
+   ],
+   "duration": 1.8
+  },
+  "cash_1": {
+   "how": "Kenney handleCoins2 + chips-collide-1 + a quiet synthesized E7/B7 mallet ting",
+   "sources": [
+    "Kenney 'casino-audio' pack: chips-collide-1.ogg",
+    "Kenney 'rpg-audio' pack: handleCoins2.ogg"
+   ],
+   "duration": 0.7
+  }
+ }
+}

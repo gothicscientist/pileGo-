@@ -1,52 +1,142 @@
 {
  "anorak": {
-  "src": "garments/anorak.png",
+  "src": "garments/anorak.webp",
   "w": 602,
   "h": 736
  },
  "beanie": {
-  "src": "garments/beanie.png",
+  "src": "garments/beanie.webp",
   "w": 554,
   "h": 736
  },
+ "blue-sweater-tulips": {
+  "src": "garments/blue-sweater-tulips.webp",
+  "w": 806,
+  "h": 1000
+ },
+ "brogues": {
+  "src": "garments/brogues.webp",
+  "w": 946,
+  "h": 1000
+ },
  "camel-blazer": {
-  "src": "garments/camel-blazer.png",
+  "src": "garments/camel-blazer.webp",
   "w": 310,
   "h": 736
  },
  "cap": {
-  "src": "garments/cap.png",
+  "src": "garments/cap.webp",
   "w": 684,
   "h": 446
  },
+ "cream-turtleneck": {
+  "src": "garments/cream-turtleneck.webp",
+  "w": 682,
+  "h": 1000
+ },
  "denim-jacket": {
-  "src": "garments/denim-jacket.png",
+  "src": "garments/denim-jacket.webp",
   "w": 603,
   "h": 736
  },
  "flannel": {
-  "src": "garments/flannel.png",
+  "src": "garments/flannel.webp",
   "w": 477,
   "h": 736
  },
+ "floral-tea-dress": {
+  "src": "garments/floral-tea-dress.webp",
+  "w": 490,
+  "h": 1000
+ },
+ "green-cable-vest": {
+  "src": "garments/green-cable-vest.webp",
+  "w": 880,
+  "h": 1000
+ },
+ "jeans": {
+  "src": "garments/jeans.webp",
+  "w": 516,
+  "h": 1000
+ },
+ "kraft-tote": {
+  "src": "garments/kraft-tote.webp",
+  "w": 626,
+  "h": 1000
+ },
+ "lilac-sweater": {
+  "src": "garments/lilac-sweater.webp",
+  "w": 580,
+  "h": 1000
+ },
  "navy-bomber": {
-  "src": "garments/navy-bomber.png",
+  "src": "garments/navy-bomber.webp",
   "w": 559,
   "h": 736
  },
+ "pink-coat-outfit": {
+  "src": "garments/pink-coat-outfit.webp",
+  "w": 799,
+  "h": 1000
+ },
+ "red-cardigan": {
+  "src": "garments/red-cardigan.webp",
+  "w": 639,
+  "h": 1000
+ },
+ "rose-floral-dress": {
+  "src": "garments/rose-floral-dress.webp",
+  "w": 400,
+  "h": 1000
+ },
  "rust-bomber-photo": {
-  "src": "garments/rust-bomber-photo.png",
+  "src": "garments/rust-bomber-photo.webp",
   "w": 640,
   "h": 800
  },
  "rust-bomber": {
-  "src": "garments/rust-bomber.png",
+  "src": "garments/rust-bomber.webp",
   "w": 611,
   "h": 736
  },
+ "rust-sweater": {
+  "src": "garments/rust-sweater.webp",
+  "w": 1000,
+  "h": 692
+ },
+ "sage-blazer": {
+  "src": "garments/sage-blazer.webp",
+  "w": 630,
+  "h": 1000
+ },
+ "silk-scarf": {
+  "src": "garments/silk-scarf.webp",
+  "w": 653,
+  "h": 1000
+ },
+ "straw-hat": {
+  "src": "garments/straw-hat.webp",
+  "w": 979,
+  "h": 1000
+ },
+ "striped-knit-sweater": {
+  "src": "garments/striped-knit-sweater.webp",
+  "w": 1000,
+  "h": 731
+ },
+ "tan-blazer": {
+  "src": "garments/tan-blazer.webp",
+  "w": 733,
+  "h": 1000
+ },
  "white-tee": {
-  "src": "garments/white-tee.png",
+  "src": "garments/white-tee.webp",
   "w": 464,
   "h": 736
+ },
+ "wool-chore-jacket": {
+  "src": "garments/wool-chore-jacket.webp",
+  "w": 929,
+  "h": 1000
  }
 }

@@ -22,9 +22,9 @@ const PRESS = 118; // "Relist 3 old listings"
 
 // The closet's real tabs and counts (public/ui/closet-rack.png).
 const COLUMNS = [
-  { label: "Drafts", count: 3, items: ["white-tee", "beanie", "cream-knit"] },
-  { label: "Ready", count: 4, items: ["cap", "camel-blazer", "flannel"] },
-  { label: "Listed", count: 7, items: ["navy-bomber", "anorak", "denim-jacket"] },
+  { label: "Drafts", count: 3, items: ["cream-turtleneck", "lilac-sweater", "beanie"] },
+  { label: "Ready", count: 4, items: ["jeans", "red-cardigan", "cap"] },
+  { label: "Listed", count: 7, items: ["denim-jacket", "green-cable-vest", "blue-sweater-tulips"] },
   { label: "Sold", count: 2, items: ["rust-bomber"] },
 ];
 
@@ -102,10 +102,10 @@ const Column: React.FC<{ ci: number; frame: number }> = ({ ci, frame }) => {
         const sx = rnd(`sx${idx}`, 260, 1660);
         const sy = rnd(`sy${idx}`, 520, 980);
         const sr = rnd(`sr${idx}`, -40, 40);
-        const tx = cx + (k - (items.length - 1) / 2) * 26;
-        const ty = 700 - k * 46;
+        const tx = cx + (k - (items.length - 1) / 2) * 52;
+        const ty = 720 - k * 64;
         const g = garment(name);
-        const w = name === "beanie" || name === "cap" ? 190 : name === "camel-blazer" ? 170 : 300;
+        const w = name === "beanie" || name === "cap" ? 200 : name === "jeans" ? 220 : 300;
         const lift = Math.sin(Math.PI * Math.min(1, p)) * 0.7;
         return (
           <Garment

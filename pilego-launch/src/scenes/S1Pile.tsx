@@ -21,15 +21,19 @@ type Drop = { g: string; x: number; y: number; w: number; r: number; at: number 
 
 // The pile, bottom to top. `at` is the landing frame, on the 8th notes.
 export const PILE: Drop[] = [
-  { g: "flannel", x: 760, y: 790, w: 360, r: -16, at: 4 },
-  { g: "denim-jacket", x: 1250, y: 800, w: 400, r: 13, at: 11 },
-  { g: "camel-blazer", x: 1500, y: 770, w: 220, r: -22, at: 19 },
-  { g: "anorak", x: 540, y: 860, w: 330, r: 19, at: 26 },
-  { g: "white-tee", x: 1000, y: 880, w: 380, r: -5, at: 34 },
-  { g: "navy-bomber", x: 860, y: 720, w: 360, r: 9, at: 41 },
-  { g: "cap", x: 680, y: 975, w: 250, r: -12, at: 49 },
-  { g: "beanie", x: 1370, y: 975, w: 190, r: 16, at: 56 },
-  { g: "rust-bomber", x: 1090, y: 720, w: 380, r: -7, at: 64 },
+  { g: "striped-knit-sweater", x: 560, y: 905, w: 430, r: -8, at: 14 },
+  { g: "jeans", x: 1510, y: 820, w: 290, r: 18, at: 19 },
+  { g: "green-cable-vest", x: 1190, y: 890, w: 400, r: 6, at: 24 },
+  { g: "floral-tea-dress", x: 360, y: 770, w: 230, r: -14, at: 29 },
+  { g: "red-cardigan", x: 810, y: 760, w: 370, r: -10, at: 34 },
+  { g: "lilac-sweater", x: 1680, y: 660, w: 290, r: 12, at: 40 },
+  { g: "denim-jacket", x: 1390, y: 690, w: 350, r: -6, at: 44 },
+  { g: "blue-sweater-tulips", x: 620, y: 620, w: 330, r: 8, at: 49 },
+  { g: "brogues", x: 1740, y: 960, w: 250, r: -10, at: 55 },
+  { g: "cap", x: 290, y: 985, w: 240, r: -12, at: 59 },
+  { g: "silk-scarf", x: 1010, y: 980, w: 250, r: 24, at: 64 },
+  { g: "beanie", x: 1250, y: 600, w: 160, r: 14, at: 68 },
+  { g: "rust-bomber", x: 1080, y: 690, w: 380, r: -7, at: 74 },
 ];
 
 const HERO = "rust-bomber";
@@ -147,7 +151,7 @@ export const S1Pile: React.FC = () => {
         </AbsoluteFill>
 
         {/* The hero rides above the pile once it's picked. */}
-        {!shot && <Falling d={hero} i={heroIdx} frame={frame} override={{ x: hx, y: hy, w: hw, r: hr, lift: lift * 0.9 }} />}
+        {!shot && <Falling d={hero} i={heroIdx} frame={frame} override={frame >= PICK ? { x: hx, y: hy, w: hw, r: hr, lift: lift * 0.9 } : undefined} />}
       </AbsoluteFill>
 
       {/* The scan page assembles under the photo. */}
@@ -183,7 +187,7 @@ export const S1Pile: React.FC = () => {
             }}
           >
             <Img
-              src={staticFile("garments/rust-bomber-photo.png")}
+              src={staticFile("garments/rust-bomber-photo.webp")}
               style={{
                 width: "100%",
                 height: "100%",
@@ -278,7 +282,7 @@ const SideProps: React.FC<{ frame: number }> = ({ frame }) => {
         caption="Saturday haul"
         style={{ left: 1600, top: 560 + (1 - p) * 300, rotate: `${8 - (1 - p) * 20}deg`, opacity: p > 0.01 ? 1 : 0 }}
       >
-        <Img src={staticFile("garments/flannel.png")} style={{ width: "80%", margin: "8% 10%", filter: "drop-shadow(0 6px 6px rgb(0 0 0 / 0.2))" }} />
+        <Img src={staticFile("garments/rust-sweater.webp")} style={{ width: "84%", margin: "30% 8%", filter: "drop-shadow(0 6px 6px rgb(0 0 0 / 0.2))" }} />
       </Polaroid>
       <Tape w={160} h={40} style={{ left: 250, top: 660, rotate: "-24deg", opacity: t, scale: String(0.8 + t * 0.2) }} />
     </>

@@ -23,7 +23,7 @@ const CUES: Cue[] = [
   // 1 · The pile. Every landing gets a soft cloth thump; every other one a swish on the way down.
   ...PILE.filter((p) => p.g !== "rust-bomber").map((p, i) => ({ f: p.at - 1, s: drops[i % 4], v: 0.55 + (i % 3) * 0.08 })),
   ...PILE.filter((_, i) => i % 2 === 0).map((p, i) => ({ f: p.at - 9, s: swishes[i % 4], v: 0.32 })),
-  { f: 63, s: "fabric_drop_2", v: 0.7 }, // the bomber lands on top
+  { f: 73, s: "fabric_drop_2", v: 0.7 }, // the bomber lands on top
   { f: 50, s: "tag_flick_1", v: 0.6 },
   { f: 66, s: "tag_flick_2", v: 0.55 },
   { f: 80, s: "tag_flick_3", v: 0.5 },

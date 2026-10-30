@@ -3,17 +3,15 @@ dist
 .DS_Store
 .env
 
-# Renders. The finished film is copied to film/ and committed.
+# Renders. The finished film lives in film/ and is committed.
 out
 
-# Capture tooling scratch (see capture/README in the main README).
+# Capture tooling scratch.
 capture/node_modules
 capture/test-results
 
-# Asset folders still being built; committed once pruned to what the film uses.
-public/ui
-public/audio
-public/garments
-public/textures
-assets-src
-sound
+# Downloaded originals and matting intermediates: re-fetched from the URLs in
+# public/garments/CREDITS.md by the scripts in assets-src/.
+assets-src/originals
+assets-src/work
+assets-src/candidates

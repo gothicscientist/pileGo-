@@ -1,0 +1,422 @@
+{
+ "bpm": 120,
+ "fps": 30,
+ "durationSeconds": 28.0,
+ "barSeconds": 2.0,
+ "beatSeconds": 0.5,
+ "key": "D minor -> F major",
+ "cues": [
+  {
+   "name": "intro_start",
+   "time": 0.0,
+   "frame": 0,
+   "note": "vinyl crackle + muffled kick, filter opens"
+  },
+  {
+   "name": "riser_start",
+   "time": 2.0,
+   "frame": 60
+  },
+  {
+   "name": "breath",
+   "time": 3.75,
+   "frame": 112,
+   "note": "8th-note of silence before the drop"
+  },
+  {
+   "name": "drop",
+   "time": 4.0,
+   "frame": 120,
+   "note": "full groove, Dm9; crash"
+  },
+  {
+   "name": "hook_in",
+   "time": 10.0,
+   "frame": 300,
+   "note": "hook motif + arp layer"
+  },
+  {
+   "name": "fill",
+   "time": 15.5,
+   "frame": 465,
+   "note": "snare fill into bar 9"
+  },
+  {
+   "name": "energy_up",
+   "time": 16.0,
+   "frame": 480,
+   "note": "shaker + congas + pad, crash"
+  },
+  {
+   "name": "filter_down",
+   "time": 21.0,
+   "frame": 630,
+   "note": "filter-down + riser + snare build"
+  },
+  {
+   "name": "pre_hit_gap",
+   "time": 21.965,
+   "frame": 659
+  },
+  {
+   "name": "finale_hit",
+   "time": 22.0,
+   "frame": 660,
+   "note": "big Dm9 + impact + crash (logo)"
+  },
+  {
+   "name": "button",
+   "time": 24.0,
+   "frame": 720,
+   "note": "Fmaj9 stinger, rings out"
+  },
+  {
+   "name": "fade_start",
+   "time": 25.5,
+   "frame": 765
+  },
+  {
+   "name": "silence",
+   "time": 27.8,
+   "frame": 834
+  }
+ ],
+ "beats": [
+  {
+   "time": 0.0,
+   "frame": 0,
+   "bar": 1,
+   "beat": 1
+  },
+  {
+   "time": 0.5,
+   "frame": 15,
+   "bar": 1,
+   "beat": 2
+  },
+  {
+   "time": 1.0,
+   "frame": 30,
+   "bar": 1,
+   "beat": 3
+  },
+  {
+   "time": 1.5,
+   "frame": 45,
+   "bar": 1,
+   "beat": 4
+  },
+  {
+   "time": 2.0,
+   "frame": 60,
+   "bar": 2,
+   "beat": 1
+  },
+  {
+   "time": 2.5,
+   "frame": 75,
+   "bar": 2,
+   "beat": 2
+  },
+  {
+   "time": 3.0,
+   "frame": 90,
+   "bar": 2,
+   "beat": 3
+  },
+  {
+   "time": 3.5,
+   "frame": 105,
+   "bar": 2,
+   "beat": 4
+  },
+  {
+   "time": 4.0,
+   "frame": 120,
+   "bar": 3,
+   "beat": 1
+  },
+  {
+   "time": 4.5,
+   "frame": 135,
+   "bar": 3,
+   "beat": 2
+  },
+  {
+   "time": 5.0,
+   "frame": 150,
+   "bar": 3,
+   "beat": 3
+  },
+  {
+   "time": 5.5,
+   "frame": 165,
+   "bar": 3,
+   "beat": 4
+  },
+  {
+   "time": 6.0,
+   "frame": 180,
+   "bar": 4,
+   "beat": 1
+  },
+  {
+   "time": 6.5,
+   "frame": 195,
+   "bar": 4,
+   "beat": 2
+  },
+  {
+   "time": 7.0,
+   "frame": 210,
+   "bar": 4,
+   "beat": 3
+  },
+  {
+   "time": 7.5,
+   "frame": 225,
+   "bar": 4,
+   "beat": 4
+  },
+  {
+   "time": 8.0,
+   "frame": 240,
+   "bar": 5,
+   "beat": 1
+  },
+  {
+   "time": 8.5,
+   "frame": 255,
+   "bar": 5,
+   "beat": 2
+  },
+  {
+   "time": 9.0,
+   "frame": 270,
+   "bar": 5,
+   "beat": 3
+  },
+  {
+   "time": 9.5,
+   "frame": 285,
+   "bar": 5,
+   "beat": 4
+  },
+  {
+   "time": 10.0,
+   "frame": 300,
+   "bar": 6,
+   "beat": 1
+  },
+  {
+   "time": 10.5,
+   "frame": 315,
+   "bar": 6,
+   "beat": 2
+  },
+  {
+   "time": 11.0,
+   "frame": 330,
+   "bar": 6,
+   "beat": 3
+  },
+  {
+   "time": 11.5,
+   "frame": 345,
+   "bar": 6,
+   "beat": 4
+  },
+  {
+   "time": 12.0,
+   "frame": 360,
+   "bar": 7,
+   "beat": 1
+  },
+  {
+   "time": 12.5,
+   "frame": 375,
+   "bar": 7,
+   "beat": 2
+  },
+  {
+   "time": 13.0,
+   "frame": 390,
+   "bar": 7,
+   "beat": 3
+  },
+  {
+   "time": 13.5,
+   "frame": 405,
+   "bar": 7,
+   "beat": 4
+  },
+  {
+   "time": 14.0,
+   "frame": 420,
+   "bar": 8,
+   "beat": 1
+  },
+  {
+   "time": 14.5,
+   "frame": 435,
+   "bar": 8,
+   "beat": 2
+  },
+  {
+   "time": 15.0,
+   "frame": 450,
+   "bar": 8,
+   "beat": 3
+  },
+  {
+   "time": 15.5,
+   "frame": 465,
+   "bar": 8,
+   "beat": 4
+  },
+  {
+   "time": 16.0,
+   "frame": 480,
+   "bar": 9,
+   "beat": 1
+  },
+  {
+   "time": 16.5,
+   "frame": 495,
+   "bar": 9,
+   "beat": 2
+  },
+  {
+   "time": 17.0,
+   "frame": 510,
+   "bar": 9,
+   "beat": 3
+  },
+  {
+   "time": 17.5,
+   "frame": 525,
+   "bar": 9,
+   "beat": 4
+  },
+  {
+   "time": 18.0,
+   "frame": 540,
+   "bar": 10,
+   "beat": 1
+  },
+  {
+   "time": 18.5,
+   "frame": 555,
+   "bar": 10,
+   "beat": 2
+  },
+  {
+   "time": 19.0,
+   "frame": 570,
+   "bar": 10,
+   "beat": 3
+  },
+  {
+   "time": 19.5,
+   "frame": 585,
+   "bar": 10,
+   "beat": 4
+  },
+  {
+   "time": 20.0,
+   "frame": 600,
+   "bar": 11,
+   "beat": 1
+  },
+  {
+   "time": 20.5,
+   "frame": 615,
+   "bar": 11,
+   "beat": 2
+  },
+  {
+   "time": 21.0,
+   "frame": 630,
+   "bar": 11,
+   "beat": 3
+  },
+  {
+   "time": 21.5,
+   "frame": 645,
+   "bar": 11,
+   "beat": 4
+  },
+  {
+   "time": 22.0,
+   "frame": 660,
+   "bar": 12,
+   "beat": 1
+  },
+  {
+   "time": 22.5,
+   "frame": 675,
+   "bar": 12,
+   "beat": 2
+  },
+  {
+   "time": 23.0,
+   "frame": 690,
+   "bar": 12,
+   "beat": 3
+  },
+  {
+   "time": 23.5,
+   "frame": 705,
+   "bar": 12,
+   "beat": 4
+  },
+  {
+   "time": 24.0,
+   "frame": 720,
+   "bar": 13,
+   "beat": 1
+  },
+  {
+   "time": 24.5,
+   "frame": 735,
+   "bar": 13,
+   "beat": 2
+  },
+  {
+   "time": 25.0,
+   "frame": 750,
+   "bar": 13,
+   "beat": 3
+  },
+  {
+   "time": 25.5,
+   "frame": 765,
+   "bar": 13,
+   "beat": 4
+  },
+  {
+   "time": 26.0,
+   "frame": 780,
+   "bar": 14,
+   "beat": 1
+  },
+  {
+   "time": 26.5,
+   "frame": 795,
+   "bar": 14,
+   "beat": 2
+  },
+  {
+   "time": 27.0,
+   "frame": 810,
+   "bar": 14,
+   "beat": 3
+  },
+  {
+   "time": 27.5,
+   "frame": 825,
+   "bar": 14,
+   "beat": 4
+  }
+ ]
+}

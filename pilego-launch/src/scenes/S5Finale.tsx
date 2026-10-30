@@ -25,14 +25,15 @@ const MAT = { x: 1010, y: 175, w: 800, h: 700, r: -3 };
 
 // The pile on the mat, bottom to top. Landing frames step on the 16ths into the hit.
 const PIECES: Piece[] = [
-  { g: "denim-jacket", x: 1230, y: 400, w: 380, r: -8, at: 6 },
-  { g: "flannel", x: 1640, y: 520, w: 330, r: 9, at: 8 },
-  { g: "navy-bomber", x: 1180, y: 690, w: 330, r: 7, at: 10 },
-  { g: "white-tee", x: 1520, y: 760, w: 300, r: -10, at: 12 },
-  { g: "anorak", x: 1730, y: 830, w: 260, r: 14, at: 14 },
-  { g: "rust-bomber", x: 1430, y: 470, w: 400, r: -4, at: 16 },
-  { g: "cap", x: 1110, y: 250, w: 230, r: -16, at: 18 },
-  { g: "beanie", x: 1760, y: 300, w: 170, r: 12, at: 19 },
+  { g: "striped-knit-sweater", x: 1260, y: 800, w: 400, r: -6, at: 5 },
+  { g: "jeans", x: 1700, y: 600, w: 260, r: 14, at: 7 },
+  { g: "green-cable-vest", x: 1600, y: 820, w: 340, r: 8, at: 9 },
+  { g: "lilac-sweater", x: 1170, y: 420, w: 300, r: -12, at: 11 },
+  { g: "red-cardigan", x: 1660, y: 360, w: 320, r: 10, at: 13 },
+  { g: "blue-sweater-tulips", x: 1190, y: 640, w: 300, r: 6, at: 15 },
+  { g: "rust-bomber", x: 1430, y: 520, w: 400, r: -4, at: 17 },
+  { g: "brogues", x: 1780, y: 830, w: 200, r: -10, at: 18 },
+  { g: "cap", x: 1110, y: 250, w: 220, r: -16, at: 19 },
 ];
 
 export const S5Finale: React.FC = () => {
@@ -172,7 +173,7 @@ export const S5Finale: React.FC = () => {
           <span style={{ position: "absolute", left: 28, top: "50%", width: 10, height: 10, borderRadius: 99, background: C.accentInk, translate: "0 -50%" }} />
           pilego.app
         </div>
-        <MonoLabel size={22} style={{ lineHeight: 1.5 }}>
+        <MonoLabel size={25} color={C.ink} style={{ lineHeight: 1.45 }}>
           Free · open source
           <br />
           for resellers

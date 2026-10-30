@@ -54,7 +54,7 @@ export const S3CrossList: React.FC = () => {
   const dy = 540 - dh / 2 + (1 - sheetIn) * 120 + sheetOut * 60;
 
   // Headline.
-  const swap = tween(frame, [SOLD + 4, SOLD + 14], [0, 1], ease.inOut);
+  const swap = tween(frame, [SOLD - 4, SOLD + 5], [0, 1], ease.inOut);
 
   return (
     <AbsoluteFill>
