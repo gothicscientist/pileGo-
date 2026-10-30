@@ -76,6 +76,8 @@ interface RequestOptions {
   headers?: Record<string, string>;
   body?: string;
   fields?: Field[];
+  /** How long to wait for Vinted's answer. A photo upload from a slow connection takes a while. */
+  timeout?: number;
 }
 
 async function direct(url: string, o: RequestOptions): Promise<Reply> {
@@ -119,7 +121,7 @@ async function request(url: string, o: RequestOptions = {}): Promise<Reply> {
       window.removeEventListener('message', onReply);
       if (REPEATABLE.test(o.method ?? 'GET')) direct(url, o).then(resolve, reject);
       else reject(new VintedError('Vinted did not answer in time. Check your Vinted tab before trying again.', 0));
-    }, 15_000);
+    }, o.timeout ?? (REPEATABLE.test(o.method ?? 'GET') ? 15_000 : 45_000));
     function onReply(event: MessageEvent) {
       const d = event.data;
       if (event.source !== window || !d || d.t !== `pg:${CH}:r` || d.id !== id) return;
@@ -358,6 +360,7 @@ export async function uploadPhoto(blob: Blob, sessionId: string): Promise<{ id: 
       { name: 'photo[temp_uuid]', value: sessionId },
       { name: 'photo[file]', blob, filename: 'photo.jpg' },
     ],
+    timeout: 120_000,
   });
   if (!reply.ok) await fail(reply);
   const body = parse<{ id?: number; orientation?: number; photo?: { id: number; orientation?: number } }>(reply);

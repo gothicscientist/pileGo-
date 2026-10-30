@@ -31,6 +31,18 @@ export const state: RunState = { running: new Set(), lastError: null, lastMessag
 // Database helpers
 // ---------------------------------------------------------------------------
 
+/** Every error a job has hit, oldest first, so a later retry or "superseded" does not wipe what went wrong. */
+const jobLogs = new Map<string, Array<{ at: string; error: string }>>();
+
+function withLog(job: Job, error: string | null, result: Record<string, unknown> | null): Record<string, unknown> | null {
+  const saved = ((job.result as { log?: Array<{ at: string; error: string }> } | null)?.log ?? []).slice();
+  const log = jobLogs.get(job.id) ?? saved;
+  if (error && log[log.length - 1]?.error !== error) log.push({ at: new Date().toISOString(), error });
+  jobLogs.set(job.id, log.slice(-10));
+  if (!log.length) return result;
+  return { ...((job.result as Record<string, unknown> | null) ?? {}), ...(result ?? {}), log: log.slice(-10) };
+}
+
 async function finish(
   sb: SupabaseClient,
   job: Job,
@@ -42,7 +54,7 @@ async function finish(
   const { error: e } = await sb.rpc('finish_job', {
     p_job_id: job.id,
     p_status: status,
-    p_result: result,
+    p_result: withLog(job, error, result),
     p_error: error,
     p_retry_in_seconds: retryIn ?? null,
   });
