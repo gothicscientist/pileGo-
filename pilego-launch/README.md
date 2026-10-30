@@ -2,7 +2,7 @@
 
 A 28-second launch film for [pileGo!](https://pilego.app), made in [Remotion](https://www.remotion.dev).
 
-**The film:** [`film/pilego-launch.mp4`](film/pilego-launch.mp4). It is 1920×1080 at 30 fps, encoded as H.264 High (CRF 16, BT.709) with 48 kHz AAC audio at 320 kbps. The audio is mastered to −14.0 LUFS integrated with a −1.4 dBFS peak.
+**The film:** [`film/pilego-launch.mp4`](film/pilego-launch.mp4). It is 1920×1080 at 30 fps, encoded as H.264 High (CRF 16, BT.709) with 48 kHz AAC audio at 320 kbps. The audio is mastered to −14.0 LUFS integrated with a −1.3 dBFS peak.
 
 The concept, the scene-by-scene storyboard and the rules the film follows to stay accurate about the product are in [STORYBOARD.md](STORYBOARD.md).
 
@@ -40,7 +40,7 @@ node scripts/stills.mjs LaunchFilm /tmp/sheet 0.25 every:15
 | `src/scenes/S1Pile.tsx` … `S5Finale.tsx` | The scenes: the pile, Snap/Scan/Done, cross-listing, the closet and relisting, and the finale. |
 | `src/Soundtrack.tsx` | The score plus every sound effect, placed by frame. |
 | `src/components/` | Paper and grain, garment cutouts with lift-dependent shadows, kraft tags, tape, polaroids, stamps, the torn-sheet transition, app captures (`Screen`), the wordmark and kinetic type. |
-| `src/theme.ts` | pileGo!'s colour tokens (from `apps/web/src/styles/app.css`) and fonts. |
+| `src/theme.ts` | pileGo!'s light and dark colour tokens (from `apps/web/src/styles/app.css`) and fonts. `MODE` picks the theme; the film is dark. |
 | `public/ui/` | Real captures of the app that the film uses. See `MANIFEST.md`. |
 | `public/garments/`, `public/textures/` | Licensed garment cutouts and textures, with `CREDITS.md`. |
 | `public/audio/` | Score (`music.wav`), stems (FLAC), sound effects, cue map, QA plots and `CREDITS.md`. |
@@ -61,7 +61,7 @@ node scripts/stills.mjs LaunchFilm /tmp/sheet 0.25 every:15
   pnpm exec playwright test -c ../../pilego-launch/capture/capture.config.ts
   ```
 
-  This writes all 106 states to `public/ui/`, but only the nine the film uses are committed. The run needs Chromium; set `PW_CHROMIUM` to its path if Playwright's own copy isn't installed.
+  This writes all 106 states to `public/ui/` in dark mode (add `CAPTURE_SCHEME=light` for the light theme), but only the nine the film uses are committed. The run needs Chromium; set `PW_CHROMIUM` to its path if Playwright's own copy isn't installed.
 - **Score:**
 
   ```sh

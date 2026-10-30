@@ -8,7 +8,7 @@ import { Viewfinder } from "../components/Viewfinder";
 import { garment } from "../data/registry";
 import { COVER, CROP, onPrint, PRINT, SCAN_START, STACK } from "../layout";
 import { drift, ease, keys, mix, sp, springs, tween } from "../lib/anim";
-import { C, serif } from "../theme";
+import { C, DARK_MODE, serif } from "../theme";
 
 /**
  * 0–6.2s. The hook and the snap. Real garments fall onto the paper floor in
@@ -68,7 +68,8 @@ export const S1Pile: React.FC = () => {
 
   // Viewfinder, shutter, and the photo developing.
   const vf = sp(frame, 130, springs.firm);
-  const flash = keys(frame, [SNAP - 1, SNAP, SNAP + 7], [0, 1, 0], ease.out);
+  // A softer, shorter flash on the dark grade, so it reads as a shutter, not a white frame.
+  const flash = keys(frame, [SNAP - 1, SNAP, SNAP + (DARK_MODE ? 5 : 7)], [0, DARK_MODE ? 0.7 : 1, 0], ease.out);
   const shot = frame >= SNAP;
   const develop = tween(frame, [SNAP, SNAP + 22], [0, 1], ease.soft);
 

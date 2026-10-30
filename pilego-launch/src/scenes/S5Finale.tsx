@@ -62,7 +62,7 @@ export const S5Finale: React.FC = () => {
             height: MAT.h,
             rotate: `${MAT.r + (1 - mat) * 8}deg`,
             borderRadius: 34,
-            background: "#4f6a3a",
+            background: C.mat,
             backgroundImage:
               "linear-gradient(rgb(255 255 255 / 0.07) 1.5px, transparent 1.5px), linear-gradient(90deg, rgb(255 255 255 / 0.07) 1.5px, transparent 1.5px)",
             backgroundSize: "48px 48px",
@@ -93,7 +93,7 @@ export const S5Finale: React.FC = () => {
             padding: "10px 24px 10px 12px",
             borderRadius: 999,
             background: C.ink,
-            color: "#fbf8ee",
+            color: C.paper,
             fontFamily: franklin,
             fontWeight: 600,
             fontSize: 28,

@@ -8,6 +8,7 @@ import { expect, test, type Locator, type Page, type Route } from '@playwright/t
 import { mockSupabase, SUPABASE, UID } from '../../apps/web/e2e/fixtures';
 
 const OUT = fileURLToPath(new URL('../public/ui/', import.meta.url));
+const SCHEME = process.env.CAPTURE_SCHEME === 'light' ? 'light' : 'dark';
 const PHOTOS = fileURLToPath(new URL('./photos/', import.meta.url));
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
 const iso = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000).toISOString();
@@ -128,10 +129,11 @@ const json = (route: Route, body: unknown, status = 200) =>
 async function setup(page: Page, opts: { hero?: HeroPhase; extension?: boolean; scanDelay?: number } = {}) {
   await mockSupabase(page);
   const s: State = { hero: opts.hero ?? 'fresh', queued: [], relists: [], rawItems: [], rawJobs: [] };
-  await page.addInitScript(() => {
+  // The film is dark; CAPTURE_SCHEME=light captures the light theme instead.
+  await page.addInitScript(theme => {
     localStorage.setItem('pilego-cutouts', 'off');
-    localStorage.setItem('pilego-theme', 'light');
-  });
+    localStorage.setItem('pilego-theme', theme);
+  }, SCHEME);
   if (opts.extension) {
     // Stands in for the installed, linked browser extension's content script.
     await page.addInitScript(uid => {

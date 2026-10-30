@@ -7,7 +7,7 @@ import { headlineItalic, MaskWords } from "../components/Type";
 import { garment } from "../data/registry";
 import { S2Scan, SCAN_LEN } from "./S2Scan";
 import { ease, keys, mix, sp, springs, tween } from "../lib/anim";
-import { C, franklin, mono, serif, shadowRGB } from "../theme";
+import { C, franklin, mono, serif, shade } from "../theme";
 
 /**
  * 10.9–16.7s. One listing, six marketplaces. "Save and cross-list" opens the
@@ -70,7 +70,7 @@ export const S3CrossList: React.FC = () => {
       )}
 
       {/* Dim the table under the sheet, as the app does. */}
-      <AbsoluteFill style={{ background: `rgb(${shadowRGB} / ${0.28 * sheetIn * (1 - sheetOut)})` }} />
+      <AbsoluteFill style={{ background: shade(0.28 * sheetIn * (1 - sheetOut)) }} />
 
       {sheetOut < 1 && (
         <div
@@ -188,7 +188,7 @@ const ListingCard: React.FC<{ i: number; frame: number }> = ({ i, frame }) => {
         opacity: 1 - tween(down, [0.6, 1], [0, 1]),
         background: C.card,
         borderRadius: 6,
-        boxShadow: `0 1px 1px rgb(${shadowRGB} / 0.12), 0 ${10 + lift * 30 + soldLift * 20}px ${22 + lift * 40 + soldLift * 30}px -8px rgb(${shadowRGB} / ${0.3 + soldLift * 0.1})`,
+        boxShadow: `0 1px 1px ${shade(0.12)}, 0 ${10 + lift * 30 + soldLift * 20}px ${22 + lift * 40 + soldLift * 30}px -8px ${shade(0.3 + soldLift * 0.1)}`,
       }}
     >
       {/* Marketplace tab, taped to the top. */}
@@ -203,7 +203,7 @@ const ListingCard: React.FC<{ i: number; frame: number }> = ({ i, frame }) => {
           padding: "8px 16px 8px 10px",
           borderRadius: 999,
           background: C.card,
-          boxShadow: `0 2px 6px rgb(${shadowRGB} / 0.18)`,
+          boxShadow: `0 2px 6px ${shade(0.18)}`,
           fontFamily: franklin,
           fontWeight: 700,
           fontSize: 26,
@@ -217,7 +217,7 @@ const ListingCard: React.FC<{ i: number; frame: number }> = ({ i, frame }) => {
       <Tape w={70} h={24} style={{ right: 18, top: -10, rotate: `${8 - i * 3}deg` }} />
 
       {/* The photo. */}
-      <div style={{ position: "absolute", left: 14, top: 36, width: CARD_W - 28, height: 196, background: "#efe9dc", borderRadius: 4, overflow: "hidden" }}>
+      <div style={{ position: "absolute", left: 14, top: 36, width: CARD_W - 28, height: 196, background: C.photoBg, borderRadius: 4, overflow: "hidden" }}>
         <Garment src={g.src} x={(CARD_W - 28) / 2} y={100} w={156} rot={-2} lift={0.1} />
       </div>
 
@@ -244,7 +244,7 @@ const ListingCard: React.FC<{ i: number; frame: number }> = ({ i, frame }) => {
         />
       )}
       {!sold && strike > 0 && (
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: `rgb(244 240 230 / ${strike * 0.6})`, borderRadius: 6 }}>
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: `${C.paper}${Math.round(strike * 0.6 * 255).toString(16).padStart(2, "0")}`, borderRadius: 6 }}>
           <div
             style={{
               ...kraftBg,

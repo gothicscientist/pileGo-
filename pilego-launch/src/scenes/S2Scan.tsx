@@ -138,7 +138,7 @@ export const S2Scan: React.FC = () => {
       <AbsoluteFill
         style={{
           opacity: push,
-          background: `linear-gradient(90deg, ${C.paper} 0%, ${C.paper} 31%, rgb(244 240 230 / 0) 36%)`,
+          background: `linear-gradient(90deg, ${C.paper} 0%, ${C.paper} 31%, ${C.paper}00 36%)`,
         }}
       />
       {frame >= PUSH && <Callouts frame={frame} scroll={scroll} s={s} tx={tx} ty={ty} />}

@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill } from "remotion";
 import { rnd } from "../lib/anim";
-import { C, shadowRGB } from "../theme";
+import { C, shade } from "../theme";
 
 // A torn top edge: a jagged polygon with fibrous, uneven teeth.
 const edge = (seed: string, depth: number) => {
@@ -32,7 +32,7 @@ export const TornSheet: React.FC<{ progress: number; seed?: string; children: Re
       style={{
         translate: `0 ${y}px`,
         rotate: `${(1 - progress) * rotate}deg`,
-        filter: progress < 1 ? `drop-shadow(0 -10px 24px rgb(${shadowRGB} / 0.28))` : undefined,
+        filter: progress < 1 ? `drop-shadow(0 -10px 24px ${shade(0.28)})` : undefined,
       }}
     >
       <AbsoluteFill style={{ top: -depth, height: 1080 + depth, background: C.paper, clipPath: progress < 1 ? edge(seed, depth) : undefined }}>

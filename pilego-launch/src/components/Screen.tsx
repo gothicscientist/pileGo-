@@ -1,6 +1,6 @@
 import React from "react";
 import { Img, staticFile } from "remotion";
-import { shadowRGB } from "../theme";
+import { shade } from "../theme";
 
 /**
  * A real capture of the pileGo! app. Captures are 2x PNGs of a 1440x900
@@ -39,4 +39,4 @@ export const Screen: React.FC<{
 
 /** Paper-print presentation for a capture: a sheet with a real shadow. */
 export const printShadow = (lift = 0.3) =>
-  `0 1px 1px rgb(${shadowRGB} / 0.12), 0 ${6 + lift * 30}px ${14 + lift * 50}px -${4 + lift * 10}px rgb(${shadowRGB} / ${0.22 + lift * 0.12})`;
+  `0 1px 1px ${shade(0.12)}, 0 ${6 + lift * 30}px ${14 + lift * 50}px -${4 + lift * 10}px ${shade(0.22 + lift * 0.12)}`;

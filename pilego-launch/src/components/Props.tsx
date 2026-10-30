@@ -1,6 +1,6 @@
 import React from "react";
 import { Img, staticFile } from "remotion";
-import { C, franklin, mono, shadowRGB } from "../theme";
+import { C, DARK_MODE, franklin, mono, shade } from "../theme";
 
 /**
  * A real garment cutout. `lift` is how far it is off the paper (0 = lying
@@ -39,8 +39,8 @@ export const Garment: React.FC<{
         opacity,
         zIndex: z,
         filter: [
-          `drop-shadow(${dx * 0.3}px ${1 + lift * 4}px ${1.5 + lift * 3}px rgb(${shadowRGB} / ${0.32 - lift * 0.2}))`,
-          `drop-shadow(${dx}px ${dy}px ${b}px rgb(${shadowRGB} / ${a}))`,
+          `drop-shadow(${dx * 0.3}px ${1 + lift * 4}px ${1.5 + lift * 3}px ${shade(0.32 - lift * 0.2)})`,
+          `drop-shadow(${dx}px ${dy}px ${b}px ${shade(a)})`,
           blur > 0 ? `blur(${blur}px)` : "",
           brightness !== 1 ? `brightness(${brightness})` : "",
         ].join(" "),
@@ -211,8 +211,8 @@ export const Stamp: React.FC<{
       lineHeight: 1,
       letterSpacing: "0.04em",
       textTransform: "uppercase",
-      background: "rgb(255 253 246 / 0.82)",
-      mixBlendMode: "multiply",
+      background: DARK_MODE ? "rgb(38 42 33 / 0.88)" : "rgb(255 253 246 / 0.82)",
+      mixBlendMode: DARK_MODE ? "normal" : "multiply",
       WebkitMaskImage:
         "radial-gradient(circle at 30% 40%, #000 60%, rgb(0 0 0 / 0.75) 61%, #000 70%), radial-gradient(circle at 70% 70%, #000 50%, rgb(0 0 0 / 0.8) 80%)",
       ...style,

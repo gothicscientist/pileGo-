@@ -242,7 +242,7 @@ const LiveList: React.FC<{ frame: number }> = ({ frame }) => {
           translate: "-50% 0",
           opacity: Math.min(1, toast * 2),
           background: C.ink,
-          color: "#fbf8ee",
+          color: C.paper,
           fontFamily: franklin,
           fontWeight: 600,
           fontSize: 34,

@@ -1,6 +1,7 @@
 import React from "react";
 import { AbsoluteFill, Sequence, useCurrentFrame } from "remotion";
 import { Grain } from "./components/Paper";
+import { C } from "./theme";
 import { TornSheet } from "./components/TornSheet";
 import { CLOSET_LEN, CLOSET_START, CROSS_LEN, CROSS_START, FINALE_LEN, FINALE_START, SCAN_LEN, SCAN_START, TEAR } from "./layout";
 import { Soundtrack } from "./Soundtrack";
@@ -25,7 +26,7 @@ const Torn: React.FC<{ seed: string; children: React.ReactNode }> = ({ seed, chi
 };
 
 export const LaunchFilm: React.FC = () => (
-  <AbsoluteFill style={{ backgroundColor: "#f4f0e6" }}>
+  <AbsoluteFill style={{ backgroundColor: C.paper }}>
     <Sequence name="1 · The pile" durationInFrames={SCAN_START}>
       <S1Pile />
     </Sequence>

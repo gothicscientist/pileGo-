@@ -52,4 +52,4 @@ marketplaces, Relist 3 old listings) are pressed in time with the music.
 - Libre Franklin 900 italic, −0.05 em: headlines and the wordmark (the app's face).
 - Instrument Serif italic: the editorial accent words (*inventory.*, *Six marketplaces.*, *handled.*, *More living.*).
 - DM Mono, tracked caps: masthead, viewfinder and footnotes.
-- Colours are pileGo!'s tokens from `apps/web/src/styles/app.css`: paper `#f4f0e6`, ink `#22241e`, grass green `#56703f`, kraft `#d9c49c`, tomato `#e0533a`, butter tape.
+- The film is graded in pileGo!'s own **dark theme** (tokens from `apps/web/src/styles/app.css`): night paper `#161813`, card `#262a21`, warm white ink `#f2efe4`, light grass green `#a8c68a`, kraft `#c8b083`, tomato `#ff7b5e`, and the app captures are taken in dark mode too. Shadows are black and about twice as strong so garments still lift off the dark floor. `MODE` in `src/theme.ts` switches the whole film back to the light paper version.

@@ -1,6 +1,6 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
-import { C } from "../theme";
+import { C, DARK_MODE } from "../theme";
 
 /**
  * The floor everything sits on: pileGo!'s warm paper with its faint grid,
@@ -12,8 +12,8 @@ export const Paper: React.FC<{
   gridOpacity?: number;
   offsetX?: number;
   offsetY?: number;
-}> = ({ dark = false, grid = 56, gridOpacity = 1, offsetX = 0, offsetY = 0 }) => {
-  const base = dark ? C.night : C.paper;
+}> = ({ dark = DARK_MODE, grid = 56, gridOpacity = 1, offsetX = 0, offsetY = 0 }) => {
+  const base = C.paper;
   const line = dark ? "rgba(242,239,228,0.045)" : "rgba(60,52,30,0.055)";
   return (
     <AbsoluteFill style={{ backgroundColor: base, overflow: "hidden" }}>
@@ -29,7 +29,7 @@ export const Paper: React.FC<{
       <AbsoluteFill
         style={{
           background: dark
-            ? "radial-gradient(ellipse 75% 70% at 50% 45%, rgba(0,0,0,0) 40%, rgba(0,0,0,0.55) 100%)"
+            ? "radial-gradient(ellipse 70% 65% at 50% 42%, rgba(255,240,205,0.05) 0%, rgba(0,0,0,0) 45%, rgba(0,0,0,0.5) 100%)"
             : "radial-gradient(ellipse 80% 75% at 50% 45%, rgba(255,250,235,0.35) 0%, rgba(0,0,0,0) 45%, rgba(70,55,25,0.16) 100%)",
         }}
       />

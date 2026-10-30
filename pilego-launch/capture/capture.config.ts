@@ -3,6 +3,8 @@
 //
 //   cd apps/web && pnpm exec playwright test -c ../../pilego-launch/capture/capture.config.ts
 //
+// CAPTURE_SCHEME=light captures the light theme; the film uses dark (the default).
+//
 import { defineConfig } from '@playwright/test';
 
 const PORT = 4179;
@@ -18,7 +20,7 @@ export default defineConfig({
     baseURL: `http://localhost:${PORT}`,
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: 2,
-    colorScheme: 'light',
+    colorScheme: process.env.CAPTURE_SCHEME === 'light' ? 'light' : 'dark',
     locale: 'en-US',
     timezoneId: 'America/New_York',
     launchOptions: { executablePath: process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium' },
