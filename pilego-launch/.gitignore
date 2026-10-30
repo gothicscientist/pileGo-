@@ -1,0 +1,19 @@
+node_modules
+dist
+.DS_Store
+.env
+
+# Renders. The finished film is copied to film/ and committed.
+out
+
+# Capture tooling scratch (see capture/README in the main README).
+capture/node_modules
+capture/test-results
+
+# Asset folders still being built; committed once pruned to what the film uses.
+public/ui
+public/audio
+public/garments
+public/textures
+assets-src
+sound

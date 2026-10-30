@@ -1,0 +1,52 @@
+{
+ "anorak": {
+  "src": "garments/anorak.png",
+  "w": 602,
+  "h": 736
+ },
+ "beanie": {
+  "src": "garments/beanie.png",
+  "w": 554,
+  "h": 736
+ },
+ "camel-blazer": {
+  "src": "garments/camel-blazer.png",
+  "w": 310,
+  "h": 736
+ },
+ "cap": {
+  "src": "garments/cap.png",
+  "w": 684,
+  "h": 446
+ },
+ "denim-jacket": {
+  "src": "garments/denim-jacket.png",
+  "w": 603,
+  "h": 736
+ },
+ "flannel": {
+  "src": "garments/flannel.png",
+  "w": 477,
+  "h": 736
+ },
+ "navy-bomber": {
+  "src": "garments/navy-bomber.png",
+  "w": 559,
+  "h": 736
+ },
+ "rust-bomber-photo": {
+  "src": "garments/rust-bomber-photo.png",
+  "w": 640,
+  "h": 800
+ },
+ "rust-bomber": {
+  "src": "garments/rust-bomber.png",
+  "w": 611,
+  "h": 736
+ },
+ "white-tee": {
+  "src": "garments/white-tee.png",
+  "w": 464,
+  "h": 736
+ }
+}
