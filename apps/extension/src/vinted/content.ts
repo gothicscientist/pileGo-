@@ -4,6 +4,7 @@
 import { watchSellerAddress } from '../assist/seller-address.ts';
 import { between, errorText, ext, fromBase64, sleep, uuid } from '../shared/browser.ts';
 import type { ListingWork, VintedOutcome, VintedRequest } from '../shared/messages.ts';
+import { cardStep, closeCard, resetCard, showCard } from '../shared/overlay.ts';
 import * as api from './api.ts';
 import {
   buildDraft,
@@ -74,7 +75,9 @@ async function resolveIds(work: ListingWork): Promise<{ ids: VintedIds; learned:
 
 async function uploadPhotos(work: ListingWork, sessionId: string) {
   const photos = [];
-  for (const p of work.photos.slice(0, 20)) {
+  const all = work.photos.slice(0, 20);
+  for (const [i, p] of all.entries()) {
+    cardStep(`Uploading photos (${i + 1} of ${all.length})…`);
     photos.push(await api.uploadPhoto(fromBase64(p.data, p.type), sessionId));
     await sleep(between(400, 1100));
   }
@@ -88,6 +91,31 @@ function needsUser(message: string, draftId: number, learned: Record<string, unk
   return { status: 'needs_user', message, url: draftUrl(draftId), draft_id: String(draftId), learned };
 }
 
+const itemName = (work: ListingWork) => work.listing.title || work.listing.description.split('\n')[0] || work.item.sku;
+
+/** The pileGo card in this tab's corner, for the outcome of a listing. */
+function showOutcome(work: ListingWork, out: VintedOutcome) {
+  const base = { marketplace: 'vinted' as const, item: itemName(work), secondary: { label: 'Close', onClick: closeCard } };
+  if (out.status === 'listed') showCard({ ...base, state: 'done', heading: 'Listed on Vinted', message: 'It’s live, and the link is saved on the item in pileGo.', link: out.url });
+  else if (out.status === 'needs_user') showCard({ ...base, state: 'needs', heading: 'Needs you', message: out.message, link: null, primary: { label: 'Open the draft', onClick: () => window.open(out.url, '_blank') } });
+  else if (out.status === 'failed') showCard({ ...base, state: 'needs', heading: 'Not listed yet', message: out.retry_in ? `${out.message} pileGo will try again by itself.` : out.message });
+}
+
+async function publishWithCard(work: ListingWork, replace: string | null): Promise<VintedOutcome> {
+  resetCard();
+  showCard({ marketplace: 'vinted', item: itemName(work), state: 'working', heading: 'Listing on Vinted', message: 'Checking you are logged in…' });
+  let out: VintedOutcome;
+  try {
+    out = await publish(work, replace);
+  } catch (err) {
+    const blocked = err instanceof api.VintedError && err.blocked;
+    const transient = err instanceof api.VintedError ? err.status === 0 || err.status >= 500 : true;
+    out = { status: 'failed', message: errorText(err), blocked, retry_in: blocked ? undefined : transient ? 300 : undefined };
+  }
+  showOutcome(work, out);
+  return out;
+}
+
 /** Publish a new listing, or with `replace`, publish it and remove the old one first. */
 async function publish(work: ListingWork, replace: string | null): Promise<VintedOutcome> {
   // First-time seller address dialogs can appear while the draft is being finished.
@@ -98,11 +126,13 @@ async function publish(work: ListingWork, replace: string | null): Promise<Vinte
     return { status: 'failed', message: 'Log in to Vinted in this browser first.' };
   }
   const sessionId = uuid();
+  cardStep('Matching the category, size and brand…');
   const { ids, learned, missing } = await resolveIds(work);
   await step();
   const photos = await uploadPhotos(work, sessionId);
   const draft = buildDraft(work, ids, sessionId, photos);
   await step();
+  cardStep('Saving the draft…');
   const draftId = await api.createDraft(draft, sessionId);
 
   if (!ids.catalog_id) {
@@ -119,6 +149,7 @@ async function publish(work: ListingWork, replace: string | null): Promise<Vinte
     }
   }
 
+  cardStep('Publishing…');
   try {
     const done = await api.completeDraft(draftId, forCompletion(draft, draftId), sessionId);
     stopAddressFill();
@@ -175,9 +206,9 @@ async function handle(msg: VintedRequest): Promise<VintedOutcome> {
       case 'vinted:ping':
         return { status: 'done', data: { site: api.SITE, logged_in: await api.loggedIn() } };
       case 'vinted:publish':
-        return await publish(msg.work, null);
+        return await publishWithCard(msg.work, null);
       case 'vinted:relist':
-        return await publish(msg.work, msg.work.external_id);
+        return await publishWithCard(msg.work, msg.work.external_id);
       case 'vinted:delist': {
         const result = await api.deleteItem(msg.external_id);
         return { status: 'done', data: { result } };

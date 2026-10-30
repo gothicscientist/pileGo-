@@ -191,3 +191,14 @@ describe('reading Vinted back', () => {
     expect(pile).toMatchObject({ department: 'women', category: 'outerwear', subcategory: 'denim-jackets', condition: 'excellent', price: 30, currency: 'GBP', brand: 'Levi’s' });
   });
 });
+
+describe('telling whether a Vinted tab is logged in', () => {
+  it('reads the member from the markup Vinted draws the page with', async () => {
+    const { userFromMarkup } = await import('../src/vinted/map.ts');
+    const inPage = 'self.__next_f.push([1,"{\\"sessionProps\\":{\\"initialSessionData\\":{\\"userId\\":3167409088,\\"isWebview\\":false}}}"])';
+    expect(userFromMarkup(inPage)).toBe('3167409088');
+    expect(userFromMarkup('{"initialUserState":{"user":{"id":42,"login":"sam"}}}')).toBe('42');
+    expect(userFromMarkup('{"initialSessionData":{"userId":null,"isWebview":false}}')).toBeNull();
+    expect(userFromMarkup('<html>no session here</html>')).toBeUndefined();
+  });
+});

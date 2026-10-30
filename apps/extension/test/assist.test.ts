@@ -70,6 +70,8 @@ describe('pages', () => {
       url: 'https://www.depop.com/products/sam-levis-jacket-1234/',
     });
     expect(postedListing('depop', 'https://www.depop.com/products/create/')).toBeNull();
+    expect(postedListing('depop', 'https://www.depop.com/products/radiant_jor-uc-berkeley-graphic-pullover-hoodie-412d/')?.id).toBe('radiant_jor-uc-berkeley-graphic-pullover-hoodie-412d');
+    expect(postedListing('depop', 'https://www.depop.com/products/create')).toBeNull();
     expect(postedListing('depop', 'https://www.depop.com/products/sam-levis-jacket-1234/manage/?x=1')).toEqual({
       id: 'sam-levis-jacket-1234', url: 'https://www.depop.com/products/sam-levis-jacket-1234/',
     });
