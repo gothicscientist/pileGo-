@@ -14,7 +14,7 @@ import { C, franklin } from "../theme";
  * every field the AI filled, scrolled like the real page.
  */
 
-export const SCAN_LEN = 150;
+export { SCAN_LEN } from "../layout";
 const PRESS = 16; // "Scan with AI"
 const LOAD = [18, 34, 48]; // the three real progress states
 const DONE = 64; // "Check it over"

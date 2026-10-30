@@ -15,7 +15,7 @@ import { C, franklin, serif } from "../theme";
  * "Relist 3 old listings".
  */
 
-export const CLOSET_LEN = 160;
+export { CLOSET_LEN } from "../layout";
 const SORT = 6; // garments start flying to their columns
 const OUT = 78; // the Out there print slides in
 const PRESS = 118; // "Relist 3 old listings"

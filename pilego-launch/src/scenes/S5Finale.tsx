@@ -14,7 +14,8 @@ import { C, franklin, serif } from "../theme";
  * 22.0s, then the line and the address. The end card holds for four seconds.
  */
 
-export const FINALE_LEN = 200;
+import { FINALE_LEN } from "../layout";
+export { FINALE_LEN };
 export const HIT = 20; // 22.0s: the chord and the wordmark
 const LINE = 34; // "Less listing. More living."
 const CHORD = 80; // 24.0s: the address

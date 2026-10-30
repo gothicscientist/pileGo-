@@ -34,5 +34,17 @@ export const COVER: Rect = { x: 288, y: 217, w: 416, h: 520 };
 /** The "Snap. Scan. Done." stack on the left. */
 export const STACK = { x: 96, y: 250, size: 150, step: 158 };
 
-/** Global frame where the scan scene takes over from the pile. */
+/**
+ * The timeline, in global frames. A sheet torn off the pad overlaps the
+ * scene before it by TEAR frames.
+ */
+export const FILM_LEN = 840;
+export const TEAR = 16;
 export const SCAN_START = 186;
+export const SCAN_LEN = 150;
+export const CROSS_START = SCAN_START + SCAN_LEN; // 336
+export const CROSS_LEN = 176;
+export const CLOSET_START = CROSS_START + CROSS_LEN - TEAR; // 496
+export const CLOSET_LEN = 160;
+export const FINALE_LEN = 200;
+export const FINALE_START = FILM_LEN - FINALE_LEN; // 640

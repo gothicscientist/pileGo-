@@ -16,7 +16,7 @@ import { C, franklin, mono, serif, shadowRGB } from "../theme";
  * method and fees the sheet showed. Then one sells, and the rest come down.
  */
 
-export const CROSS_LEN = 176;
+export { CROSS_LEN } from "../layout";
 const PRESS = 30; // "List on 6 marketplaces"
 const DEAL = 42; // cards leave the deck
 const SOLD = 124; // Vinted sells
@@ -24,12 +24,12 @@ const DOWN = 136; // the other five come down
 
 // From the real cross-list sheet for a $30 listing (public/ui/crosslist-card-*.png).
 export const MARKETS = [
-  { id: "ebay", name: "eBay", method: "Automatic", keep: "$25.52", title: "62 of 80" },
-  { id: "vinted", name: "Vinted", method: "One click", keep: "$30", title: "62 of 100" },
-  { id: "depop", name: "Depop", method: "Auto-post", keep: "$28.56", title: "no title" },
-  { id: "poshmark", name: "Poshmark", method: "Auto-post", keep: "$24", title: "62 of 80" },
-  { id: "mercari", name: "Mercari", method: "Auto-post", keep: "$25.63", title: "62 of 80" },
-  { id: "grailed", name: "Grailed", method: "Auto-post", keep: "$25.76", title: "51 of 60" },
+  { id: "ebay", name: "eBay", method: "Automatic", keep: "$25.52", title: "Title 62/80" },
+  { id: "vinted", name: "Vinted", method: "One click", keep: "$30", title: "Title 62/100" },
+  { id: "depop", name: "Depop", method: "Auto-post", keep: "$28.56", title: "No title field" },
+  { id: "poshmark", name: "Poshmark", method: "Auto-post", keep: "$24", title: "Title 62/80" },
+  { id: "mercari", name: "Mercari", method: "Auto-post", keep: "$25.63", title: "Title 62/80" },
+  { id: "grailed", name: "Grailed", method: "Auto-post", keep: "$25.76", title: "Title 51/60" },
 ];
 const SOLD_ON = 1; // Vinted
 
@@ -226,7 +226,7 @@ const ListingCard: React.FC<{ i: number; frame: number }> = ({ i, frame }) => {
       </div>
       <div style={{ position: "absolute", left: 18, right: 18, top: 306, display: "flex", justifyContent: "space-between", fontFamily: mono, fontSize: 15, color: C.muted, letterSpacing: "0.04em" }}>
         <span style={{ color: C.ink, fontWeight: 500 }}>$30</span>
-        <span>TITLE {m.title.toUpperCase()}</span>
+        <span>{m.title.toUpperCase()}</span>
       </div>
       <div style={{ position: "absolute", left: 18, right: 18, top: 330, height: 1.5, background: C.line }} />
       <div style={{ position: "absolute", left: 18, right: 18, bottom: 12, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
