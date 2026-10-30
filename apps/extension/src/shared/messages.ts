@@ -71,9 +71,39 @@ export type AssistRequest =
   | { type: 'assist:fill'; work: ListingWork }
   | { type: 'assist:remove'; work: ListingWork; reason: string }
   | { type: 'assist:comps'; market: 'mercari' | 'depop' }
-  /** After posting landed somewhere other than the new listing: find its link on the page. */
-  | { type: 'assist:find'; marketplace: MarketplaceId; title: string }
+  /**
+   * After posting landed somewhere other than the new listing: find its link
+   * on the page. Answers { url } or, when it is not here, { shop } to look in.
+   */
+  | {
+      type: 'assist:find';
+      marketplace: MarketplaceId;
+      title: string;
+      /** Other words the listing may go by, such as the description's first line. */
+      titles?: string[];
+      /** Links to the seller's older listings, never the new one. */
+      exclude?: string[];
+      /** When pileGo pressed post (ms): listings older than this are not it. */
+      since?: number;
+      /** Depop's number for the new product, from its "Done" screen. */
+      product_id?: string | null;
+      /** How long to wait for the page to draw its listings. */
+      wait?: number;
+    }
+  /** The bottom-right card to show, or null to take it down. */
+  | { type: 'assist:overlay'; view: OverlayView | null }
   | { type: 'assist:ping' };
+
+/** What the pileGo card in the bottom right of a marketplace tab says. */
+export interface OverlayView {
+  marketplace: MarketplaceId;
+  /** The item being listed. */
+  title: string;
+  state: 'working' | 'done' | 'needs';
+  step: string;
+  /** The new listing, once it is up. */
+  link?: string | null;
+}
 
 export type AssistReport =
   | { type: 'assist:posted'; job_id: string; url: string | null }

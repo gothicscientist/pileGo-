@@ -7,7 +7,7 @@
 
 import { errorText, ext, uuid } from '../shared/browser.ts';
 import { noteRefusal, refusalKind, retryAfterMs } from '../shared/pace.ts';
-import type { CatalogNode, EditableItem, SizeGroup, WardrobeItem } from './map.ts';
+import { userFromMarkup, type CatalogNode, type EditableItem, type SizeGroup, type WardrobeItem } from './map.ts';
 
 export const SITE = location.origin;
 
@@ -186,24 +186,32 @@ let currentUser: string | null | undefined;
 
 /**
  * The logged-in member's id. The v_uid cookie used to say, but Vinted now
- * marks it HttpOnly on some domains (vinted.com), so the page cannot read it;
- * the current-user endpoint answers for any logged-in tab.
+ * marks it HttpOnly on some domains (vinted.com), so the page cannot read it.
+ * The page's own markup says next; the current-user endpoint last. That
+ * endpoint answers 403 both when logged out and when the bot shield has not
+ * warmed up in a fresh background tab, so a refusal alone never means
+ * "logged out" while the markup says otherwise.
  */
 export async function memberId(): Promise<string | null> {
   const fromCookie = readCookie('v_uid');
   if (fromCookie && /^\d+$/.test(fromCookie)) return fromCookie;
-  if (currentUser !== undefined) return currentUser;
-  try {
-    const reply = await request(`${SITE}/api/v2/users/current`, { headers: { accept: 'application/json, text/plain, */*' } });
-    const id = reply.ok ? (JSON.parse(reply.text || '{}') as { user?: { id?: number } }).user?.id : null;
-    currentUser = id ? String(id) : null;
-  } catch {
-    return null;
+  if (currentUser) return currentUser;
+  const drawn = userFromMarkup(document.documentElement?.innerHTML ?? '');
+  if (drawn) return (currentUser = drawn);
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const reply = await request(`${SITE}/api/v2/users/current`, { headers: { accept: 'application/json, text/plain, */*' } });
+      const id = reply.ok ? (JSON.parse(reply.text || '{}') as { user?: { id?: number } }).user?.id : null;
+      if (id) return (currentUser = String(id));
+      // A clear "not logged in" from both the page and the API.
+      if (drawn === null && (reply.status === 401 || reply.status === 403 || reply.ok)) return null;
+    } catch {
+      // Network trouble: try again.
+    }
+    if (attempt < 3) await new Promise(done => setTimeout(done, 1500 * attempt));
   }
   // A logged-out answer is not cached: the seller may log in in this tab.
-  const found = currentUser;
-  if (!found) currentUser = undefined;
-  return found ?? null;
+  return null;
 }
 
 async function writeHeaders(): Promise<Record<string, string>> {
@@ -436,7 +444,16 @@ export async function wardrobePage(member: string, page: number): Promise<{ item
   return { items: body.items ?? [], total_pages: body.pagination?.total_pages ?? null };
 }
 
-/** Whether this tab is logged in to Vinted. */
+/**
+ * Whether this tab is logged in to Vinted. "out" only when the page itself was
+ * drawn logged out and the API agrees; anything else is not proof, so pileGo
+ * carries on and lets Vinted's own answer to the listing decide.
+ */
+export async function loginState(): Promise<'in' | 'out' | 'unknown'> {
+  if (await memberId()) return 'in';
+  return userFromMarkup(document.documentElement?.innerHTML ?? '') === null ? 'out' : 'unknown';
+}
+
 export async function loggedIn(): Promise<boolean> {
-  return (await memberId()) != null;
+  return (await loginState()) !== 'out';
 }

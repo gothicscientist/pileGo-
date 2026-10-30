@@ -344,3 +344,18 @@ export function toPileItem(v: EditableItem, catalogPath: string[]) {
     currency: currencyOf(v),
   };
 }
+
+/**
+ * The logged-in member's id as the page itself was drawn with it. Vinted
+ * renders the session into the markup (initialSessionData, initialUserState),
+ * so this needs no request and cannot be refused by the bot shield.
+ * undefined: the page does not say either way. null: the page was drawn logged out.
+ */
+export function userFromMarkup(markup: string): string | null | undefined {
+  const q = '\\\\?"';
+  const session = markup.match(new RegExp(`initialSessionData${q}:\\{${q}userId${q}:${q}?(\\d+|null)`));
+  const state = markup.match(new RegExp(`initialUserState${q}:\\{${q}user${q}:(?:\\{${q}id${q}:(\\d+)|null)`));
+  const id = (session?.[1] && session[1] !== 'null' ? session[1] : null) ?? state?.[1] ?? null;
+  if (id) return id;
+  return session || state ? null : undefined;
+}

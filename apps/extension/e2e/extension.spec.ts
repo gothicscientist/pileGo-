@@ -20,8 +20,8 @@ test('Depop success under products/create captures the public link from View lis
   expect(out).toMatchObject({ ok: true, posted: true });
   expect(page.url()).toContain('/products/create/success/');
   const found = await worker.evaluate(id => chrome.tabs.sendMessage(id, { type: 'assist:find', marketplace: 'depop', title: 'GAP brown jacket' }), id);
-  expect(found).toEqual({ url: 'https://www.depop.com/products/seller-gap-brown-jacket-1234/' });
-  await expect(page.locator('pilego-panel')).toHaveCount(0);
+  expect(found).toMatchObject({ url: 'https://www.depop.com/products/seller-gap-brown-jacket-1234/' });
+  await expect(page.locator('pilego-panel')).toHaveCount(1);
 });
 
 test('Depop keeps a remounted size when the menu closes before aria-expanded updates', async ({ context, worker }) => {
@@ -211,7 +211,7 @@ test('fills every field on Depop, removes its colour guess and posts', async ({ 
   });
   expect(await page.evaluate(() => (window as unknown as { posts: number }).posts)).toBe(1);
   expect(page.url()).toBe('https://www.depop.com/products/seller-gap-jacket-1234/');
-  await expect(page.locator('pilego-panel')).toHaveCount(0);
+  await expect(page.locator('pilego-panel')).toHaveCount(1);
 });
 
 test.describe('Depop worldwide shipping', () => {
@@ -415,8 +415,8 @@ test.describe('after pressing post', () => {
     expect(out).toMatchObject({ ok: true, posted: true });
     expect(page.url()).toBe('https://poshmark.com/closet/seller');
     const found = await worker.evaluate(({ id }) => chrome.tabs.sendMessage(id, { type: 'assist:find', marketplace: 'poshmark', title: 'GAP brown jacket' }), { id });
-    expect(found).toEqual({ url: 'https://poshmark.com/listing/GAP-brown-jacket-65a1b2c3' });
-    await expect(page.locator('pilego-panel')).toHaveCount(0);
+    expect(found).toMatchObject({ url: 'https://poshmark.com/listing/GAP-brown-jacket-65a1b2c3' });
+    await expect(page.locator('pilego-panel')).toHaveCount(1);
   });
 
   test('Poshmark saying the listing is live counts as listed, even on the editor’s address', async ({ context, worker }) => {

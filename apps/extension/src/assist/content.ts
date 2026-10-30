@@ -4,11 +4,13 @@
 
 import { MARKETPLACES, type MarketplaceId } from '@pilego/core';
 import { ext, fromBase64, send, sleep } from '../shared/browser.ts';
-import type { AssistProgress, AssistReport, AssistRequest, FillResult, ListingWork } from '../shared/messages.ts';
+import type { AssistProgress, AssistReport, AssistRequest, FillResult, ListingWork, OverlayView } from '../shared/messages.ts';
+import { cardShown, cardStep, closeCard, resetCard, showCard, type CardAction } from '../shared/overlay.ts';
 import { readComps } from './comps.ts';
 import { watchSellerAddress } from './seller-address.ts';
 import { fillDepop } from './depop.ts';
-import { norm, pageError, text, waitFor } from './dom.ts';
+import { pageError, waitFor } from './dom.ts';
+import { pageIsProduct, rankListings, shopUrl } from './find.ts';
 import { Stopped, type Driver, type DriverContext } from './driver.ts';
 import { fillGrailed } from './grailed.ts';
 import { fillMercari } from './mercari.ts';
@@ -76,96 +78,11 @@ async function fill(work: ListingWork): Promise<{ filled: FieldKey[]; photos: nu
 }
 
 // ---------------------------------------------------------------------------
-// The panel. Shadow DOM, so the site's styles and ours leave each other alone.
+// The card in the bottom right (see shared/overlay.ts).
 // ---------------------------------------------------------------------------
 
-const CSS = `
-:host { all: initial; }
-.card { position: fixed; z-index: 2147483646; right: 16px; bottom: 16px; width: min(340px, calc(100vw - 32px));
-  max-height: min(70vh, 560px); display: flex; flex-direction: column; background: #F6F6F1; color: #16172B;
-  border-radius: 14px; box-shadow: 0 2px 0 #16172B, 0 18px 40px rgba(22,23,43,.28); font: 14px/1.4 ui-sans-serif, system-ui, sans-serif;
-  border: 2px solid #16172B; overflow: hidden; }
-.head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #2B3FE8; color: #F6F6F1; }
-.tag { display: inline-block; background: #FF4F9A; color: #16172B; font-weight: 800; padding: 2px 8px 2px 12px; border-radius: 3px 6px 6px 3px;
-  clip-path: polygon(8px 0, 100% 0, 100% 100%, 8px 100%, 0 50%); transform: rotate(-4deg); }
-.head b { font-size: 15px; }
-.x { margin-left: auto; background: none; border: 0; color: inherit; font-size: 18px; cursor: pointer; padding: 2px 6px; }
-.body { padding: 12px; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
-.msg { margin: 0; }
-ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #fff; border-radius: 8px; }
-li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-li small { display: block; color: #5b5c70; font-size: 11px; }
-li.done { opacity: .6; }
-button.copy { flex: none; border: 1.5px solid #16172B; background: #fff; color: #16172B; border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
-.foot { display: flex; gap: 8px; padding: 10px 12px; border-top: 1.5px dashed #c9c9c0; }
-.foot button { flex: 1; border-radius: 999px; padding: 8px 10px; font: inherit; font-weight: 700; cursor: pointer; border: 2px solid #16172B; }
-.go { background: #FF4F9A; color: #16172B; }
-.no { background: transparent; color: #16172B; }
-button:focus-visible { outline: 3px solid #FFE14D; outline-offset: 2px; }
-`;
-
-let panelHost: HTMLElement | null = null;
-
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}, ...children: Array<Node | string>) {
-  const node = Object.assign(document.createElement(tag), props);
-  node.append(...children);
-  return node;
-}
-
-function closePanel() {
-  panelHost?.remove();
-  panelHost = null;
-}
-
-function panel(opts: {
-  title: string;
-  message: string;
-  rows: Array<{ label: string; value: string; done?: boolean }>;
-  go: string;
-  no: string;
-  onGo: () => void;
-  onNo: () => void;
-}) {
-  closePanel();
-  panelHost = document.createElement('pilego-panel');
-  const root = panelHost.attachShadow({ mode: 'closed' });
-  root.append(el('style', { textContent: CSS }));
-  const close = el('button', { className: 'x', textContent: '×', title: 'Hide' });
-  close.setAttribute('aria-label', 'Hide the pileGo panel');
-  close.addEventListener('click', closePanel);
-  const list = el('ul');
-  for (const row of opts.rows) {
-    const copy = el('button', { className: 'copy', textContent: 'Copy' });
-    copy.addEventListener('click', async () => {
-      await navigator.clipboard.writeText(row.value).catch(() => {});
-      copy.textContent = 'Copied';
-      setTimeout(() => (copy.textContent = 'Copy'), 1400);
-    });
-    list.append(el('li', { className: row.done ? 'done' : '' }, el('span', {}, el('small', { textContent: row.done ? `${row.label}, filled in` : row.label }), row.value), copy));
-  }
-  const go = el('button', { className: 'go', textContent: opts.go });
-  go.addEventListener('click', () => {
-    opts.onGo();
-    closePanel();
-  });
-  const no = el('button', { className: 'no', textContent: opts.no });
-  no.addEventListener('click', () => {
-    opts.onNo();
-    closePanel();
-  });
-  const card = el(
-    'div',
-    { className: 'card' },
-    el('div', { className: 'head' }, el('span', { className: 'tag', textContent: 'pileGo' }), el('b', { textContent: opts.title }), close),
-    el('div', { className: 'body' }, el('p', { className: 'msg', textContent: opts.message }), opts.rows.length ? list : ''),
-    el('div', { className: 'foot' }, go, no),
-  );
-  card.setAttribute('role', 'dialog');
-  card.setAttribute('aria-label', `pileGo: ${opts.title}`);
-  root.append(card);
-  document.documentElement.append(panelHost);
-}
+const closePanel = closeCard;
+const itemName = (work: ListingWork) => work.listing.title || work.listing.description.split('\n')[0] || work.item.sku;
 
 function report(msg: AssistReport | AssistProgress) {
   void send(msg);
@@ -183,19 +100,20 @@ const GRACE_SECONDS = 3;
 let stopped = false;
 let stopAddressFill = () => {};
 
+function stop() {
+  stopped = true;
+  stopAddressFill();
+}
+
 function progressPanel(work: ListingWork, message: string) {
   const name = MARKETPLACES[work.marketplace].name;
-  panel({
-    title: `Listing on ${name}`,
+  showCard({
+    marketplace: work.marketplace,
+    item: itemName(work),
+    state: 'working',
+    heading: `Listing on ${name}`,
     message,
-    rows: [],
-    go: 'Hide',
-    no: 'Stop',
-    onGo: () => {},
-    onNo: () => {
-      stopped = true;
-      stopAddressFill();
-    },
+    secondary: { label: 'Stop', onClick: () => { stop(); cardStep('Stopping…'); } },
   });
 }
 
@@ -206,7 +124,7 @@ async function runDriver(work: ListingWork, driver: Driver): Promise<FillResult>
   const ctx: DriverContext = {
     step(message) {
       shownStep = message;
-      if (panelHost) progressPanel(work, message);
+      if (!stopped) progressPanel(work, message);
       report({ type: 'assist:progress', job_id: work.job_id, step: message });
     },
     check() {
@@ -221,6 +139,7 @@ async function runDriver(work: ListingWork, driver: Driver): Promise<FillResult>
       return !stopped;
     },
   };
+  resetCard();
   progressPanel(work, 'Starting…');
   // Chrome stops an idle background worker after 30 seconds; a photo upload can take longer.
   const heartbeat = setInterval(() => report({ type: 'assist:progress', job_id: work.job_id, step: shownStep }), 10_000);
@@ -239,11 +158,16 @@ async function runDriver(work: ListingWork, driver: Driver): Promise<FillResult>
   }
 
   if (result.posted) {
-    closePanel();
-    // Some sites land on the closet or feed instead of the new listing: find it there.
-    const url = postedListing(work.marketplace, location.href)
-      ? location.href
-      : ((await waitFor(() => findListing(work.marketplace, work.listing.title || work.listing.description), 5000)) ?? location.href);
+    // The background finds the link (the site may not have gone to the new
+    // listing) and keeps this card up on whatever page the tab lands on.
+    const url = postedListing(work.marketplace, location.href)?.url ?? location.href;
+    showCard({
+      marketplace: work.marketplace,
+      item: itemName(work),
+      state: 'working',
+      heading: `Listing on ${name}`,
+      message: `Listed on ${name}. Finding the link to it…`,
+    });
     report({ type: 'assist:posted', job_id: work.job_id, url });
     return result;
   }
@@ -266,37 +190,17 @@ async function runDriver(work: ListingWork, driver: Driver): Promise<FillResult>
     .join(' ');
   report({ type: 'assist:stuck', job_id: work.job_id, message: why });
   const rows = work.listing.fields.map(f => ({ label: f.label, value: f.value, done: result.filled.includes(f.key) }));
-  panel({
-    title: 'Needs you',
+  showCard({
+    marketplace: work.marketplace,
+    item: itemName(work),
+    state: 'needs',
+    heading: 'Needs you',
     message: why,
     rows,
-    go: 'I’ve posted it',
-    no: 'Stop',
-    onGo: () => { stopAddressFill(); report({ type: 'assist:posted', job_id: work.job_id, url: null }); },
-    onNo: () => { stopAddressFill(); report({ type: 'assist:gave-up', job_id: work.job_id, message: `You stopped the ${name} form.` }); },
+    primary: { label: 'I’ve posted it', onClick: () => { stopAddressFill(); report({ type: 'assist:posted', job_id: work.job_id, url: null }); closePanel(); } },
+    secondary: { label: 'Stop', onClick: () => { stopAddressFill(); report({ type: 'assist:gave-up', job_id: work.job_id, message: `You stopped the ${name} form.` }); closePanel(); } },
   });
   return result;
-}
-
-/** The new listing's link on a closet or feed page, matched by its title. */
-function findListing(market: MarketplaceId, title: string): string | null {
-  const site = SITES[market];
-  const want = norm(title).slice(0, 40).trim();
-  if (!site || want.length < 4) return null;
-  for (const a of document.querySelectorAll<HTMLAnchorElement>('a[href]')) {
-    const hit = postedListing(market, a.href);
-    if (!hit) continue;
-    let path = '';
-    try {
-      path = new URL(a.href).pathname;
-    } catch {
-      continue;
-    }
-    // The card's text, its photo's alt text, or the slug in the address all carry the title.
-    const words = norm(`${text(a)} ${a.title} ${a.querySelector('img')?.alt ?? ''} ${path}`);
-    if (` ${words} `.includes(` ${want}`)) return hit.url;
-  }
-  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -332,21 +236,19 @@ async function startFill(work: ListingWork): Promise<FillResult> {
 
 async function assistFill(work: ListingWork): Promise<FillResult> {
   const name = MARKETPLACES[work.marketplace].name;
-  panel({
-    title: `Filling ${name}`,
-    message: 'Adding photos and filling the form…',
-    rows: [],
-    go: 'I’ve posted it',
-    no: 'Stop',
-    onGo: () => { stopAddressFill(); report({ type: 'assist:posted', job_id: work.job_id, url: null }); },
-    onNo: () => { stopAddressFill(); report({ type: 'assist:gave-up', job_id: work.job_id, message: `You stopped the ${name} form.` }); },
-  });
+  const posted: CardAction = { label: 'I’ve posted it', onClick: () => { stopAddressFill(); report({ type: 'assist:posted', job_id: work.job_id, url: null }); closePanel(); } };
+  const stopIt: CardAction = { label: 'Stop', onClick: () => { stopAddressFill(); report({ type: 'assist:gave-up', job_id: work.job_id, message: `You stopped the ${name} form.` }); closePanel(); } };
+  resetCard();
+  showCard({ marketplace: work.marketplace, item: itemName(work), state: 'working', heading: `Filling ${name}`, message: 'Adding photos and filling the form…', primary: posted, secondary: stopIt });
   const { filled, photos } = await fill(work);
   const rows = work.listing.fields.map(f => ({ label: f.label, value: f.value, done: filled.includes(f.key as FieldKey) }));
   if (work.listing.description) rows.push({ label: 'Description', value: work.listing.description, done: filled.includes('description') });
   const left = rows.filter(r => !r.done).map(r => r.label.toLowerCase());
-  panel({
-    title: `Check it, then post`,
+  showCard({
+    marketplace: work.marketplace,
+    item: itemName(work),
+    state: 'needs',
+    heading: 'Check it, then post',
     message: [
       photos ? `Added ${photos} ${photos === 1 ? 'photo' : 'photos'}.` : 'Add the photos: pileGo could not reach the upload button.',
       filled.length ? `Filled ${filled.length} ${filled.length === 1 ? 'field' : 'fields'}.` : '',
@@ -356,25 +258,83 @@ async function assistFill(work: ListingWork): Promise<FillResult> {
       .filter(Boolean)
       .join(' '),
     rows,
-    go: 'I’ve posted it',
-    no: 'Stop',
-    onGo: () => { stopAddressFill(); report({ type: 'assist:posted', job_id: work.job_id, url: null }); },
-    onNo: () => { stopAddressFill(); report({ type: 'assist:gave-up', job_id: work.job_id, message: `You stopped the ${name} form.` }); },
+    primary: posted,
+    secondary: stopIt,
   });
   return { ok: true, filled, missing: [], photos, posted: false };
 }
 
 function startRemoval(work: ListingWork, reason: string) {
   const name = MARKETPLACES[work.marketplace].name;
-  panel({
-    title: `Take it down on ${name}`,
+  showCard({
+    marketplace: work.marketplace,
+    item: itemName(work),
+    state: 'needs',
+    heading: `Take it down on ${name}`,
     message: `${reason} Delete this listing or mark it sold on ${name}, then press Done.`,
     rows: [{ label: 'Item', value: work.listing.title || work.item.sku }],
-    go: 'Done, it’s gone',
-    no: 'Not now',
-    onGo: () => report({ type: 'assist:removed', job_id: work.job_id }),
-    onNo: () => report({ type: 'assist:gave-up', job_id: work.job_id, message: `Still live on ${name}. Remove it by hand.` }),
+    primary: { label: 'Done, it’s gone', onClick: () => { report({ type: 'assist:removed', job_id: work.job_id }); closePanel(); } },
+    secondary: { label: 'Not now', onClick: () => { report({ type: 'assist:gave-up', job_id: work.job_id, message: `Still live on ${name}. Remove it by hand.` }); closePanel(); } },
   });
+}
+
+/** The card the background keeps for this tab, drawn on whatever page the tab is on now. */
+function showView(view: OverlayView | null) {
+  if (!view) {
+    if (!filling) closePanel();
+    return;
+  }
+  // The page's own driver is drawing its steps.
+  if (filling && view.state === 'working') return;
+  const name = MARKETPLACES[view.marketplace].name;
+  showCard({
+    marketplace: view.marketplace,
+    item: view.title,
+    state: view.state,
+    heading: view.state === 'done' ? `Listed on ${name}` : view.state === 'needs' ? 'Needs you' : `Listing on ${name}`,
+    message: view.step,
+    link: view.link ?? null,
+    secondary: view.state === 'working' ? undefined : { label: 'Close', onClick: closePanel },
+  });
+}
+
+type FindRequest = Extract<AssistRequest, { type: 'assist:find' }>;
+
+/** Read a page of this site, for checking which product it is. */
+async function pageText(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(url, { credentials: 'include' });
+    return r.ok ? await r.text() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The new listing's link on this page, or failing that where to look next:
+ * the seller's own shop, newest first.
+ */
+async function locate(msg: FindRequest): Promise<{ url: string | null; shop: string | null }> {
+  const wants = [msg.title, ...(msg.titles ?? [])].filter(Boolean);
+  const ranked = await waitFor(() => {
+    const hits = rankListings(msg.marketplace, document, wants, msg.exclude ?? [], msg.since);
+    return hits.length ? hits : null;
+  }, msg.wait ?? 8000, 400);
+  if (ranked) {
+    if (!msg.product_id) return { url: ranked[0]!.url, shop: null };
+    // Depop said which product it made: check the likeliest few pages say the same.
+    let read = 0;
+    for (const hit of ranked.slice(0, 4)) {
+      const page = await pageText(hit.url);
+      if (page == null) continue;
+      read += 1;
+      if (pageIsProduct(page, msg.product_id)) return { url: hit.url, shop: null };
+    }
+    if (!read) return { url: ranked[0]!.url, shop: null };
+  }
+  const shop = shopUrl(msg.marketplace, document);
+  const here = location.href.split(/[?#]/)[0];
+  return { url: null, shop: shop && shop !== here ? shop : null };
 }
 
 ext.runtime.onMessage.addListener((msg: AssistRequest, _sender, reply) => {
@@ -384,8 +344,13 @@ ext.runtime.onMessage.addListener((msg: AssistRequest, _sender, reply) => {
     return false;
   }
   if (msg.type === 'assist:find') {
-    waitFor(() => findListing(msg.marketplace, msg.title), 8000).then(url => reply({ url }));
+    locate(msg).then(reply, () => reply({ url: null, shop: null }));
     return true;
+  }
+  if (msg.type === 'assist:overlay') {
+    showView(msg.view);
+    reply({ ok: true });
+    return false;
   }
   if (msg.type === 'assist:remove') {
     startRemoval(msg.work, msg.reason);
@@ -406,4 +371,10 @@ ext.runtime.onMessage.addListener((msg: AssistRequest, _sender, reply) => {
     err => reply({ ok: false, error: String(err) }),
   );
   return true;
+});
+
+// A page that loads while this tab is listing (the new listing, the seller's
+// shop) picks the card up where the last page left it.
+void send<{ view?: OverlayView | null }>({ type: 'assist:hello' }).then(r => {
+  if (r?.view && !cardShown()) showView(r.view);
 });

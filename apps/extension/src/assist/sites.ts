@@ -32,7 +32,8 @@ export const SITES: Partial<Record<MarketplaceId, SiteAdapter>> = {
   depop: {
     id: 'depop',
     sellPage: /depop\.com\/products\/create\/?(?:[?#]|$)/,
-    posted: /depop\.com\/products\/(?!create|edit)([a-z0-9-]+)\/?(?:\?|$)/i,
+    // Depop scrambles the username at the front of the slug, underscores and all.
+    posted: /depop\.com\/products\/(?!(?:create|edit)(?:[/?#]|$))([a-z0-9_-]+)\/?(?:\?|$)/i,
     afterPost: /depop\.com\/(?:products\/create\/success\/?(?:[?#]|$)|(?!products\/create|login|signup))/,
     selectors: {
       description: ['textarea[name="description"]', '#description', 'textarea[data-testid*="description" i]'],

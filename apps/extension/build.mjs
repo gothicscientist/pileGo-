@@ -70,7 +70,11 @@ function manifest(browser) {
       { matches: vintedMatches, js: ['vinted.js'], run_at: 'document_idle' },
       { matches: assistMatches, js: ['assist.js'], run_at: 'document_idle' },
     ],
-    web_accessible_resources: [{ resources: ['bridge.js'], matches: vintedMatches }],
+    web_accessible_resources: [
+      { resources: ['bridge.js'], matches: vintedMatches },
+      // The pileGo card on each marketplace tab uses the app's typeface.
+      { resources: ['fonts/*.woff2'], matches: [...vintedMatches, ...assistMatches] },
+    ],
   };
   if (browser === 'chrome') {
     m.background = { service_worker: 'background.js' };
@@ -104,6 +108,7 @@ async function build(browser) {
     minify: false,
     sourcemap: false,
     legalComments: 'inline',
+    loader: { '.png': 'dataurl' },
     define: {
       __APP_ORIGINS__: JSON.stringify(appOrigins),
       __VERSION__: JSON.stringify(pkg.version),
@@ -142,6 +147,7 @@ if (args.has('--watch')) {
     bundle: true,
     format: 'iife',
     target: 'chrome116',
+    loader: { '.png': 'dataurl' },
     define: { __APP_ORIGINS__: JSON.stringify(appOrigins), __VERSION__: JSON.stringify(pkg.version) },
   });
   await build('chrome');

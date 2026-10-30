@@ -4,8 +4,9 @@
 import { generateListing, isMarketplaceId, MARKETPLACES, type Item, type Job, type Listing, type MarketplaceId, type Profile } from '@pilego/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { between, errorText, ext, sleep, toBase64, within } from '../shared/browser.ts';
-import type { AssistReport, FillResult, ListingWork, PhotoBytes, VintedOutcome, VintedRequest } from '../shared/messages.ts';
+import type { AssistReport, FillResult, ListingWork, OverlayView, PhotoBytes, VintedOutcome, VintedRequest } from '../shared/messages.ts';
 import { blockMessage, capWait, noteWrite, readBlock } from '../shared/pace.ts';
+import { postedProductId } from '../assist/find.ts';
 import { leftForm, postedListing } from '../assist/sites.ts';
 import { activate, createTab, navigate, openTabs, readyTab, removeTab, sendToTab, updateTab, vintedSiteFor, waitForLoad } from './tabs.ts';
 
@@ -192,8 +193,14 @@ export async function vintedTab(open: boolean, region?: string | null): Promise<
   if (tab.id == null) return null;
   state.openedTabs.add(tab.id);
   await waitForLoad(tab.id);
-  const ping = await sendToTab<VintedOutcome>(tab.id, { type: 'vinted:ping' } satisfies VintedRequest).catch(() => null);
-  if (ping?.status === 'done' && !(ping.data as { logged_in?: boolean }).logged_in) {
+  const loggedOut = (ping: VintedOutcome | null) => ping?.status === 'done' && !(ping.data as { logged_in?: boolean }).logged_in;
+  let ping = await sendToTab<VintedOutcome>(tab.id, { type: 'vinted:ping' } satisfies VintedRequest).catch(() => null);
+  // A page drawn logged out can still be mid-way through refreshing its session.
+  for (let attempt = 0; attempt < 2 && loggedOut(ping); attempt += 1) {
+    await sleep(3000);
+    ping = await sendToTab<VintedOutcome>(tab.id, { type: 'vinted:ping' } satisfies VintedRequest).catch(() => null);
+  }
+  if (loggedOut(ping)) {
     await activate(tab.id);
     state.openedTabs.delete(tab.id);
     throw new Error('Log in to Vinted in the tab pileGo just opened, then try again.');
@@ -338,6 +345,8 @@ interface Waiting {
   started_at?: number;
   /** The listing's title, for finding it on a closet page after posting. */
   title?: string;
+  /** Other words the site may show it by: Depop's address comes from the description's first line. */
+  titles?: string[];
   /** pileGo pressed the site's own post button. */
   pressed?: boolean;
   /** The tab could not post by itself and handed over to the seller. */
@@ -379,6 +388,40 @@ const takeWaiting = (jobId: string) =>
     delete list[jobId];
     return w ?? null;
   });
+
+const listingName = (work: ListingWork) => work.listing.title || work.listing.description.split('\n')[0] || work.item.sku;
+
+/**
+ * What the pileGo card in the bottom right of each marketplace tab shows. It
+ * lives here, not in the page, so it carries on when posting moves the tab
+ * to the new listing or the seller's shop.
+ */
+const overlays = new Map<number, OverlayView & { at: number }>();
+
+/** How long a finished card stays up on the tab's next pages. */
+const OVERLAY_DONE_MS = 2 * 60_000;
+
+export function overlayFor(tabId: number): OverlayView | null {
+  const view = overlays.get(tabId);
+  if (!view) return null;
+  if (view.state !== 'working' && Date.now() - view.at > OVERLAY_DONE_MS) {
+    overlays.delete(tabId);
+    return null;
+  }
+  const { at: _, ...rest } = view;
+  return rest;
+}
+
+function setOverlay(tabId: number, view: OverlayView | null, push = true) {
+  if (view) overlays.set(tabId, { ...view, at: Date.now() });
+  else overlays.delete(tabId);
+  if (push) void (ext.tabs.sendMessage(tabId, { type: 'assist:overlay', view }) as Promise<unknown>).catch(() => {});
+}
+
+function patchOverlay(tabId: number, patch: Partial<OverlayView>, push = true) {
+  const now = overlays.get(tabId);
+  if (now) setOverlay(tabId, { ...now, ...patch }, push);
+}
 
 async function runAssist(sb: SupabaseClient, job: Job, first: boolean) {
   const info = MARKETPLACES[job.marketplace];
@@ -440,9 +483,11 @@ async function runAssist(sb: SupabaseClient, job: Job, first: boolean) {
       marketplace: job.marketplace,
       kind: posting ? 'post' : 'remove',
       started_at: Date.now(),
-      title: work.listing.title || work.listing.description.split('\n')[0],
+      title: listingName(work),
+      titles: [work.listing.description.split('\n')[0]?.trim() ?? ''].filter(Boolean),
     };
   });
+  if (auto) setOverlay(tabId, { marketplace: job.marketplace, title: listingName(work), state: 'working', step: `Opening ${info.name}’s sell form…` });
 
   const ready = await openForm(tabId, url, posting);
   if (!auto) {
@@ -466,6 +511,7 @@ async function runAssist(sb: SupabaseClient, job: Job, first: boolean) {
     if (!still) return;
     pressedJobs.delete(job.id);
     state.lastMessage = `${info.name}’s server had a problem. Trying again (${attempt} of ${SERVER_TRIES})…`;
+    patchOverlay(tabId, { state: 'working', step: state.lastMessage });
     await sleep(10_000 * (attempt - 1));
     await navigate(tabId, url);
     reply = (await openForm(tabId, url, true)) ? await fillTab(tabId, work) : unloaded;
@@ -540,10 +586,12 @@ const settled = new Set<string>();
 const pressedJobs = new Set<string>();
 
 /** A step from an auto-post tab. "Posting on Depop…" means the post button was pressed. */
-export async function noteProgress(jobId: string, step: string) {
+export async function noteProgress(jobId: string, step: string, tabId?: number) {
   // A tab still ticking after its job settled must not put "Listing on…" back up.
   if (settled.has(jobId)) return;
   if (step) state.lastMessage = step;
+  // The page shows its own steps; this copy is for the next page the tab lands on.
+  if (step && tabId != null) patchOverlay(tabId, { state: 'working', step }, false);
   if (!/^(posting|listing) on/i.test(step) || pressedJobs.has(jobId)) return;
   pressedJobs.add(jobId);
   await editWaiting(list => {
@@ -592,27 +640,72 @@ async function settleAuto(sb: SupabaseClient, jobId: string, tabId: number, repl
   });
   if (!still) return;
   state.lastMessage = message;
+  patchOverlay(tabId, { state: 'needs', step: message }, false);
   await setListing(sb, w.listing_id, { status: 'needs_action', error: message });
   await finish(sb, w.job, 'needs_user', message);
+}
+
+/**
+ * Links pileGo already has for this seller on a marketplace, this listing's
+ * old one included (a relist), so an older lookalike is never taken for the new one.
+ */
+async function knownListings(sb: SupabaseClient, market: MarketplaceId): Promise<string[]> {
+  const { data } = await sb.from('listings').select('external_url').eq('marketplace', market).not('external_url', 'is', null).limit(1000);
+  return ((data ?? []) as Array<{ external_url: string | null }>).map(r => r.external_url).filter((u): u is string => Boolean(u));
+}
+
+interface FindReply {
+  url?: string | null;
+  shop?: string | null;
+}
+
+/**
+ * The site took the post but did not go to the new listing (Depop's "Done"
+ * screen, Poshmark's feed): look on the page it landed on, then in the
+ * seller's own shop, where the newest listing is first.
+ */
+async function findPosted(sb: SupabaseClient, w: Waiting, url: string | null): Promise<{ id: string | null; url: string } | null> {
+  const name = MARKETPLACES[w.marketplace].name;
+  const tab = await ext.tabs.get(w.tab_id).catch(() => null);
+  if (!tab) return null;
+  patchOverlay(w.tab_id, { state: 'working', step: `Listed on ${name}. Finding the link to it…` });
+  state.lastMessage = `Listed on ${name}. Finding the link to it…`;
+  const exclude = await knownListings(sb, w.marketplace).catch(() => []);
+  const ask = (wait: number) => {
+    const msg = {
+      type: 'assist:find',
+      marketplace: w.marketplace,
+      title: w.title ?? '',
+      titles: w.titles ?? [],
+      exclude,
+      since: w.started_at,
+      product_id: postedProductId(w.marketplace, url ?? tab.url),
+      wait,
+    };
+    return within(sendToTab<FindReply>(w.tab_id, msg, 15_000).catch(() => undefined), wait + 30_000, undefined);
+  };
+  await waitForLoad(w.tab_id, 15_000);
+  let reply = await ask(6000);
+  if (!reply?.url && reply?.shop) {
+    await navigate(w.tab_id, reply.shop);
+    reply = await ask(15_000);
+  }
+  return reply?.url ? postedListing(w.marketplace, reply.url) : null;
 }
 
 async function settlePosted(sb: SupabaseClient, w: Waiting, url: string | null) {
   if (settled.has(w.job.id)) return;
   pressedJobs.delete(w.job.id);
   let found = url ? postedListing(w.marketplace, url) : null;
-  if (!found && w.title) {
-    // Landed on the closet or the feed: the new listing is usually on it, once the page is up.
-    await waitForLoad(w.tab_id, 15_000);
-    const ask = sendToTab<{ url?: string | null }>(w.tab_id, { type: 'assist:find', marketplace: w.marketplace, title: w.title }, 8000).catch(() => undefined);
-    const link = (await within(ask, 20_000, undefined))?.url;
-    found = link ? postedListing(w.marketplace, link) : null;
-  }
+  if (!found && (w.title || w.titles?.length)) found = await findPosted(sb, w, url);
   // A redirect to the closet/feed is also used for cancelled or rejected
   // posts. It is not evidence that this particular listing was created.
   if (!found && AUTO_POST.includes(w.marketplace)) {
-    const message = `${MARKETPLACES[w.marketplace].name} did not show a link to this listing. Check the marketplace tab before retrying so it is not listed twice.`;
+    const name = MARKETPLACES[w.marketplace].name;
+    const message = `pileGo pressed ${name}’s post button but could not find the new listing in your ${name} shop. If it is there, paste its link on the item page; if not, press Retry.`;
     await editWaiting(list => { list[w.job.id] = { ...w, stuck: true }; });
     state.lastMessage = message;
+    patchOverlay(w.tab_id, { state: 'needs', step: message });
     await setListing(sb, w.listing_id, { status: 'needs_action', error: message });
     await finish(sb, w.job, 'needs_user', message);
     return;
@@ -631,6 +724,7 @@ async function settlePosted(sb: SupabaseClient, w: Waiting, url: string | null) 
     });
   }
   state.lastMessage = `Listed on ${MARKETPLACES[w.marketplace].name}.`;
+  patchOverlay(w.tab_id, { state: 'done', step: found ? 'It’s live, and the link is saved on the item in pileGo.' : 'It’s live.', link: found?.url ?? null });
   await finish(sb, w.job, 'done', null, { url: found?.url ?? null });
   await editWaiting(list => {
     for (const [id, older] of Object.entries(list)) {
@@ -654,6 +748,7 @@ export async function onAssistReport(sb: SupabaseClient, report: AssistReport, t
     });
     if (!w) return;
     state.lastMessage = report.message;
+    patchOverlay(w.tab_id, { state: 'needs', step: report.message }, false);
     await setListing(sb, w.listing_id, { status: 'needs_action', error: report.message });
     await finish(sb, w.job, 'needs_user', report.message);
     return;
@@ -667,6 +762,7 @@ export async function onAssistReport(sb: SupabaseClient, report: AssistReport, t
     if ((data as { status?: string } | null)?.status !== 'sold') await setListing(sb, w.listing_id, { status: 'delisted', error: null });
     await finish(sb, w.job, 'done');
   } else {
+    setOverlay(w.tab_id, null, false);
     const message = w.kind === 'post' ? `${report.message} Press Retry to open the ${name} form again.` : report.message;
     await setListing(sb, w.listing_id, { status: 'needs_action', error: message });
     await finish(sb, w.job, 'needs_user', message);
@@ -694,6 +790,7 @@ export async function onTabUrl(sb: SupabaseClient, tabId: number, url: string) {
 /** A tab pileGo was working in closed: say so on the listing instead of leaving it on "Listing…". */
 export async function onTabClosed(sb: SupabaseClient | null, tabId: number) {
   forgetTab(tabId);
+  overlays.delete(tabId);
   const gone = await editWaiting(list => {
     const out: Waiting[] = [];
     for (const [id, w] of Object.entries(list)) {

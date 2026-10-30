@@ -3,12 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>pileGo</title>
+    <title>pileGo!</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
     <header>
-      <span class="tag">pileGo</span>
+      <span class="mark" aria-label="pileGo!">
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 2.5 C 10 2.5, 9 9, 13.5 10.5" fill="none" stroke="var(--ink-2)" stroke-width="1.3" stroke-linecap="round" />
+          <path d="M11 8 H21 L26 13 V28 a2 2 0 0 1 -2 2 H8 a2 2 0 0 1 -2 -2 V13 Z" fill="var(--kraft)" />
+          <circle cx="16" cy="12.5" r="2" fill="var(--paper)" />
+          <path d="M10.5 19.5 H21.5 M10.5 24 H18" stroke="var(--kraft-ink)" stroke-width="1.7" stroke-linecap="round" opacity=".55" />
+        </svg>
+        <span class="word">pileGo<i>!</i></span>
+      </span>
       <span class="hand">your closet, everywhere</span>
     </header>
     <main id="main" aria-live="polite"><p class="muted">Loading…</p></main>
