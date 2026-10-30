@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, Freeze, Img, staticFile, useCurrentFrame } from "remotion";
 import { Paper } from "../components/Paper";
-import { Garment, kraftBg, MonoLabel, Stamp, Tape } from "../components/Props";
+import { Garment, kraftBg, Stamp, Tape } from "../components/Props";
 import { printShadow, Screen } from "../components/Screen";
 import { headlineItalic, MaskWords } from "../components/Type";
 import { garment } from "../data/registry";
@@ -132,22 +132,6 @@ export const S3CrossList: React.FC = () => {
       {frame >= DEAL - 6 &&
         MARKETS.map((m, i) => <ListingCard key={m.id} i={i} frame={frame} />)}
 
-      <MonoLabel
-        size={20}
-        color={C.muted}
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 46,
-          textAlign: "center",
-          textTransform: "none",
-          letterSpacing: "0.02em",
-          opacity: tween(frame, [DEAL + 40, DEAL + 52], [0, 1]) * (1 - swap),
-        }}
-      >
-        eBay through its official API · Vinted, Depop, Poshmark, Mercari and Grailed through the free pileGo! browser extension
-      </MonoLabel>
     </AbsoluteFill>
   );
 };

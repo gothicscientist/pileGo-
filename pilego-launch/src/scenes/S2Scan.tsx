@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
 import { Paper } from "../components/Paper";
-import { MonoLabel, PriceTag } from "../components/Props";
+import { PriceTag } from "../components/Props";
 import { printShadow, Screen } from "../components/Screen";
 import { headlineItalic, MaskWords } from "../components/Type";
 import { COVER, CROP, inPrint, PRINT, PRINT_K, STACK } from "../layout";
@@ -50,6 +50,8 @@ export const S2Scan: React.FC = () => {
 
   const savePress = keys(frame, [SAVE - 1, SAVE + 1, SAVE + 6], [1, 0.95, 1], ease.out);
   const stackCompact = tween(frame, [PUSH - 2, PUSH + 16], [0, 1], ease.inOut);
+  // The page around the form card dissolves to paper as the camera starts to move.
+  const trim = tween(frame, [PUSH - 2, PUSH + 10], [0, 1], ease.inOut);
 
   const btn = inPrint(BUTTON);
   const card = inPrint(CARD);
@@ -69,6 +71,9 @@ export const S2Scan: React.FC = () => {
           translate: `${tx}px ${ty}px`,
           scale: String(s),
           transformOrigin: "0 0",
+          // Once the page around the form has dissolved, the print is cropped to
+          // the card, so the labels sit on clean paper with no fade or seam.
+          clipPath: trim >= 1 ? `inset(${card.y - 3}px -200px -200px ${card.x - 3}px)` : undefined,
         }}
       >
         <div style={{ position: "relative", boxShadow: printShadow(0.25), borderRadius: 12, overflow: "hidden", background: C.paper }}>
@@ -97,6 +102,12 @@ export const S2Scan: React.FC = () => {
                 width={bar.w}
                 style={{ position: "absolute", left: bar.x, top: bar.y, scale: String(savePress), transformOrigin: "25% 50%" }}
               />
+            </>
+          )}
+          {trim > 0 && trim < 1 && (
+            <>
+              <div style={{ position: "absolute", left: 0, top: 0, width: card.x - 3, height: "100%", background: C.paper, opacity: trim }} />
+              <div style={{ position: "absolute", left: card.x - 3, top: 0, right: 0, height: card.y - 3, background: C.paper, opacity: trim }} />
             </>
           )}
           {/* "Scan with AI": a ring finds the button, then it's pressed. */}
@@ -134,14 +145,7 @@ export const S2Scan: React.FC = () => {
         </div>
       </div>
 
-      {/* Once pushed in, the left of the frame goes back to paper for the type. */}
-      <AbsoluteFill
-        style={{
-          opacity: push,
-          background: `linear-gradient(90deg, ${C.paper} 0%, ${C.paper} 31%, ${C.paper}00 36%)`,
-        }}
-      />
-      {frame >= PUSH && <Callouts frame={frame} scroll={scroll} s={s} tx={tx} ty={ty} />}
+      {frame >= PUSH && <Callouts frame={frame} scroll={scroll} s={s} tx={tx} ty={ty} show={tween(push, [0.75, 1], [0, 1])} />}
 
       {/* The kinetic stack, which tucks itself into a byline once the form needs the room. */}
       <div
@@ -160,19 +164,6 @@ export const S2Scan: React.FC = () => {
         <div style={{ height: STACK.step - STACK.size }} />
         <StackWord text="Done." at={DONE} active={frame >= DONE} />
       </div>
-      <MonoLabel
-        size={22}
-        style={{
-          position: "absolute",
-          left: STACK.x + 4,
-          top: 300,
-          opacity: tween(frame, [PUSH + 10, PUSH + 20], [0, 1]),
-          lineHeight: 1.55,
-        }}
-      >
-        3 photos in.
-        <br />A full listing out.
-      </MonoLabel>
     </AbsoluteFill>
   );
 };
@@ -213,7 +204,7 @@ const Beam: React.FC<{ frame: number }> = ({ frame }) => {
  * Kraft labels naming what the AI filled. Each rides with its field as the
  * form scrolls, and only shows while that field is on screen.
  */
-const Callouts: React.FC<{ frame: number; scroll: number; s: number; tx: number; ty: number }> = ({ frame, scroll, s, tx, ty }) => {
+const Callouts: React.FC<{ frame: number; scroll: number; s: number; tx: number; ty: number; show: number }> = ({ frame, scroll, s, tx, ty, show }) => {
   const form = inPrint(FORM);
   const card = inPrint(CARD);
   // y: the field's position inside the form capture (app CSS px).
@@ -233,7 +224,7 @@ const Callouts: React.FC<{ frame: number; scroll: number; s: number; tx: number;
     <>
       {items.map((it) => {
         const y = screenY(it.y);
-        const vis = tween(y, [top - 10, top + 60], [0, 1]) * tween(y, [bottom - 80, bottom], [1, 0]);
+        const vis = show * tween(y, [top - 10, top + 60], [0, 1]) * tween(y, [bottom - 80, bottom], [1, 0]);
         if (vis <= 0.001) return null;
         return (
           <div

@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
 import { Paper } from "../components/Paper";
-import { Garment, kraftBg, MonoLabel, Stamp } from "../components/Props";
+import { Garment, kraftBg, Stamp } from "../components/Props";
 import { printShadow, Screen } from "../components/Screen";
 import { headlineItalic, MaskWords } from "../components/Type";
 import { garment, hasGarment } from "../data/registry";
@@ -254,13 +254,6 @@ const LiveList: React.FC<{ frame: number }> = ({ frame }) => {
       >
         Relisting 3 listings
       </div>
-      <MonoLabel
-        size={20}
-        color={C.muted}
-        style={{ position: "absolute", left: 0, right: 0, bottom: 40, textAlign: "center", textTransform: "none", letterSpacing: "0.02em", opacity: toast }}
-      >
-        Relisting works on eBay and Vinted · you choose when a listing counts as old
-      </MonoLabel>
     </>
   );
 };

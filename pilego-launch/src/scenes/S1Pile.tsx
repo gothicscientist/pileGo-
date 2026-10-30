@@ -1,6 +1,6 @@
 import React from "react";
 import { AbsoluteFill, Img, staticFile, useCurrentFrame } from "remotion";
-import { Garment, MonoLabel, Polaroid, PriceTag, Tape } from "../components/Props";
+import { Garment, Polaroid, PriceTag, Tape } from "../components/Props";
 import { Paper } from "../components/Paper";
 import { printShadow, Screen } from "../components/Screen";
 import { headlineItalic, MaskWords, Strike } from "../components/Type";
@@ -88,29 +88,7 @@ export const S1Pile: React.FC = () => {
     <AbsoluteFill>
       <Paper />
       <AbsoluteFill style={{ scale: String(push), translate: `${camX}px ${camY}px`, opacity: 1 - pileAway }}>
-        {/* Masthead: the magazine cover the pile sits on. */}
-        <AbsoluteFill style={{ opacity: 1 - headOut }}>
-          <MonoLabel size={22} style={{ position: "absolute", left: 104, top: 62, opacity: tween(frame, [0, 12], [0, 1]) }}>
-            No. 01 · The resale issue
-          </MonoLabel>
-          <MonoLabel size={22} style={{ position: "absolute", right: 104, top: 62, opacity: tween(frame, [0, 12], [0, 1]) }}>
-            pilego.app
-          </MonoLabel>
-          <div
-            style={{
-              position: "absolute",
-              left: 104,
-              right: 104,
-              top: 100,
-              height: 3,
-              background: C.ink,
-              scale: `${tween(frame, [0, 24], [0, 1], ease.out)} 1`,
-              transformOrigin: "0 50%",
-            }}
-          />
-        </AbsoluteFill>
-
-        {/* The cover line, behind the pile like a masthead behind the model. */}
+        {/* The cover line, behind the pile like a cover line behind the model. */}
         <div style={{ position: "absolute", left: 104, top: 140, opacity: 1 - headOut, translate: `0 ${-headOut * 40}px` }}>
           <MaskWords words={["That", "pile?"]} at={6} size={132} wordStyle={headlineItalic} />
           <div style={{ position: "relative", marginTop: 8 }}>
@@ -207,7 +185,6 @@ export const S1Pile: React.FC = () => {
         h={740}
         progress={vf}
         opacity={shot ? 1 - develop : Math.min(1, vf * 1.4)}
-        label="Shot 1 of 3 · Front"
       />
 
       {/* Snap. — the first word of the stack the scan scene builds on. */}
